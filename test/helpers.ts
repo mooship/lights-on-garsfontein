@@ -38,7 +38,7 @@ export function mockTurnstile(success: boolean) {
   const realFetch = globalThis.fetch;
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
-    if (url.includes('challenges.cloudflare.com')) return Response.json({ success });
+    if (new URL(url).hostname === 'challenges.cloudflare.com') return Response.json({ success });
     return realFetch(input, init);
   });
   vi.stubGlobal('fetch', spy);

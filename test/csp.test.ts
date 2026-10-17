@@ -4,7 +4,8 @@ import headers from '../public/_headers?raw';
 import privacy from '../public/privacy.html?raw';
 
 async function inlineScriptHashes(html: string): Promise<string[]> {
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1] ?? '');
+  // Inline scripts only (no attributes); JSON-LD and module scripts are not covered by the hash.
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script[^>]*>/gi)].map((m) => m[1] ?? '');
   return Promise.all(
     scripts.map(async (body) => {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));

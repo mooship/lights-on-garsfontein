@@ -56,5 +56,10 @@
     "vite-plugin-solid": "^2.11.14",
     "vitest": "^4.1.11",
     "wrangler": "^4.151.1"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    }
   }
 }
