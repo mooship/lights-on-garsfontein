@@ -31,13 +31,18 @@ main {
   padding: max(1.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
     max(3rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
+/* Afrikaans compounds ("Privaatheidskennisgewing") are longer than a phone is wide. */
+main {
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
 h1,
 h2 {
   font-family: var(--gg-font-display);
   line-height: 1.2;
 }
 h1 {
-  font-size: 2.25rem;
+  font-size: clamp(1.75rem, 8vw, 2.25rem);
   margin: 1rem 0 0.25rem;
 }
 h2 {

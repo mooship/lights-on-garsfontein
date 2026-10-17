@@ -392,3 +392,22 @@ test.describe('site banner', () => {
     expect(footer && banner && banner.y >= footer.y + footer.height).toBe(true);
   });
 });
+
+test.describe('narrow screens', () => {
+  test.use({ viewport: { width: 320, height: 640 } });
+
+  for (const locale of site.locales) {
+    for (const path of ['/', '/privacy', '/admin']) {
+      test(`${path} has no horizontal scroll at 320px (${locale})`, async ({ page }) => {
+        await withLocale(page, locale);
+        await page.goto(path);
+        await page.evaluate(() => document.fonts.ready);
+        const { scroll, client } = await page.evaluate(() => ({
+          scroll: document.documentElement.scrollWidth,
+          client: document.documentElement.clientWidth,
+        }));
+        expect(scroll).toBeLessThanOrEqual(client);
+      });
+    }
+  }
+});
