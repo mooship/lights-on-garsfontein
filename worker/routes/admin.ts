@@ -1,17 +1,23 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import type { AdminOutagesResponse } from '../../shared/api';
+import { type AdminOutagesResponse, MINUTE_MS, type TimerAction } from '../../shared/api';
 import { outages } from '../db/schema';
-import { refuseBadToken } from '../lib/auth';
-import { safeEqual } from '../lib/crypto';
-import { getOpenOutage, outagesWithCounts, summarise } from '../lib/grid';
-import { bearerToken, errors, isCrossOrigin, json, parseBody } from '../lib/http';
+import { checkBearer, refuseBadToken } from '../lib/auth';
+import { getOpenOutage, openOutage, outagesWithCounts, summarise } from '../lib/grid';
+import { errors, json, parseBody, refuseCrossSite } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkSession } from './auth';
 
-const isoDate = z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
+/** Clock skew allowed on admin times; anything later is a typo, not an outage. */
+const MAX_FUTURE_MS = 5 * MINUTE_MS;
 
-const timerSchema = z.object({ action: z.enum(['punch_out', 'punch_in']) });
+const isoDate = z.iso
+  .datetime({ offset: true })
+  .transform((v) => new Date(v).toISOString())
+  .refine((v) => Date.parse(v) <= Date.now() + MAX_FUTURE_MS, 'time_in_future');
+
+const timerActions = ['punch_out', 'punch_in'] as const satisfies readonly TimerAction[];
+const timerSchema = z.object({ action: z.enum(timerActions) });
 
 const outageSchema = z.discriminatedUnion('action', [
   z.object({
@@ -34,7 +40,7 @@ async function listOutages({ db }: RouteContext): Promise<Response> {
   const rows = await outagesWithCounts(db).orderBy(desc(outages.startTime)).limit(50);
   const body: AdminOutagesResponse = {
     outages: rows.map((r) => ({
-      ...summarise(r, r.confirmations),
+      ...summarise(r),
       source: r.source,
       isFalsePositive: r.isFalsePositive,
     })),
@@ -47,20 +53,21 @@ async function timer({ request, db }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, timerSchema);
   if ('response' in parsed) return parsed.response;
   const now = new Date().toISOString();
-  const open = await getOpenOutage(db);
 
   if (parsed.data.action === 'punch_out') {
-    if (open) return errors.conflict('outage_already_open');
-    const [outage] = await db.insert(outages).values({ startTime: now, source: 'manual' }).returning();
-    return json({ outage }, 201);
+    if (!(await openOutage(db, now, 'manual'))) return errors.conflict('outage_already_open');
+    return json({ outage: await getOpenOutage(db) }, 201);
   }
 
+  const open = await getOpenOutage(db);
   if (!open) return errors.conflict('no_open_outage');
   const [outage] = await db
     .update(outages)
     .set({ endTime: now })
     .where(and(eq(outages.id, open.id), isNull(outages.endTime)))
     .returning();
+  // Closed or deleted by another request in the meantime.
+  if (!outage) return errors.conflict('no_open_outage');
   return json({ outage });
 }
 
@@ -110,23 +117,16 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
 }
 
 /**
- * Admin access for scripts and AI agents: `Authorization: Bearer <ADMIN_API_TOKEN>`.
- * Returns null when no bearer token was sent, so the session cookie is checked instead.
+ * Admin auth: `Authorization: Bearer <ADMIN_API_TOKEN>` (scripts and AI agents) or, without a
+ * bearer header, a session cookie on a same-site request.
  */
-async function checkApiToken(request: Request, env: Env): Promise<boolean | null> {
-  const token = bearerToken(request);
-  if (token === null) return null;
-  if (!env.ADMIN_API_TOKEN) return false;
-  return safeEqual(token, env.ADMIN_API_TOKEN);
-}
-
-/** Admin auth: a valid API token, or a session cookie on a same-origin request. */
 async function authorizeAdmin(ctx: RouteContext): Promise<Response | null> {
   const { request, env } = ctx;
-  const token = await checkApiToken(request, env);
+  const token = await checkBearer(request, env.ADMIN_API_TOKEN);
   if (token === false) return refuseBadToken(ctx);
   if (token === null) {
-    if (request.method !== 'GET' && isCrossOrigin(request)) return errors.forbidden();
+    const refused = request.method === 'GET' ? null : refuseCrossSite(request);
+    if (refused) return refused;
     if (!(await checkSession(ctx))) return errors.unauthorized();
   }
   return null;

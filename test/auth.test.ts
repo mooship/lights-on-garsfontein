@@ -125,6 +125,15 @@ describe('admin auth', () => {
     expect(codes).toEqual([401, 401, 401, 401, 401, 429]);
   });
 
+  it('does not count failed Turnstile checks against the site-wide sign-in cap', async () => {
+    mockTurnstile(false, 'login');
+    // The global cap is 30 a minute; junk from many addresses must not use it up.
+    const codes = new Set<number>();
+    for (let i = 0; i < 35; i++) codes.add((await attempt('nope')).status);
+    expect([...codes]).toEqual([403]);
+    expect(await login()).toMatch(/^__Host-admin_session=/);
+  });
+
   it('accepts the admin API token so agents can log outages', async () => {
     const headers = { Authorization: 'Bearer test-admin-api-token' };
     const out = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' }, headers });

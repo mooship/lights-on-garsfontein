@@ -3,6 +3,7 @@ name = "garsfontein-grid"
 main = "worker/index.ts"
 compatibility_date = "2026-10-01"
 workers_dev = false
+upload_source_maps = true
 routes = [{ pattern = "garsfontein.timothybrits.co.za", custom_domain = true }]
 
 [assets]
@@ -44,7 +45,8 @@ namespace_id = "4504"
 simple = { limit = 30, period = 60 }
 
 [triggers]
-crons = ["* * * * *"]
+# Outage detection every minute; housekeeping (session and fingerprint purges) hourly.
+crons = ["* * * * *", "0 * * * *"]
 
 [observability]
 enabled = true

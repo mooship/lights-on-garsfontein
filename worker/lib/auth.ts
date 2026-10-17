@@ -8,12 +8,20 @@ export async function refuseBadToken({ env, limitKey }: RouteContext): Promise<R
   return errors.unauthorized();
 }
 
+/**
+ * Checks `Authorization: Bearer <token>` against a secret: null when no bearer header was sent,
+ * otherwise whether it matches. An unset secret matches nothing.
+ */
+export async function checkBearer(request: Request, secret: string | undefined): Promise<boolean | null> {
+  const token = bearerToken(request);
+  if (token === null) return null;
+  return secret ? safeEqual(token, secret) : false;
+}
+
 /** An `authorize` guard for bearer-token endpoints. An unset secret refuses every request. */
 export function requireBearer(secretOf: (env: Env) => string | undefined) {
   return async (ctx: RouteContext): Promise<Response | null> => {
-    const secret = secretOf(ctx.env);
-    const token = bearerToken(ctx.request);
-    if (secret && token && (await safeEqual(token, secret))) return null;
+    if (await checkBearer(ctx.request, secretOf(ctx.env))) return null;
     return refuseBadToken(ctx);
   };
 }

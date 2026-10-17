@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { createScheduledController, env } from 'cloudflare:test';
 import { expect, vi } from 'vitest';
 import type { StatusResponse, TurnstileAction } from '../shared/api';
 import worker from '../worker/index';
@@ -15,7 +15,9 @@ export function uniqueIp(): string {
 
 interface CallOptions {
   method?: string;
+  /** Sent as JSON; `rawBody` is sent as is. Either way Content-Type defaults to application/json. */
   body?: unknown;
+  rawBody?: string;
   ip?: string;
   cookie?: string;
   headers?: Record<string, string>;
@@ -26,11 +28,8 @@ export async function call(path: string, options: CallOptions = {}): Promise<Res
   const headers = new Headers(options.headers);
   headers.set('CF-Connecting-IP', options.ip ?? uniqueIp());
   if (options.cookie) headers.set('Cookie', options.cookie);
-  let body: string | undefined;
-  if (options.body !== undefined) {
-    headers.set('Content-Type', 'application/json');
-    body = JSON.stringify(options.body);
-  }
+  const body = options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body));
+  if (body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const request = new Request(`${ORIGIN}${path}`, { method: options.method ?? 'GET', headers, body });
   return worker.fetch(request as Request<unknown, IncomingRequestCfProperties>, options.env ?? env);
 }
@@ -101,4 +100,20 @@ export async function login(password = 'test-password'): Promise<string> {
   if (res.status !== 200) throw new Error(`login failed: ${res.status}`);
   const cookie = res.headers.get('Set-Cookie') ?? '';
   return cookie.split(';')[0] ?? '';
+}
+
+/** The per-minute (outage detection) and hourly (housekeeping) crons in wrangler.toml. */
+export const MINUTE_CRON = '* * * * *';
+export const HOURLY_CRON = '0 * * * *';
+
+export async function runCron(cron = MINUTE_CRON, scheduledTime = Date.now()): Promise<void> {
+  await worker.scheduled(createScheduledController({ scheduledTime, cron }), env);
+}
+
+/** Outages that are open and not dismissed as false positives. */
+export async function openOutageCount(): Promise<number> {
+  const row = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM outages WHERE end_time IS NULL AND is_false_positive = 0',
+  ).first<{ n: number }>();
+  return row?.n ?? 0;
 }

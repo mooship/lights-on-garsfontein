@@ -62,6 +62,16 @@ describe('GET /api/status', () => {
     expect(body.recent[0]?.endTime).toBe(endTime);
   });
 
+  it('reports ON since the latest end when outages overlap', async () => {
+    await setHeartbeat(10);
+    const ago = (minutes: number) => new Date(Date.now() - minutes * MINUTE_MS).toISOString();
+    const lastEnd = ago(5);
+    // The newest outage by start ended first; the older one ran on past it.
+    await insertOutage({ startTime: ago(60), endTime: lastEnd, source: 'manual' });
+    await insertOutage({ startTime: ago(50), endTime: ago(30) });
+    expect(await status()).toMatchObject({ status: 'ON', since: lastEnd });
+  });
+
   it('is never cached', async () => {
     const res = await call('/api/status');
     expect(res.headers.get('Cache-Control')).toBe('no-store');
@@ -107,6 +117,28 @@ describe('POST /api/heartbeat', () => {
     expect(res.status).toBe(200);
     const row = await env.DB.prepare('SELECT last_seen FROM heartbeats WHERE id = 1').first<{ last_seen: string }>();
     expect(Date.now() - Date.parse(row?.last_seen ?? '')).toBeLessThan(5_000);
+  });
+
+  it('records an outage that began and ended between two cron runs', async () => {
+    const lastSeen = await setHeartbeat(240);
+    const res = await call('/api/heartbeat', { method: 'POST', headers: auth });
+    expect(await res.json()).toEqual({ ok: true, closedOutages: 0 });
+    const rows = await env.DB.prepare('SELECT start_time, end_time, source FROM outages').all<{
+      start_time: string;
+      end_time: string | null;
+      source: string;
+    }>();
+    expect(rows.results).toEqual([{ start_time: lastSeen, end_time: expect.any(String), source: 'sensor' }]);
+  });
+
+  it('records no extra outage after a fresh heartbeat, or when the silence is already on record', async () => {
+    await setHeartbeat(30);
+    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    const lastSeen = await setHeartbeat(240);
+    await insertOutage({ startTime: lastSeen, endTime: new Date().toISOString(), isFalsePositive: 1 });
+    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
+    expect(n).toBe(1);
   });
 
   it('closes open sensor outages but leaves manual ones to the admin', async () => {

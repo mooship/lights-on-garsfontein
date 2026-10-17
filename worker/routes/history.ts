@@ -65,6 +65,6 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
 }
 
 export const historyRoutes: Routes = {
-  'GET /api/stats': { handler: getStats, limiter: 'STATUS_LIMITER', cors: true },
-  'GET /api/outages.csv': { handler: getOutagesCsv, limiter: 'STATUS_LIMITER', cors: true },
+  'GET /api/stats': { handler: getStats, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
+  'GET /api/outages.csv': { handler: getOutagesCsv, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
 };

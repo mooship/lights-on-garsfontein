@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
-import { call, insertOutage, mockTurnstile, ORIGIN, setHeartbeat, uniqueIp } from './helpers';
+import { describe, expect, it, vi } from 'vitest';
+import { call, insertOutage, mockTurnstile, ORIGIN, openOutageCount, runCron, setHeartbeat, uniqueIp } from './helpers';
 
 const confirm = (ip?: string, body: unknown = { token: 'turnstile-token' }) =>
   call('/api/confirm', { method: 'POST', body, ip });
@@ -77,13 +77,76 @@ describe('POST /api/confirm', () => {
     expect(codes).toEqual([201, 409, 409, 409, 409, 429]);
   });
 
-  it('accepts Cloudflare test secrets without action/host checks, but not their failures', async () => {
+  it('accepts Cloudflare test secrets on localhost without action/host checks, but not their failures', async () => {
     await insertOutage({});
-    const testEnv = { ...env, TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA' } as Env;
+    const testEnv = {
+      ...env,
+      SITE_URL: 'http://localhost:8787',
+      TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA',
+    } as Env;
     mockTurnstile(true, 'login', 'example.com');
     expect((await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: testEnv })).status).toBe(201);
     mockTurnstile(false);
     expect((await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: testEnv })).status).toBe(403);
+  });
+
+  it('refuses Cloudflare test secrets outside localhost without calling siteverify', async () => {
+    await insertOutage({});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const spy = mockTurnstile(true);
+    const deployed = { ...env, TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA' } as Env;
+    const res = await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: deployed });
+    expect(res.status).toBe(403);
+    expect(spy).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('treats a malformed siteverify answer as a failure', async () => {
+    await insertOutage({});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ success: 'yes', action: 'confirm', hostname: new URL(ORIGIN).hostname })),
+    );
+    expect((await confirm()).status).toBe(403);
+  });
+
+  it('counts addresses in the same IPv6 /64 as one neighbour', async () => {
+    mockTurnstile(true);
+    await insertOutage({});
+    expect((await confirm('2001:db8:1:2::a')).status).toBe(201);
+    const again = await confirm('2001:db8:1:2:ffff::b');
+    expect(await again.json()).toEqual({ error: 'already_confirmed' });
+  });
+
+  it('refuses a confirmation meant for an outage that is no longer open', async () => {
+    mockTurnstile(true);
+    const ended = await insertOutage({ endTime: new Date().toISOString() });
+    const current = await insertOutage({});
+    const stale = await confirm(undefined, { token: 'x', outageId: ended });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({ error: 'outage_changed' });
+    expect((await confirm(undefined, { token: 'x', outageId: current })).status).toBe(201);
+  });
+
+  it('opens one outage when the cron and a confirmation race on a stale heartbeat', async () => {
+    mockTurnstile(true);
+    await setHeartbeat(600);
+    const [res] = await Promise.all([confirm(), runCron(), confirm()]);
+    expect(res.status).toBe(201);
+    expect(await openOutageCount()).toBe(1);
+    const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
+    expect(n).toBe(1);
+  });
+
+  it('refuses requests the browser marks as cross-site', async () => {
+    mockTurnstile(true);
+    await insertOutage({});
+    const res = await call('/api/confirm', {
+      method: 'POST',
+      body: { token: 'x' },
+      headers: { 'Sec-Fetch-Site': 'cross-site' },
+    });
+    expect(res.status).toBe(403);
   });
 
   it('rejects cross-site requests', async () => {

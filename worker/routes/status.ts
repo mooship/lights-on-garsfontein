@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ConfirmResponse, StatusResponse } from '../../shared/api';
+import type { ConfirmRequest, ConfirmResponse, StatusResponse } from '../../shared/api';
 import { outageConfirmations } from '../db/schema';
 import { requireBearer } from '../lib/auth';
 import { sha256Hex } from '../lib/crypto';
@@ -8,7 +8,18 @@ import { errors, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
 
-const confirmSchema = z.object({ token: z.string().min(1).max(2048) });
+const confirmSchema = z.object({
+  token: z.string().min(1).max(2048),
+  outageId: z.number().int().positive().optional(),
+}) satisfies z.ZodType<ConfirmRequest>;
+
+/** The outage was deleted between reading it and inserting the confirmation. */
+function isForeignKeyError(error: unknown): boolean {
+  for (let e = error; e instanceof Error; e = e.cause) {
+    if (e.message.includes('FOREIGN KEY constraint failed')) return true;
+  }
+  return false;
+}
 
 async function getStatus({ env, db }: RouteContext): Promise<Response> {
   const now = new Date();
@@ -21,7 +32,7 @@ async function getStatus({ env, db }: RouteContext): Promise<Response> {
 }
 
 async function postConfirm(ctx: RouteContext): Promise<Response> {
-  const { request, env, db, ip } = ctx;
+  const { request, env, db, limitKey } = ctx;
   const parsed = await parseBody(request, confirmSchema);
   if ('response' in parsed) return parsed.response;
   // Without the salt the stored fingerprints would be trivially reversible.
@@ -31,13 +42,24 @@ async function postConfirm(ctx: RouteContext): Promise<Response> {
 
   const outage = await detectOutage(db, new Date());
   if (!outage) return errors.conflict('no_active_outage');
+  // The visitor saw an outage that has since ended and another began: do not count them for it.
+  if (parsed.data.outageId !== undefined && parsed.data.outageId !== outage.id) {
+    return errors.conflict('outage_changed');
+  }
 
-  const clientHash = await sha256Hex(`${env.IP_SALT}:${ip}`);
-  const inserted = await db
-    .insert(outageConfirmations)
-    .values({ outageId: outage.id, clientHash, createdAt: new Date().toISOString() })
-    .onConflictDoNothing()
-    .returning({ id: outageConfirmations.id });
+  // The rate-limit key (IPv6 grouped by /64), so rotating addresses within a /64 counts once.
+  const clientHash = await sha256Hex(`${env.IP_SALT}:${limitKey}`);
+  let inserted: { id: number }[];
+  try {
+    inserted = await db
+      .insert(outageConfirmations)
+      .values({ outageId: outage.id, clientHash, createdAt: new Date().toISOString() })
+      .onConflictDoNothing()
+      .returning({ id: outageConfirmations.id });
+  } catch (error) {
+    if (isForeignKeyError(error)) return errors.conflict('no_active_outage');
+    throw error;
+  }
   if (inserted.length === 0) return errors.conflict('already_confirmed');
 
   const body: ConfirmResponse = { confirmations: await countConfirmations(db, outage.id) };

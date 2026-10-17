@@ -65,12 +65,12 @@ async function login(ctx: RouteContext): Promise<Response> {
   const { request, env, db } = ctx;
   const parsed = await parseBody(request, loginSchema);
   if ('response' in parsed) return parsed.response;
-  // A site-wide cap on top of the per-connection limit, so spreading guesses over many
-  // addresses does not help either.
-  if (await isRateLimited(env.LOGIN_GLOBAL_LIMITER, 'login')) return errors.rateLimited();
   // Turnstile keeps bots off the sign-in form; scripts use ADMIN_API_TOKEN instead.
   const refused = await checkTurnstile(ctx, parsed.data.token, 'login');
   if (refused) return refused;
+  // A site-wide cap on top of the per-connection limit, so spreading guesses over many
+  // addresses does not help either. Counted only after Turnstile, so junk cannot lock out sign-in.
+  if (await isRateLimited(env.LOGIN_GLOBAL_LIMITER, 'login')) return errors.rateLimited();
   // Check both before answering, and give the same answer either way, so neither the
   // response nor its timing reveals whether the username was right.
   const { username, password } = parsed.data;

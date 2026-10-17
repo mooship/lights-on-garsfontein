@@ -16,8 +16,12 @@ export const outages = sqliteTable(
     isFalsePositive: integer('is_false_positive', { mode: 'boolean' }).notNull().default(sql`0`),
     isPlanned: integer('is_planned', { mode: 'boolean' }).notNull().default(sql`0`),
   },
-  // "Newest first" queries (status, admin list) read only the rows they return.
-  (table) => [index('outages_start_time_idx').on(table.startTime)],
+  (table) => [
+    // "Newest first" queries (status, admin list) read only the rows they return.
+    index('outages_start_time_idx').on(table.startTime),
+    // Open outages (end_time IS NULL) and the stats range scan on end_time.
+    index('outages_end_start_idx').on(table.endTime, table.startTime),
+  ],
 );
 
 export const outageConfirmations = sqliteTable(
@@ -30,7 +34,11 @@ export const outageConfirmations = sqliteTable(
     createdAt: text('created_at').notNull(),
     clientHash: text('client_hash').notNull(),
   },
-  (table) => [uniqueIndex('unique_ip_per_outage_idx').on(table.outageId, table.clientHash)],
+  (table) => [
+    uniqueIndex('unique_ip_per_outage_idx').on(table.outageId, table.clientHash),
+    // The hourly fingerprint purge filters on created_at.
+    index('outage_confirmations_created_at_idx').on(table.createdAt),
+  ],
 );
 
 export const sessions = sqliteTable('sessions', {

@@ -30,6 +30,13 @@ export interface StatusResponse {
   generatedAt: string;
 }
 
+export interface ConfirmRequest {
+  /** Turnstile token solved for the 'confirm' action. */
+  token: string;
+  /** The outage the visitor is confirming; if another one is open now, the server answers 409 `outage_changed`. */
+  outageId?: number;
+}
+
 export interface ConfirmResponse {
   confirmations: number;
 }
@@ -79,6 +86,9 @@ export const DAY_MS = 24 * HOUR_MS;
 
 /** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
 export type TurnstileAction = 'confirm' | 'login';
+
+/** Admin punch clock: punch out when the power goes off, punch in when it comes back. */
+export type TimerAction = 'punch_out' | 'punch_in';
 
 /** How long an outage lasted; one still in progress runs until `now`. */
 export function outageDurationMs(outage: { startTime: string; endTime: string | null }, now: number): number {

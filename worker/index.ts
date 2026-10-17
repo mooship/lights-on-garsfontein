@@ -8,6 +8,9 @@ import { historyRoutes } from './routes/history';
 import { seoRoutes } from './routes/seo';
 import { statusRoutes } from './routes/status';
 
+/** The hourly housekeeping cron in wrangler.toml. */
+const HOURLY_CRON = '0 * * * *';
+
 /** Every Worker endpoint, keyed by "METHOD /path". */
 const routes: Routes = { ...statusRoutes, ...historyRoutes, ...authRoutes, ...adminRoutes, ...seoRoutes };
 
@@ -34,7 +37,7 @@ function withSecurityHeaders(routed: Response): Response {
 async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const match = routes[`${request.method} ${url.pathname}`];
-  if (match) return dispatch(match, request, env, url);
+  if (match) return dispatch(match, request, env);
   if (url.pathname.startsWith('/api/')) return errors.notFound();
   return env.ASSETS.fetch(request);
 }
@@ -49,11 +52,14 @@ export default {
     }
   },
 
+  /** Two crons (wrangler.toml): outage detection every minute, housekeeping every hour. */
   async scheduled(controller, env) {
     const db = createDb(env.DB);
     const now = new Date(controller.scheduledTime);
-    const housekeeping =
-      now.getUTCMinutes() === 0 ? [purgeExpiredSessions(db, now), purgeOldFingerprints(db, now)] : [];
-    await Promise.all([detectOutage(db, now), ...housekeeping]);
+    if (controller.cron === HOURLY_CRON) {
+      await Promise.all([purgeExpiredSessions(db, now), purgeOldFingerprints(db, now)]);
+    } else {
+      await detectOutage(db, now);
+    }
   },
 } satisfies ExportedHandler<Env>;

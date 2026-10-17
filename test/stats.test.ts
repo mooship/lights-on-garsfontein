@@ -71,6 +71,51 @@ describe('windowStats', () => {
     expect(stats).toMatchObject({ daysTracked: 3, daysWithOutage: 2 });
   });
 
+  it('counts an outage crossing SAST midnight on both days, and skips days between outages', () => {
+    const intervals = mergeOutages(
+      [
+        { startTime: '2026-11-02T22:00:00+02:00', endTime: '2026-11-03T01:00:00+02:00' },
+        { startTime: '2026-11-04T08:00:00+02:00', endTime: '2026-11-04T09:00:00+02:00' },
+        { startTime: '2026-11-05T23:59:00+02:00', endTime: '2026-11-06T00:01:00+02:00' },
+      ],
+      t('2026-11-10T00:00:00Z'),
+    );
+    // Starts mid-afternoon on the 2nd and stops just after midnight on the 6th.
+    const stats = windowStats(intervals, t('2026-11-02T15:00:00+02:00'), t('2026-11-06T00:00:30+02:00'), since);
+    expect(stats).toMatchObject({ daysTracked: 5, daysWithOutage: 5 });
+    const gap = windowStats(intervals, t('2026-11-02T00:00:00+02:00'), t('2026-11-09T00:00:00+02:00'), since);
+    // 2nd, 3rd, 4th, 5th and 6th had outages; 7th and 8th were clean.
+    expect(gap).toMatchObject({ daysTracked: 7, daysWithOutage: 5 });
+  });
+
+  it('counts the same days with an outage as checking every outage against every day', () => {
+    const D = 24 * H;
+    let seed = 7;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    for (let run = 0; run < 50; run++) {
+      const base = since + Math.floor(random() * 10) * D;
+      const rows = Array.from({ length: Math.floor(random() * 12) }, () => {
+        const start = base + random() * 20 * D;
+        return { startTime: new Date(start).toISOString(), endTime: new Date(start + random() * 2 * D).toISOString() };
+      });
+      const intervals = mergeOutages(rows, base + 30 * D);
+      const from = base + random() * 5 * D;
+      const to = from + random() * 25 * D;
+      // The old scan: for each SAST day, does any interval overlap it?
+      const start = Math.max(from, since);
+      let expected = 0;
+      for (let day = Math.floor((start + 2 * H) / D) * D - 2 * H; day < to; day += D) {
+        const dayFrom = Math.max(day, start);
+        const dayTo = Math.min(day + D, to);
+        if (intervals.some((i) => Math.min(i.end, dayTo) - Math.max(i.start, dayFrom) > 0)) expected += 1;
+      }
+      expect(windowStats(intervals, from, to, since).daysWithOutage).toBe(expected);
+    }
+  });
+
   it('counts planned outages separately but still as time without power', () => {
     const all = [
       { start: t('2026-11-02T08:00:00Z'), end: t('2026-11-02T10:00:00Z') },

@@ -34,7 +34,8 @@ function overlap(i: Interval, from: number, to: number): number {
 }
 
 /**
- * Statistics for [from, to), never counting time before `trackingSince`.
+ * Statistics for [from, to), never counting time before `trackingSince`. `intervals` must be
+ * sorted and non-overlapping, as `mergeOutages` returns them.
  * `planned` holds the planned outages (already merged) so they can be counted separately.
  */
 export function windowStats(
@@ -57,14 +58,18 @@ export function windowStats(
     longest = Math.max(longest, ms);
   }
 
-  // Calendar days (SAST) touched by the window, and how many of them had any outage.
+  // Calendar days (SAST) touched by the window, and how many of them had any outage. Merged
+  // intervals are sorted by both start and end, so one index moves forward with the days.
   let daysTracked = 0;
   let daysWithOutage = 0;
+  let next = 0;
   for (let day = dayStartOf(start); day < to; day += DAY) {
     daysTracked += 1;
     const dayFrom = Math.max(day, start);
     const dayTo = Math.min(day + DAY, to);
-    if (intervals.some((i) => overlap(i, dayFrom, dayTo) > 0)) daysWithOutage += 1;
+    while ((intervals[next]?.end ?? Number.POSITIVE_INFINITY) <= dayFrom) next += 1;
+    const current = intervals[next];
+    if (current && overlap(current, dayFrom, dayTo) > 0) daysWithOutage += 1;
   }
 
   return {

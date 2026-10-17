@@ -12,11 +12,12 @@ export function json(data: unknown, status = 200, headers: HeadersInit = {}): Re
 }
 
 export const errors = {
-  badRequest: (details?: unknown) => json({ error: 'bad_request', details }, 400),
+  badRequest: (error = 'bad_request', details?: unknown) => json({ error, details }, 400),
   unauthorized: () => json({ error: 'unauthorized' }, 401),
   forbidden: (error = 'forbidden') => json({ error }, 403),
   notFound: () => json({ error: 'not_found' }, 404),
   conflict: (error: string) => json({ error }, 409),
+  unsupportedMediaType: () => json({ error: 'unsupported_media_type' }, 415),
   rateLimited: () => json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' }),
   internal: () => json({ error: 'internal_error' }, 500),
 };
@@ -64,12 +65,29 @@ export async function parseBody<T extends z.ZodType>(
     return { response: errors.badRequest('invalid_json') };
   }
   const result = schema.safeParse(body);
-  if (!result.success) return { response: errors.badRequest(result.error.issues) };
+  if (!result.success) return { response: errors.badRequest('bad_request', result.error.issues) };
   return { data: result.data };
 }
 
-/** Rejects cross-site state-changing requests when the browser sends an Origin. */
-export function isCrossOrigin(request: Request): boolean {
+/** True when the browser says the request came from another site (Origin or Sec-Fetch-Site). */
+function isCrossSite(request: Request): boolean {
   const origin = request.headers.get('Origin');
-  return origin !== null && origin !== new URL(request.url).origin;
+  if (origin !== null && origin !== new URL(request.url).origin) return true;
+  const site = request.headers.get('Sec-Fetch-Site');
+  return site !== null && site !== 'same-origin' && site !== 'none';
+}
+
+const isJson = (type: string) => type.split(';')[0]?.trim().toLowerCase() === 'application/json';
+
+/**
+ * Guard for cookie-authenticated writes: refuses other sites, and bodies that are not JSON
+ * (an HTML form can post cross-site without a CORS preflight; JSON cannot). A request with no
+ * body at all, such as sign-out, may leave out the Content-Type. Returns null when allowed.
+ */
+export function refuseCrossSite(request: Request): Response | null {
+  if (isCrossSite(request)) return errors.forbidden();
+  const type = request.headers.get('Content-Type');
+  const hasBody = request.body !== null && request.headers.get('Content-Length') !== '0';
+  if (type === null ? hasBody : !isJson(type)) return errors.unsupportedMediaType();
+  return null;
 }

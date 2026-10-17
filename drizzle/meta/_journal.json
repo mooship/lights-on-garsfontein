@@ -29,6 +29,13 @@
       "when": 1792234569578,
       "tag": "0003_boolean_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792242911773,
+      "tag": "0004_indexes",
+      "breakpoints": true
     }
   ]
 }

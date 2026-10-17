@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { AdminOutagesResponse } from '../shared/api';
-import { call, getStatus, insertConfirmation, insertOutage, login, setHeartbeat } from './helpers';
+import { type AdminOutagesResponse, MINUTE_MS } from '../shared/api';
+import { call, getStatus, insertConfirmation, insertOutage, login, openOutageCount, setHeartbeat } from './helpers';
 
 let cookie: string;
 beforeEach(async () => {
@@ -33,7 +33,78 @@ describe('POST /api/admin/timer (punch clock)', () => {
   });
 
   it('validates the action', async () => {
-    expect((await post('/api/admin/timer', { action: 'lunch' })).status).toBe(400);
+    const res = await post('/api/admin/timer', { action: 'lunch' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'bad_request', details: expect.any(Array) });
+  });
+
+  it('opens only one outage when punch out is pressed twice at once', async () => {
+    const codes = await Promise.all(
+      [1, 2, 3].map(async () => (await post('/api/admin/timer', { action: 'punch_out' })).status),
+    );
+    expect(codes.sort()).toEqual([201, 409, 409]);
+    expect(await openOutageCount()).toBe(1);
+  });
+
+  it('answers no_open_outage to the loser of two concurrent punch ins', async () => {
+    await post('/api/admin/timer', { action: 'punch_out' });
+    const results = await Promise.all([1, 2].map(() => post('/api/admin/timer', { action: 'punch_in' })));
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const loser = results.find((r) => r.status === 409);
+    expect(await loser?.json()).toEqual({ error: 'no_open_outage' });
+  });
+});
+
+describe('admin request checks', () => {
+  it('reports malformed JSON by its own error code', async () => {
+    const res = await call('/api/admin/timer', { method: 'POST', rawBody: '{nope', cookie });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_json' });
+  });
+
+  it('refuses cookie writes the browser marks as cross-site or same-site', async () => {
+    for (const site of ['cross-site', 'same-site']) {
+      const res = await call('/api/admin/timer', {
+        method: 'POST',
+        body: { action: 'punch_out' },
+        cookie,
+        headers: { 'Sec-Fetch-Site': site },
+      });
+      expect(res.status).toBe(403);
+    }
+    const same = await call('/api/admin/timer', {
+      method: 'POST',
+      body: { action: 'punch_out' },
+      cookie,
+      headers: { 'Sec-Fetch-Site': 'same-origin' },
+    });
+    expect(same.status).toBe(201);
+  });
+
+  it('refuses cookie writes whose body is not JSON (HTML forms)', async () => {
+    for (const type of ['text/plain', 'application/x-www-form-urlencoded']) {
+      const res = await call('/api/admin/timer', {
+        method: 'POST',
+        rawBody: JSON.stringify({ action: 'punch_out' }),
+        cookie,
+        headers: { 'Content-Type': type },
+      });
+      expect(res.status).toBe(415);
+    }
+    expect(await openOutageCount()).toBe(0);
+  });
+
+  it('exempts API-token requests from the browser checks', async () => {
+    const res = await call('/api/admin/timer', {
+      method: 'POST',
+      rawBody: JSON.stringify({ action: 'punch_out' }),
+      headers: {
+        Authorization: 'Bearer test-admin-api-token',
+        'Sec-Fetch-Site': 'cross-site',
+        'Content-Type': 'text/plain',
+      },
+    });
+    expect(res.status).toBe(201);
   });
 });
 
@@ -62,6 +133,24 @@ describe('/api/admin/outages', () => {
       endTime: '2026-10-01T16:00:00Z',
     });
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'end_before_start' });
+  });
+
+  it('rejects times more than five minutes in the future', async () => {
+    const inMinutes = (n: number) => new Date(Date.now() + n * MINUTE_MS).toISOString();
+    const future = await post('/api/admin/outages', { action: 'create', startTime: inMinutes(10) });
+    expect(future.status).toBe(400);
+    expect(await openOutageCount()).toBe(0);
+
+    const skewed = await post('/api/admin/outages', {
+      action: 'create',
+      startTime: inMinutes(1),
+      endTime: inMinutes(2),
+    });
+    expect(skewed.status).toBe(201);
+    const { outage } = (await skewed.json()) as { outage: { id: number } };
+    const update = await post('/api/admin/outages', { action: 'update', id: outage.id, endTime: inMinutes(60) });
+    expect(update.status).toBe(400);
   });
 
   it('flagging an open outage as a false positive closes it', async () => {
@@ -93,8 +182,8 @@ describe('/api/admin/outages', () => {
   it('marks outages as planned and shows it publicly', async () => {
     const created = await post('/api/admin/outages', {
       action: 'create',
-      startTime: '2026-10-18T08:00:00+02:00',
-      endTime: '2026-10-18T12:00:00+02:00',
+      startTime: '2026-10-10T08:00:00+02:00',
+      endTime: '2026-10-10T12:00:00+02:00',
       isPlanned: true,
     });
     const { outage } = (await created.json()) as { outage: { id: number } };

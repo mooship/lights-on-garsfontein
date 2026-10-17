@@ -1,7 +1,7 @@
 import { getPowerStatus } from '../lib/grid';
 import type { RouteContext, Routes } from '../lib/router';
 
-const SITEMAP_PATHS = ['/', '/privacy.html'];
+const SITEMAP_PATHS = ['/', '/privacy'];
 
 function sitemap({ env }: RouteContext): Response {
   const urls = SITEMAP_PATHS.map(
@@ -42,7 +42,7 @@ async function ogImage({ request, env, db }: RouteContext): Promise<Response> {
 const pages: Routes = {
   '/sitemap.xml': { handler: sitemap },
   '/robots.txt': { handler: robots },
-  '/og.png': { handler: ogImage, limiter: 'STATUS_LIMITER' },
+  '/og.png': { handler: ogImage, limiter: 'STATUS_LIMITER', edgeCache: true },
 };
 
 /** Each page answers both GET and HEAD. */
