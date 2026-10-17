@@ -1,0 +1,16 @@
+{
+  "name": "Garsfontein Grid",
+  "short_name": "Garsfontein Grid",
+  "description": "Live power status and outage history for Ward 45, Garsfontein, Pretoria.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F6F4EF",
+  "theme_color": "#F6F4EF",
+  "lang": "en-ZA",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

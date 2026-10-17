@@ -1,0 +1,61 @@
+{
+  "name": "garsfontein-grid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source civic power tracking for Ward 45, Garsfontein, Pretoria.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooship/garsfontein-grid.git"
+  },
+  "homepage": "https://garsfontein.timothybrits.co.za",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:worker": "wrangler dev",
+    "build": "vite build",
+    "preview": "npm run build && wrangler dev",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.node.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:ci": "biome ci .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "cf-typegen": "wrangler types worker/worker-configuration.d.ts",
+    "hash-password": "node scripts/hash-password.ts",
+    "og": "node scripts/build-og.ts",
+    "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy",
+    "prepare": "lefthook install",
+    "icons": "node scripts/build-icons.ts"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.4",
+    "lucide-solid": "^1.54.0",
+    "solid-js": "^1.9.17",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@cloudflare/vitest-plugin": "^1.4.0",
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^24.19.2",
+    "@vanilla-extract/css": "^1.21.3",
+    "@vanilla-extract/vite-plugin": "^5.2.6",
+    "drizzle-kit": "^0.31.11",
+    "fontaine": "^1.0.1",
+    "lefthook": "^2.2.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-plugin-solid": "^2.11.14",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.149.0"
+  }
+}

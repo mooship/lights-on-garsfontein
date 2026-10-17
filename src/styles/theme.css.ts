@@ -1,0 +1,94 @@
+import { createGlobalTheme, createThemeContract, globalFontFace } from '@vanilla-extract/css';
+
+const latinRange =
+  'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
+
+// font-display: optional + preload keeps CLS at zero: the font is used only if it
+// is ready before first paint, otherwise the metric-matched fallback stays.
+globalFontFace('Fraunces', {
+  src: "url('/fonts/fraunces-latin-wght.woff2') format('woff2')",
+  fontWeight: '100 900',
+  fontStyle: 'normal',
+  fontDisplay: 'optional',
+  unicodeRange: latinRange,
+});
+
+// Registered as 'Jakarta' (no spaces): Fontaine mis-parses multi-word family names.
+globalFontFace('Jakarta', {
+  src: "url('/fonts/plus-jakarta-sans-latin-wght.woff2') format('woff2')",
+  fontWeight: '200 800',
+  fontStyle: 'normal',
+  fontDisplay: 'optional',
+  unicodeRange: latinRange,
+});
+
+export const vars = createThemeContract({
+  color: {
+    bg: null,
+    card: null,
+    text: null,
+    muted: null,
+    border: null,
+    on: null,
+    onSoft: null,
+    onContrast: null,
+    off: null,
+    offSoft: null,
+    offContrast: null,
+    chartOff: null,
+    focus: null,
+    shadow: null,
+  },
+  font: { display: null, body: null },
+  radius: { card: null, pill: null, control: null },
+});
+
+const fonts = {
+  display: "Fraunces, 'Fraunces fallback', Georgia, serif",
+  body: "Jakarta, 'Jakarta fallback', Arial, sans-serif",
+};
+const radius = { card: '1.25rem', pill: '999px', control: '0.75rem' };
+
+// Light is the default so the page is themed even before the boot script runs.
+createGlobalTheme(':root', vars, {
+  color: {
+    bg: '#F6F4EF',
+    card: '#FFFFFF',
+    text: '#1F2120',
+    muted: '#5C5850',
+    border: '#E4DFD4',
+    on: '#2D5A27',
+    onSoft: '#E6EEE3',
+    onContrast: '#FFFFFF',
+    off: '#B33A2B',
+    offSoft: '#F7E5E1',
+    offContrast: '#FFFFFF',
+    chartOff: '#B33A2B',
+    focus: '#8A5A12',
+    shadow: '0 1px 2px rgba(60, 45, 20, 0.06), 0 8px 24px rgba(60, 45, 20, 0.06)',
+  },
+  font: fonts,
+  radius,
+});
+
+createGlobalTheme(':root.dark', vars, {
+  color: {
+    bg: '#121312',
+    card: '#1C1E1C',
+    text: '#F0EFEA',
+    muted: '#A8A69E',
+    border: '#2E312E',
+    on: '#4CAF50',
+    onSoft: '#1F2E1F',
+    onContrast: '#121312',
+    off: '#E57373',
+    offSoft: '#3A2322',
+    offContrast: '#121312',
+    // Validated with the dataviz palette checker against the dark card surface.
+    chartOff: '#E06A66',
+    focus: '#E6B566',
+    shadow: '0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.25)',
+  },
+  font: fonts,
+  radius,
+});

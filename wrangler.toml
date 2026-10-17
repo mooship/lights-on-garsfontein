@@ -1,0 +1,47 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "garsfontein-grid"
+main = "worker/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+routes = [{ pattern = "garsfontein.timothybrits.co.za", custom_domain = true }]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png"]
+
+[vars]
+SITE_URL = "https://garsfontein.timothybrits.co.za"
+TURNSTILE_SITE_KEY = "REPLACE_WITH_TURNSTILE_SITE_KEY"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "garsfontein-grid"
+database_id = "6374fa3a-827f-42f4-910f-8ff9415a1259"
+migrations_dir = "drizzle"
+
+# Workers Rate Limiting API. namespace_id must be unique per account.
+[[ratelimits]]
+name = "STATUS_LIMITER"
+namespace_id = "4501"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "CONFIRM_LIMITER"
+namespace_id = "4502"
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "LOGIN_LIMITER"
+namespace_id = "4503"
+simple = { limit = 5, period = 60 }
+
+[triggers]
+crons = ["* * * * *"]
+
+[observability]
+enabled = true
+
+# Secrets (set with `wrangler secret put <NAME>`, see README):
+# ADMIN_PASSWORD_HASH, HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY

@@ -1,0 +1,32 @@
+# Garsfontein Grid
+
+> Open-source, community-run record of electricity outages in Ward 45, Garsfontein, Pretoria, South Africa, kept to show how severe outages are and whether the situation is improving or getting worse. Outage tracking began on 18 October 2026 (Africa/Johannesburg); there is no data before that date. Until a sensor is installed, outages are logged by hand by the site administrator (`mode: "manual"`). Once installed, a mains-powered sensor sends a heartbeat every minute; if no heartbeat arrives for 180 seconds the grid is reported OFF and an outage is logged automatically (`mode: "sensor"`). Outages from before tracking began may be added to the history by hand, but statistics only count time from the tracking start.
+
+Canonical site: https://garsfontein.timothybrits.co.za/
+Source code (GPL-3.0-only): https://github.com/mooship/garsfontein-grid
+
+## Machine-readable endpoints
+
+- [Live status (JSON)](https://garsfontein.timothybrits.co.za/api/status): `GET`, rate limited to 60 requests per minute per IP. Do not poll faster than once every 30 seconds.
+- [Outage statistics (JSON)](https://garsfontein.timothybrits.co.za/api/stats): hours without power, outage counts, availability and longest outage for the last 7, 30 and 365 days, the previous 30 days for comparison, and weekly totals. Never counts time before tracking began.
+- [All outages (CSV)](https://garsfontein.timothybrits.co.za/api/outages.csv): open data, one row per outage, false positives removed.
+- [Sitemap](https://garsfontein.timothybrits.co.za/sitemap.xml)
+- [Privacy notice](https://garsfontein.timothybrits.co.za/privacy.html)
+
+## /api/status response
+
+- `status`: `"ON"` or `"OFF"`
+- `mode`: `"manual"` (status reported by the site administrator; no sensor installed yet) or `"sensor"` (automatic heartbeat monitoring)
+- `since`: ISO 8601 time the current state began, or null
+- `lastSeen`: ISO 8601 time of the last sensor heartbeat, or null
+- `outage`: the open outage (`id`, `startTime`, `endTime`, `source`, `confirmations`), or null
+- `recent`: the five most recent outages, newest first
+- `generatedAt`: ISO 8601 server time of the response
+
+All times are UTC. Local time is Africa/Johannesburg (UTC+2).
+
+## Notes
+
+- `source: "sensor"` outages are detected automatically; `source: "manual"` outages were logged by the administrator.
+- `confirmations` counts residents who reported "My power is off too" (one per household connection per outage, verified with Cloudflare Turnstile).
+- This is not an official City of Tshwane or Eskom service.

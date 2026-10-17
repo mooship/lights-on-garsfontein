@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en-ZA">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <script>
+      (function() {
+        try {
+          var s = localStorage.getItem('theme');
+          var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
+        } catch (e) {}
+      })();
+    </script>
+    <title>Garsfontein Grid · Power outages in Garsfontein, Pretoria</title>
+    <meta
+      name="description"
+      content="How bad are the power outages in Garsfontein? Live electricity status, outage history and trends for Ward 45, Pretoria, tracked since 18 October 2026."
+    />
+    <link rel="canonical" href="https://garsfontein.timothybrits.co.za/" />
+    <meta name="theme-color" content="#F6F4EF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121312" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preload" href="/fonts/plus-jakarta-sans-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/fraunces-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Garsfontein Grid" />
+    <meta property="og:locale" content="en_ZA" />
+    <meta property="og:url" content="https://garsfontein.timothybrits.co.za/" />
+    <meta property="og:title" content="Garsfontein Grid · Power outages in Garsfontein, Pretoria" />
+    <meta
+      property="og:description"
+      content="Live electricity status, outage history and weekly trends for Ward 45, Garsfontein, Pretoria."
+    />
+    <meta property="og:image" content="https://garsfontein.timothybrits.co.za/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Garsfontein Grid live power status card" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "GovernmentService",
+        "name": "Garsfontein Grid",
+        "alternateName": "Ward 45 power status",
+        "description": "Open-source, community-run record of electricity outages in Ward 45, Garsfontein, Pretoria, showing how severe they are and how the situation changes over time. Tracking began on 18 October 2026. A volunteer project, not run by the City of Tshwane, Eskom or any government body.",
+        "url": "https://garsfontein.timothybrits.co.za/",
+        "serviceType": "Electricity supply status monitoring",
+        "areaServed": {
+          "@type": "AdministrativeArea",
+          "name": "Ward 45, Garsfontein, Pretoria",
+          "containedInPlace": {
+            "@type": "City",
+            "name": "City of Tshwane",
+            "address": { "@type": "PostalAddress", "addressRegion": "Gauteng", "addressCountry": "ZA" }
+          }
+        },
+        "availableChannel": {
+          "@type": "ServiceChannel",
+          "serviceUrl": "https://garsfontein.timothybrits.co.za/api/status"
+        },
+        "provider": {
+          "@type": "Person",
+          "name": "Timothy Brits",
+          "description": "Volunteer resident of Ward 45. Not affiliated with the City of Tshwane, Eskom or any government body."
+        },
+        "isAccessibleForFree": true,
+        "license": "https://www.gnu.org/licenses/gpl-3.0.html"
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Static skeleton: identical boxes to the app's loading state (see global.css.ts). -->
+      <div class="gg-shell">
+        <header class="gg-masthead">
+          <div>
+            <p class="gg-eyebrow">Ward 45 · Garsfontein, Pretoria</p>
+            <h1 class="gg-title">Garsfontein Grid</h1>
+          </div>
+          <button type="button" class="gg-icon-button" aria-label="Switch theme" disabled></button>
+        </header>
+        <p class="gg-notice">A volunteer project. Not affiliated with the City of Tshwane, Eskom or any government body.</p>
+        <main class="gg-main">
+          <section class="gg-card gg-status-card">
+            <p class="gg-status-loading">Checking the grid status…</p>
+          </section>
+          <section class="gg-card">
+            <div class="gg-trends-body">
+              <h2 class="gg-card-title">How bad is it?</h2>
+            </div>
+            <details class="gg-trends-details">
+              <summary>Show weekly table</summary>
+            </details>
+          </section>
+          <section class="gg-card gg-history-card">
+            <h2 class="gg-card-title">Recent outages</h2>
+          </section>
+        </main>
+      </div>
+      <noscript><p class="gg-shell">Garsfontein Grid needs JavaScript. The raw status is at /api/status.</p></noscript>
+    </div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>

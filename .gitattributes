@@ -1,0 +1,11 @@
+# LF everywhere: the CSP hash of the inline theme script depends on exact bytes.
+* text=auto eol=lf
+
+*.woff2 binary
+*.png binary
+*.ico binary
+
+# Generated files: collapsed in GitHub diffs and excluded from language stats.
+package-lock.json linguist-generated
+worker/worker-configuration.d.ts linguist-generated
+drizzle/meta/** linguist-generated

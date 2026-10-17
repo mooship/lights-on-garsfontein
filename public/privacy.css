@@ -1,0 +1,66 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f4ef;
+  --text: #1f2120;
+  --muted: #5c5850;
+  --accent: #2d5a27;
+}
+:root.dark {
+  color-scheme: dark;
+  --bg: #121312;
+  --text: #f0efea;
+  --muted: #a8a69e;
+  --accent: #4caf50;
+}
+@font-face {
+  font-family: Fraunces;
+  src: url("/fonts/fraunces-latin-wght.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: optional;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans-latin-wght.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: optional;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  line-height: 1.6;
+}
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: max(1.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(3rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+h1,
+h2 {
+  font-family: Fraunces, Georgia, serif;
+  line-height: 1.2;
+}
+h1 {
+  font-size: 2.25rem;
+  margin: 1rem 0 0.25rem;
+}
+h2 {
+  font-size: 1.375rem;
+  margin-top: 2rem;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+.updated {
+  color: var(--muted);
+  margin-top: 0;
+}
+li + li {
+  margin-top: 0.75rem;
+}

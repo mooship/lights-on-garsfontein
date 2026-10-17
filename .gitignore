@@ -1,0 +1,32 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Cloudflare / Wrangler local state and secrets
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.playwright-mcp/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,36 @@
+import { env } from 'cloudflare:test';
+import { describe, expect, it, vi } from 'vitest';
+import { call, setHeartbeat } from './helpers';
+
+describe('SEO routes', () => {
+  it('serves robots.txt that hides the admin API and points at the sitemap', async () => {
+    const res = await call('/robots.txt');
+    expect(res.headers.get('Content-Type')).toContain('text/plain');
+    const body = await res.text();
+    expect(body).toContain('Disallow: /api/admin/');
+    expect(body).toContain('Sitemap: https://garsfontein.example/sitemap.xml');
+  });
+
+  it('serves an XML sitemap with the home and privacy pages', async () => {
+    const res = await call('/sitemap.xml');
+    expect(res.headers.get('Content-Type')).toContain('application/xml');
+    const body = await res.text();
+    expect(body).toContain('<loc>https://garsfontein.example/</loc>');
+    expect(body).toContain('<loc>https://garsfontein.example/privacy.html</loc>');
+  });
+
+  it('serves the social card that matches the live status', async () => {
+    await setHeartbeat(5);
+    const fetch = vi.fn(async () => new Response('png', { headers: { 'Content-Type': 'image/png' } }));
+    const res = await call('/og.png', { env: { ...env, ASSETS: { fetch } as unknown as Fetcher } });
+    expect(String((fetch.mock.calls[0] as unknown[])[0])).toBe('https://garsfontein.example/og/on.png');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=60');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('returns JSON 404 for unknown API routes', async () => {
+    const res = await call('/api/nope');
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'not_found' });
+  });
+});

@@ -1,0 +1,8 @@
+# Copy to .dev.vars for local development. These are Cloudflare's public
+# Turnstile test keys (always pass) and a hash of the password "test-password".
+SITE_URL="http://localhost:8787"
+TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
+ADMIN_PASSWORD_HASH='pbkdf2_sha256$100000$n7SohUIkjgbP01xFrUR50w==$G4dp7lkqVXazO3SBFzPjLKXgdzhDeh99ZXefTHRlxEg='
+HEARTBEAT_TOKEN="local-heartbeat-token"
+IP_SALT="local-salt"

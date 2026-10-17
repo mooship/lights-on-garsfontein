@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en-ZA">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <script>
+      (function() {
+        try {
+          var s = localStorage.getItem('theme');
+          var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
+        } catch (e) {}
+      })();
+    </script>
+    <title>Privacy · Garsfontein Grid</title>
+    <meta name="description" content="How Garsfontein Grid handles your information under POPIA." />
+    <link rel="canonical" href="https://garsfontein.timothybrits.co.za/privacy.html" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/privacy.css" />
+  </head>
+  <body>
+    <main>
+      <p><a href="/">← Garsfontein Grid</a></p>
+      <h1>Privacy notice</h1>
+      <p class="updated">Last updated 17 October 2026</p>
+
+      <p>
+        Garsfontein Grid is a volunteer, open-source project that shows whether the electricity supply in Ward 45,
+        Garsfontein, is on. It is not run by the City of Tshwane or Eskom. This notice explains what information the
+        site processes, in line with the Protection of Personal Information Act (POPIA).
+      </p>
+
+      <h2>What we collect</h2>
+      <ul>
+        <li>
+          <strong>Outage confirmations.</strong> When you tap "My power is off too", we store a one-way, salted SHA-256
+          hash of your IP address together with the outage and the time. The hash lets us count one confirmation per
+          connection per outage. We cannot turn it back into your IP address, and we do not store the IP itself.
+        </li>
+        <li>
+          <strong>Bot protection.</strong> Confirmations are protected by Cloudflare Turnstile, which loads only when you
+          tap the button. Cloudflare processes signals from your browser to tell people from bots. See
+          <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Cloudflare's Turnstile privacy addendum</a>.
+        </li>
+        <li>
+          <strong>Rate limiting and security.</strong> Your IP address is used briefly, in memory, to limit how often
+          the API can be called. Cloudflare may keep standard request logs to operate and secure the service.
+        </li>
+        <li>
+          <strong>Your theme choice.</strong> If you pick light or dark mode, the choice is saved in your browser's
+          local storage. It never leaves your device.
+        </li>
+      </ul>
+
+      <h2>What we do not do</h2>
+      <ul>
+        <li>No accounts, no tracking cookies, no analytics and no advertising.</li>
+        <li>We do not sell or share information with anyone.</li>
+      </ul>
+
+      <h2>Retention</h2>
+      <p>
+        Outage records and their confirmation counts are kept as a public history of the local grid. You can ask for
+        a confirmation to be removed; because we only hold a hash, include the date and time you confirmed.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions or requests:
+        <a href="https://github.com/mooship/garsfontein-grid/issues">open an issue on GitHub</a>.
+      </p>
+    </main>
+  </body>
+</html>
