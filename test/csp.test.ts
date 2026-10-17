@@ -22,9 +22,15 @@ describe('Content-Security-Policy', () => {
     }
   });
 
-  it('only allows Turnstile as a third party', () => {
+  it('only allows Turnstile and Cloudflare Web Analytics as third parties', () => {
     const csp = headers.match(/Content-Security-Policy: (.*)/)?.[1] ?? '';
     const hosts = [...csp.matchAll(/https:\/\/[^\s;]+/g)].map((m) => m[0]);
-    expect(new Set(hosts)).toEqual(new Set(['https://challenges.cloudflare.com']));
+    expect(new Set(hosts)).toEqual(
+      new Set([
+        'https://challenges.cloudflare.com',
+        'https://static.cloudflareinsights.com',
+        'https://cloudflareinsights.com',
+      ]),
+    );
   });
 });

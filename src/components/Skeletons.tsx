@@ -3,7 +3,7 @@ import { type Component, For } from 'solid-js';
 // Loading placeholders. index.html renders the same markup statically before any
 // JavaScript runs, so keep the two in step: identical boxes mean zero layout shift.
 
-export const STATUS_NOTE = 'Power out at your place? Check in here and let neighbours know it’s not just them.';
+export const STATUS_NOTE = 'If the power goes off, you can report it here so neighbours know it’s not just them.';
 export const TRENDS_TITLE = 'By the numbers';
 export const TRENDS_TABLE_LABEL = 'Show the weekly numbers';
 
