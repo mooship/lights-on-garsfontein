@@ -1,5 +1,6 @@
 import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
 import { DAY_MS, MINUTE_MS, outageDurationMs, type StatsResponse, TRACKING_SINCE } from '../../shared/api';
+import { site } from '../../site.config';
 import { outages } from '../db/schema';
 import { outagesWithCounts } from '../lib/grid';
 import { json } from '../lib/http';
@@ -42,7 +43,15 @@ function csvField(value: string | number | null): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** Open data: every outage (false positives excluded) as CSV. */
+/**
+ * Open data: every outage (false positives excluded) as CSV, oldest first.
+ *
+ * The columns are a stable public contract that other people's scripts read, so don't rename,
+ * reorder or reformat them; add new columns only at the end, and note any change with a version
+ * in the README. `start_time_utc` and `end_time_utc` are ISO 8601 UTC; `end_time_utc` and
+ * `duration_minutes` (whole minutes) are empty while the outage is open; `planned` is yes or no;
+ * `confirmations` counts community confirmations.
+ */
 async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   const rows = await outagesWithCounts(db, eq(outages.isFalsePositive, false)).orderBy(asc(outages.startTime));
   const lines = [
@@ -57,7 +66,7 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   return new Response(`${lines.join('\n')}\n`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="lights-on-garsfontein-outages.csv"',
+      'Content-Disposition': `attachment; filename="${site.slug}-outages.csv"`,
       // About 80 bytes per outage, so even decades of data stay a few MB; a short cache keeps repeat downloads cheap.
       'Cache-Control': 'public, max-age=300',
     },

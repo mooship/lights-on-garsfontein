@@ -1,13 +1,16 @@
 import X from 'lucide-solid/icons/x';
 import { type Component, createMemo, createSignal, Show } from 'solid-js';
 import { MINUTE_MS } from '../../shared/api';
-import { activeBanners } from '../banners';
-import { locale, t } from '../lib/i18n';
+import { activeBanners, type Banner } from '../banners';
+import { DEFAULT_LOCALE, locale, t } from '../lib/i18n';
 import { useNow } from '../lib/now';
 import { isFlagged, setFlag } from '../lib/storage';
 import * as css from './Banner.css';
 
 const storageKey = (id: string) => `banner-dismissed:${id}`;
+
+/** The copy in the active locale, else in the default one. */
+const inLocale = (copy: Banner['text']) => copy[locale()] ?? copy[DEFAULT_LOCALE];
 
 /** The first active banner the visitor hasn't dismissed, rechecked every minute so it ends on time. */
 export const SiteBanner: Component = () => {
@@ -31,11 +34,11 @@ export const SiteBanner: Component = () => {
       {(b) => (
         <section class={css.root} aria-label={t().banner.region}>
           <div class={css.body}>
-            <p>{b.text[locale()]}</p>
+            <p>{inLocale(b.text)}</p>
             <Show when={b.link}>
               {(link) => (
                 <a class={css.link} href={link().href}>
-                  {link().label[locale()]}
+                  {inLocale(link().label)}
                 </a>
               )}
             </Show>

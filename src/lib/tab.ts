@@ -1,5 +1,6 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
 import type { StatusResponse } from '../../shared/api';
+import { site } from '../../site.config';
 import { formatCompactDuration } from './format';
 import { t } from './i18n';
 
@@ -18,7 +19,7 @@ export function useStatusTab(status: Accessor<StatusResponse | undefined>, minut
     const s = status();
     if (!s) return;
     const duration = s.status === 'OFF' && s.since ? ` ${formatCompactDuration(minute() - Date.parse(s.since))}` : '';
-    document.title = `${t().tab[s.status]}${duration} · Lights On?`;
+    document.title = `${t().tab[s.status]}${duration} · ${site.brand.short}`;
     if (icon) icon.href = s.status === 'ON' ? '/favicon-on.svg' : '/favicon-off.svg';
   });
 

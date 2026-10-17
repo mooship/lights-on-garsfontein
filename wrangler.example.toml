@@ -1,0 +1,90 @@
+#:schema node_modules/wrangler/config-schema.json
+# A starting point for running this app for another area. Copy it to wrangler.toml (replacing
+# this deployment's) and fill in the <PLACEHOLDERS>:
+#
+# 1. Pick a Worker name below (and a database_name), then create the database:
+#      npx wrangler d1 create <database_name>
+#    and paste the database_id it prints into <D1_DATABASE_ID>.
+# 2. Create a Turnstile widget in the Cloudflare dashboard. Add every hostname the site is served
+#    from (your custom domain, <name>.<account>.workers.dev, and localhost for development), and
+#    paste its site key into <TURNSTILE_SITE_KEY>.
+# 3. Set <SITE_URL> to the public origin, with no trailing slash. It must equal url in
+#    site.config.ts.
+# 4. Set the secrets (npx wrangler secret put <NAME>; see README):
+#      ADMIN_USERNAME, ADMIN_PASSWORD_HASH (npm run hash-password), ADMIN_API_TOKEN,
+#      HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY (the widget's secret key)
+# 5. npm run db:migrate:remote, then npm run deploy.
+name = "lights-on"
+main = "worker/index.ts"
+compatibility_date = "2026-10-01"
+# Serves the Worker at <name>.<account>.workers.dev. Set to false once a custom domain is live.
+workers_dev = true
+upload_source_maps = true
+# For a custom domain on a zone in your Cloudflare account, uncomment this; Cloudflare creates
+# the DNS record and certificate on deploy.
+# routes = [{ pattern = "<YOUR_DOMAIN>", custom_domain = true }]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png"]
+
+[vars]
+SITE_URL = "<SITE_URL>"
+TURNSTILE_SITE_KEY = "<TURNSTILE_SITE_KEY>"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lights-on"
+database_id = "<D1_DATABASE_ID>"
+migrations_dir = "drizzle"
+
+# Workers Rate Limiting API. Each namespace_id is a positive integer that must be unique in your
+# account: change these if another Worker there already uses them.
+[[ratelimits]]
+name = "STATUS_LIMITER"
+namespace_id = "4501" # must be unique in your account
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "CONFIRM_LIMITER"
+namespace_id = "4502" # must be unique in your account
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "LOGIN_LIMITER"
+namespace_id = "4503" # must be unique in your account
+simple = { limit = 5, period = 60 }
+
+# Site-wide cap on sign-in attempts, whatever address they come from.
+[[ratelimits]]
+name = "LOGIN_GLOBAL_LIMITER"
+namespace_id = "4504" # must be unique in your account
+simple = { limit = 30, period = 60 }
+
+[triggers]
+# Outage detection every minute; housekeeping (session and fingerprint purges) hourly.
+crons = ["* * * * *", "0 * * * *"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+redact_query_string = false
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true
+
+[observability.issues]
+enabled = true
+
+# Secrets (set with `wrangler secret put <NAME>`, see README):
+# ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY

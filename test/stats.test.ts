@@ -1,10 +1,14 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HOUR_MS as H, type StatsResponse, TRACKING_SINCE } from '../shared/api';
+import { site } from '../site.config';
+import { zoned } from '../src/lib/zone';
 import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
 import { call, insertOutage, uniqueIp } from './helpers';
 
 const t = (iso: string) => Date.parse(iso);
+/** The configured zone's UTC offset in ms; days and weeks start at local midnight. */
+const OFFSET = site.utcOffsetMinutes * 60_000;
 
 describe('mergeOutages', () => {
   it('merges overlapping outages so time is never double counted', () => {
@@ -31,7 +35,7 @@ describe('mergeOutages', () => {
 });
 
 describe('windowStats', () => {
-  const since = t('2026-10-18T00:00:00+02:00');
+  const since = t(zoned('2026-10-18T00:00:00'));
 
   it('sums hours off, counts outages and finds the longest', () => {
     const intervals = [
@@ -58,32 +62,32 @@ describe('windowStats', () => {
   });
 
   it('never counts time before tracking began', () => {
-    const intervals = [{ start: t('2026-10-17T20:00:00+02:00'), end: t('2026-10-18T02:00:00+02:00') }];
+    const intervals = [{ start: t(zoned('2026-10-17T20:00:00')), end: t(zoned('2026-10-18T02:00:00')) }];
     const stats = windowStats(intervals, since - 10 * 24 * H, since + 24 * H, since);
     expect(stats.trackedHours).toBe(24);
     expect(stats.hoursOff).toBe(2);
   });
 
-  it('counts South African calendar days with any outage', () => {
-    // 23:30–00:30 SAST spans two days; the third day is clean.
-    const intervals = [{ start: t('2026-11-02T23:30:00+02:00'), end: t('2026-11-03T00:30:00+02:00') }];
-    const stats = windowStats(intervals, t('2026-11-02T00:00:00+02:00'), t('2026-11-05T00:00:00+02:00'), since);
+  it('counts calendar days in the configured zone with any outage', () => {
+    // 23:30–00:30 local time spans two days; the third day is clean.
+    const intervals = [{ start: t(zoned('2026-11-02T23:30:00')), end: t(zoned('2026-11-03T00:30:00')) }];
+    const stats = windowStats(intervals, t(zoned('2026-11-02T00:00:00')), t(zoned('2026-11-05T00:00:00')), since);
     expect(stats).toMatchObject({ daysTracked: 3, daysWithOutage: 2 });
   });
 
-  it('counts an outage crossing SAST midnight on both days, and skips days between outages', () => {
+  it('counts an outage crossing local midnight on both days, and skips days between outages', () => {
     const intervals = mergeOutages(
       [
-        { startTime: '2026-11-02T22:00:00+02:00', endTime: '2026-11-03T01:00:00+02:00' },
-        { startTime: '2026-11-04T08:00:00+02:00', endTime: '2026-11-04T09:00:00+02:00' },
-        { startTime: '2026-11-05T23:59:00+02:00', endTime: '2026-11-06T00:01:00+02:00' },
+        { startTime: zoned('2026-11-02T22:00:00'), endTime: zoned('2026-11-03T01:00:00') },
+        { startTime: zoned('2026-11-04T08:00:00'), endTime: zoned('2026-11-04T09:00:00') },
+        { startTime: zoned('2026-11-05T23:59:00'), endTime: zoned('2026-11-06T00:01:00') },
       ],
       t('2026-11-10T00:00:00Z'),
     );
     // Starts mid-afternoon on the 2nd and stops just after midnight on the 6th.
-    const stats = windowStats(intervals, t('2026-11-02T15:00:00+02:00'), t('2026-11-06T00:00:30+02:00'), since);
+    const stats = windowStats(intervals, t(zoned('2026-11-02T15:00:00')), t(zoned('2026-11-06T00:00:30')), since);
     expect(stats).toMatchObject({ daysTracked: 5, daysWithOutage: 5 });
-    const gap = windowStats(intervals, t('2026-11-02T00:00:00+02:00'), t('2026-11-09T00:00:00+02:00'), since);
+    const gap = windowStats(intervals, t(zoned('2026-11-02T00:00:00')), t(zoned('2026-11-09T00:00:00')), since);
     // 2nd, 3rd, 4th, 5th and 6th had outages; 7th and 8th were clean.
     expect(gap).toMatchObject({ daysTracked: 7, daysWithOutage: 5 });
   });
@@ -104,10 +108,10 @@ describe('windowStats', () => {
       const intervals = mergeOutages(rows, base + 30 * D);
       const from = base + random() * 5 * D;
       const to = from + random() * 25 * D;
-      // The old scan: for each SAST day, does any interval overlap it?
+      // The old scan: for each local day, does any interval overlap it?
       const start = Math.max(from, since);
       let expected = 0;
-      for (let day = Math.floor((start + 2 * H) / D) * D - 2 * H; day < to; day += D) {
+      for (let day = Math.floor((start + OFFSET) / D) * D - OFFSET; day < to; day += D) {
         const dayFrom = Math.max(day, start);
         const dayTo = Math.min(day + D, to);
         if (intervals.some((i) => Math.min(i.end, dayTo) - Math.max(i.start, dayFrom) > 0)) expected += 1;
@@ -132,16 +136,16 @@ describe('windowStats', () => {
 });
 
 describe('weekly stats', () => {
-  it('uses Monday 00:00 South African time as the week start', () => {
-    // Sunday 23:30 SAST belongs to the week that started six days earlier.
-    expect(new Date(weekStartOf(t('2026-10-25T23:30:00+02:00'))).toISOString()).toBe('2026-10-18T22:00:00.000Z');
-    expect(new Date(weekStartOf(t('2026-10-26T00:00:00+02:00'))).toISOString()).toBe('2026-10-25T22:00:00.000Z');
+  it('uses Monday 00:00 in the configured zone as the week start', () => {
+    // Sunday 23:30 local time belongs to the week that started six days earlier.
+    expect(weekStartOf(t(zoned('2026-10-25T23:30:00')))).toBe(t(zoned('2026-10-19T00:00:00')));
+    expect(weekStartOf(t(zoned('2026-10-26T00:00:00')))).toBe(t(zoned('2026-10-26T00:00:00')));
   });
 
   it('starts at the tracking week and splits outages across week boundaries', () => {
     const since = t(TRACKING_SINCE);
-    const intervals = [{ start: t('2026-10-25T22:00:00+02:00'), end: t('2026-10-26T03:00:00+02:00') }];
-    const weeks = weeklyStats(intervals, t('2026-10-28T12:00:00+02:00'), since);
+    const intervals = [{ start: t(zoned('2026-10-25T22:00:00')), end: t(zoned('2026-10-26T03:00:00')) }];
+    const weeks = weeklyStats(intervals, t(zoned('2026-10-28T12:00:00')), since);
     // Tracking began on Saturday 17 Oct, so the first week is the one starting Monday 12 Oct.
     expect(weeks).toEqual([
       { weekStart: '2026-10-12', hoursOff: 0, outages: 0 },

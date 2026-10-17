@@ -1,8 +1,9 @@
 import { DAY_MS as DAY, HOUR_MS as HOUR, MINUTE_MS, type WeekStats, type WindowStats } from '../../shared/api';
+import { site } from '../../site.config';
 
 const WEEK = 7 * DAY;
-/** South Africa has no daylight saving: SAST is always UTC+2. */
-const SAST_OFFSET = 2 * HOUR;
+/** Days and weeks are calendar ones in the configured zone (fixed offset). */
+const OFFSET = site.utcOffsetMinutes * MINUTE_MS;
 
 interface Interval {
   start: number;
@@ -58,7 +59,7 @@ export function windowStats(
     longest = Math.max(longest, ms);
   }
 
-  // Calendar days (SAST) touched by the window, and how many of them had any outage. Merged
+  // Calendar days (configured zone) touched by the window, and how many of them had any outage. Merged
   // intervals are sorted by both start and end, so one index moves forward with the days.
   let daysTracked = 0;
   let daysWithOutage = 0;
@@ -84,20 +85,20 @@ export function windowStats(
   };
 }
 
-/** Start (UTC ms) of the SAST calendar day containing `ts`. */
+/** Start (UTC ms) of the calendar day containing `ts`, in the configured zone. */
 function dayStartOf(ts: number): number {
-  return Math.floor((ts + SAST_OFFSET) / DAY) * DAY - SAST_OFFSET;
+  return Math.floor((ts + OFFSET) / DAY) * DAY - OFFSET;
 }
 
-/** Start (UTC ms) of the SAST Monday-to-Sunday week containing `ts`. */
+/** Start (UTC ms) of the Monday-to-Sunday week containing `ts`, in the configured zone. */
 export function weekStartOf(ts: number): number {
-  const day = Math.floor((ts + SAST_OFFSET) / DAY);
+  const day = Math.floor((ts + OFFSET) / DAY);
   const dayOfWeek = (day + 3) % 7; // 1970-01-01 was a Thursday; Monday = 0.
-  return (day - dayOfWeek) * DAY - SAST_OFFSET;
+  return (day - dayOfWeek) * DAY - OFFSET;
 }
 
-function sastDate(ts: number): string {
-  return new Date(ts + SAST_OFFSET).toISOString().slice(0, 10);
+function localDate(ts: number): string {
+  return new Date(ts + OFFSET).toISOString().slice(0, 10);
 }
 
 /** Weekly hours off from the tracking start's week to the current week (at most `limit`). */
@@ -107,7 +108,7 @@ export function weeklyStats(intervals: Interval[], now: number, trackingSince: n
   const weeks: WeekStats[] = [];
   for (let start = first; start <= now; start += WEEK) {
     const stats = windowStats(intervals, start, Math.min(start + WEEK, now), trackingSince);
-    weeks.push({ weekStart: sastDate(start), hoursOff: stats.hoursOff, outages: stats.outages });
+    weeks.push({ weekStart: localDate(start), hoursOff: stats.hoursOff, outages: stats.outages });
   }
   return weeks;
 }

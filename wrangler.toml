@@ -1,4 +1,6 @@
 #:schema node_modules/wrangler/config-schema.json
+# This deployment (Garsfontein Ext. 16). To run the app for another area, start from
+# wrangler.example.toml, which has placeholders and the setup steps, and edit site.config.ts.
 # Worker and D1 names keep the original slug: renaming the Worker would create a new one.
 name = "garsfontein-grid"
 main = "worker/index.ts"

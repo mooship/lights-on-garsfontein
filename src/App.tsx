@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
 import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
+import { site } from '../site.config';
 import * as css from './App.css';
 import { bannersPending } from './banners';
 import { SiteBanner } from './components/Banner';
@@ -40,7 +41,7 @@ const Masthead: Component<{ notice: boolean }> = (props) => (
     <header class="gg-masthead">
       <div>
         <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
-        <h1 class="gg-title">Lights On?</h1>
+        <h1 class="gg-title">{site.brand.short}</h1>
       </div>
       <div class="gg-masthead-actions">
         <LanguageToggle />

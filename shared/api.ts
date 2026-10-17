@@ -1,5 +1,7 @@
 // Response shapes shared by the Worker and the SolidJS client.
 
+import { site } from '../site.config';
+
 // Public responses deliberately never say how an outage was recorded (sensor or by hand);
 // only the admin API exposes `source`.
 
@@ -98,5 +100,5 @@ export function outageDurationMs(outage: { startTime: string; endTime: string | 
 /** Heartbeats older than this mean the grid is off. */
 export const HEARTBEAT_THRESHOLD_MS = 180_000;
 
-/** The public start of outage tracking. Statistics never count time before it. */
-export const TRACKING_SINCE = '2026-10-17T00:00:00+02:00';
+/** The public start of outage tracking (site.config.ts). Statistics never count time before it. */
+export const TRACKING_SINCE = site.trackingSince;

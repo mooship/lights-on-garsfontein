@@ -1,9 +1,11 @@
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
+import { site } from '../../site.config';
 import { intlLocale, t } from './i18n';
+import { zoned } from './zone';
 
 export { outageDurationMs } from '../../shared/api';
 
-const TIME_ZONE = 'Africa/Johannesburg';
+const TIME_ZONE = site.timeZone;
 
 /** Builds a formatter per locale on first use: time-zone formatters are costly to create on slow phones. */
 function lazyFormat(options: Intl.DateTimeFormatOptions): (date: Date) => string {
@@ -42,13 +44,13 @@ export function formatHours(hours: number): string {
 }
 export const formatTime = (iso: string) => timeFormat(new Date(iso));
 
-const sastDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+const zoneDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
 
-/** "vandag", "gister" or "op Sa. 17 Okt." (or the English), judged in South African time. */
+/** "vandag", "gister" or "op Sa. 17 Okt." (or the English), judged in the configured zone. */
 export function formatRelativeDay(iso: string, now: number): string {
-  const day = sastDay(new Date(iso));
-  if (day === sastDay(new Date(now))) return t().day.today;
-  if (day === sastDay(new Date(now - DAY_MS))) return t().day.yesterday;
+  const day = zoneDay(new Date(iso));
+  if (day === zoneDay(new Date(now))) return t().day.today;
+  if (day === zoneDay(new Date(now - DAY_MS))) return t().day.yesterday;
   return t().day.on(formatDay(iso));
 }
 
@@ -90,12 +92,12 @@ export function formatClock(ms: number): string {
   return `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
 }
 
-// South Africa is UTC+2 all year (no daylight saving), so the admin's datetime-local inputs are
-// read and written as SAST whatever time zone the browser is in.
-const SAST_OFFSET_MS = 2 * HOUR_MS;
+// The admin's datetime-local inputs are read and written in the configured zone (fixed offset),
+// whatever time zone the browser is in.
+const OFFSET_MS = site.utcOffsetMinutes * MINUTE_MS;
 
-/** Converts an ISO string to the value a datetime-local input expects, in SAST. */
-export const toLocalInput = (iso: string) => new Date(Date.parse(iso) + SAST_OFFSET_MS).toISOString().slice(0, 16);
+/** Converts an ISO string to the value a datetime-local input expects, in the configured zone. */
+export const toLocalInput = (iso: string) => new Date(Date.parse(iso) + OFFSET_MS).toISOString().slice(0, 16);
 
-/** Reads a datetime-local value as SAST and returns it as an ISO string. */
-export const fromLocalInput = (value: string) => new Date(`${value}+02:00`).toISOString();
+/** Reads a datetime-local value in the configured zone and returns it as an ISO string. */
+export const fromLocalInput = (value: string) => new Date(zoned(value)).toISOString();

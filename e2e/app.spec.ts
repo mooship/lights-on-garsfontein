@@ -1,9 +1,15 @@
 import { test as base, type Cookie, expect, type Page } from '@playwright/test';
 import { DAY_MS } from '../shared/api';
+import { type Locale, site } from '../site.config';
 import { activeBanners, BANNERS, type Banner } from '../src/banners';
-import type { Locale } from '../src/lib/i18n';
+import { zoned } from '../src/lib/zone';
 
-/** Stores the app's language before every load of `page` (the app's own default is Afrikaans). */
+const DEFAULT_LOCALE = site.locales[0];
+const BRAND = site.brand.short;
+/** The tab title during an outage: "OFF 5m · <brand>". */
+const outageTitle = (state: string) => new RegExp(`^${state} \\d+m · ${BRAND.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+
+/** Stores the app's language before every load of `page` (the app's own default is site.locales[0]). */
 const withLocale = (page: Page, locale: Locale) => page.addInitScript((l) => localStorage.setItem('locale', l), locale);
 
 // Most tests read the English copy; a block opts into Afrikaans with test.use({ appLocale: 'af' }).
@@ -110,11 +116,11 @@ test.describe('language', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('/');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'af');
+    await expect(page.locator('html')).toHaveAttribute('lang', DEFAULT_LOCALE);
     await expect(page.getByRole('status')).toContainText('Die krag is aan');
     await expect(page.getByRole('heading', { name: 'Statistiek' })).toBeVisible();
     await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0);
-    await expect(page).toHaveTitle('AAN · Lights On?');
+    await expect(page).toHaveTitle(`AAN · ${BRAND}`);
     await context.close();
   });
 
@@ -144,7 +150,7 @@ test.describe('language', () => {
     const page = await context.newPage();
     await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
     await page.goto('/');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'af');
+    await expect(page.locator('html')).toHaveAttribute('lang', DEFAULT_LOCALE);
     await expect(page.getByRole('heading', { name: 'Statistiek' })).toBeVisible();
 
     await withLocale(page, 'en');
@@ -167,7 +173,7 @@ test.describe('public page', () => {
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
   });
 
-  for (const locale of ['af', 'en'] as const) {
+  for (const locale of site.locales) {
     test.describe(locale, () => {
       test.use({ appLocale: locale });
 
@@ -242,11 +248,11 @@ test.describe('admin', () => {
 
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText('Power is off');
-    await expect(page).toHaveTitle(/^OFF \d+m · Lights On\?$/);
+    await expect(page).toHaveTitle(outageTitle('OFF'));
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-off.svg');
     await page.getByRole('button', { name: 'Skakel oor na Afrikaans' }).click();
     await expect(page.getByRole('status')).toContainText('Die krag is af');
-    await expect(page).toHaveTitle(/^AF \d+m · Lights On\?$/);
+    await expect(page).toHaveTitle(outageTitle('AF'));
     await page.getByRole('button', { name: 'Switch to English' }).click();
 
     await login(page);
@@ -254,7 +260,7 @@ test.describe('admin', () => {
     await expect(page.getByTestId('punch-clock')).toHaveText('00:00:00');
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText('Power is on');
-    await expect(page).toHaveTitle('ON · Lights On?');
+    await expect(page).toHaveTitle(`ON · ${BRAND}`);
   });
 
   test('logs a past outage', async ({ page }) => {
@@ -303,19 +309,19 @@ test.describe('admin session', () => {
 
 test.describe('site banner', () => {
   const VOTE = 'vote-2026-11-04';
-  const VOTE_UNTIL = '2026-11-05T00:00:00+02:00';
-  const DURING = new Date('2026-10-28T09:00:00+02:00');
+  const VOTE_UNTIL = zoned('2026-11-05T00:00');
+  const DURING = new Date(zoned('2026-10-28T09:00'));
   const notice = (page: Page) => page.getByRole('region', { name: 'Notice' });
 
   test('picks the banners active at a given time', () => {
     const at = (iso: string) => activeBanners(Date.parse(iso)).map((b) => b.id);
-    expect(at('2026-10-16T23:59:59+02:00')).toEqual([]);
-    expect(at('2026-10-17T00:00:00+02:00')).toEqual([VOTE]);
-    expect(at('2026-11-04T23:59:59+02:00')).toEqual([VOTE]);
+    expect(at(zoned('2026-10-16T23:59:59'))).toEqual([]);
+    expect(at(zoned('2026-10-17T00:00:00'))).toEqual([VOTE]);
+    expect(at(zoned('2026-11-04T23:59:59'))).toEqual([VOTE]);
     expect(at(VOTE_UNTIL)).toEqual([]); // `until` is exclusive
     const later: Banner = {
       id: 'later',
-      from: '2026-11-01T00:00:00+02:00',
+      from: zoned('2026-11-01T00:00'),
       until: VOTE_UNTIL,
       text: { af: '', en: '' },
     };

@@ -1,6 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+/**
+ * The sensor's last report. One row (id 1), so one sensor per instance: a second sensor needs its
+ * own rows here, a sensor id on the heartbeat route and on sensor outages, and its own detection.
+ */
 export const heartbeats = sqliteTable('heartbeats', {
   id: integer('id').primaryKey(),
   lastSeen: text('last_seen').notNull(),
@@ -12,6 +16,10 @@ export const outages = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     startTime: text('start_time').notNull(),
     endTime: text('end_time'),
+    // Adding a source: extend this enum, `OutageSource` in shared/api.ts and the admin `source`
+    // labels in the dictionaries together, then run `npm run db:generate` and commit any
+    // migration. In SQLite the enum is type-level only (no CHECK constraint), so existing rows and
+    // the column need no change.
     source: text('source', { enum: ['sensor', 'manual'] }).notNull(),
     isFalsePositive: integer('is_false_positive', { mode: 'boolean' }).notNull().default(sql`0`),
     isPlanned: integer('is_planned', { mode: 'boolean' }).notNull().default(sql`0`),

@@ -1,25 +1,29 @@
 <!doctype html>
-<html lang="af">
+<!-- The values in percent signs come from site.config.ts (siteConfig in vite.config.ts). Keep them
+     out of the inline script: its CSP hash is in public/_headers. -->
+<html lang="%site.locales.0%" data-locales="%site.locales%">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <script>
       (function() {
         try {
+          var h = document.documentElement;
           var s = localStorage.getItem('theme');
           var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
-          // The shell below is in both languages; base.css shows the one matching lang.
-          if (localStorage.getItem('locale') === 'en') document.documentElement.lang = 'en';
+          h.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
+          // The shell below is in every language; base.css shows the one matching lang.
+          var l = localStorage.getItem('locale');
+          if (l && h.getAttribute('data-locales').split(' ').indexOf(l) >= 0) h.lang = l;
         } catch (e) {}
       })();
     </script>
-    <title>Lights On, Garsfontein? · Is die krag aan in Garsfontein? Is the power on?</title>
+    <title>%site.brand.full% · Is die krag aan in Garsfontein? Is the power on?</title>
     <meta
       name="description"
-      content="Is die krag aan in Garsfontein? Intydse kragstatus en ’n deurlopende rekord van kragonderbrekings in Garsfontein, Pretoria (gemeet in Uitbreiding 16, Wyk 45, Streek 6, Stad Tshwane), sedert 17 Oktober 2026. Live power status and a continuous record of power outages in Garsfontein, Pretoria (measured in Extension 16, Ward 45, Region 6, City of Tshwane), since 17 October 2026."
+      content="Is die krag aan in Garsfontein? Intydse kragstatus en ’n deurlopende rekord van kragonderbrekings in Garsfontein, Pretoria (gemeet in Uitbreiding 16, Wyk 45, Streek 6, Stad Tshwane), sedert %since.af%. Live power status and a continuous record of power outages in Garsfontein, Pretoria (measured in Extension 16, Ward 45, Region 6, City of Tshwane), since %since.en%."
     />
-    <link rel="canonical" href="https://garsfontein.timothybrits.co.za/" />
+    <link rel="canonical" href="%site.url%/" />
     <meta name="theme-color" content="#F6F4EF" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#121312" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -29,48 +33,47 @@
     <link rel="stylesheet" href="/src/styles/base.css" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Lights On, Garsfontein?" />
-    <meta property="og:locale" content="af_ZA" />
-    <meta property="og:locale:alternate" content="en_ZA" />
-    <meta property="og:url" content="https://garsfontein.timothybrits.co.za/" />
-    <meta property="og:title" content="Lights On, Garsfontein? · Is die krag aan in Garsfontein? Is the power on?" />
+    <meta property="og:site_name" content="%site.brand.full%" />
+    <!-- og:locale and og:locale:alternate are added from site.locales. -->
+    <meta property="og:url" content="%site.url%/" />
+    <meta property="og:title" content="%site.brand.full% · Is die krag aan in Garsfontein? Is the power on?" />
     <meta
       property="og:description"
       content="Intydse kragstatus en ’n deurlopende rekord van kragonderbrekings in Garsfontein, Pretoria. Live power status and a record of power outages in Garsfontein, Pretoria."
     />
-    <meta property="og:image" content="https://garsfontein.timothybrits.co.za/og.png" />
+    <meta property="og:image" content="%site.url%/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Lights On? Die huidige kragstatus in Garsfontein, Pretoria. Current power status." />
+    <meta property="og:image:alt" content="%site.brand.short% Die huidige kragstatus in Garsfontein, Pretoria. Current power status." />
     <meta name="twitter:card" content="summary_large_image" />
 
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "Service",
-        "name": "Lights On, Garsfontein?",
+        "name": "%site.brand.full%",
         "alternateName": ["Garsfontein power status", "Garsfontein kragstatus"],
-        "description": "’n Oop rekord van kragonderbrekings vir huise wat hul krag van die Garsfontein-substasie in Pretoria kry, bygehou sedert 17 Oktober 2026. Onafhanklik bedryf deur ’n inwoner van Garsfontein. Nie verbonde aan die Stad Tshwane of Eskom nie. An open record of power outages for homes supplied by the Garsfontein substation in Pretoria, kept since 17 October 2026. Operated independently by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.",
-        "inLanguage": ["af", "en"],
-        "url": "https://garsfontein.timothybrits.co.za/",
+        "description": "’n Oop rekord van kragonderbrekings vir huise wat hul krag van die Garsfontein-substasie in Pretoria kry, bygehou sedert %since.af%. Onafhanklik bedryf deur ’n inwoner van Garsfontein. Nie verbonde aan die Stad Tshwane of Eskom nie. An open record of power outages for homes supplied by the Garsfontein substation in Pretoria, kept since %since.en%. Operated independently by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.",
+        "inLanguage": %site.locales%,
+        "url": "%site.url%/",
         "serviceType": "Power outage tracking",
         "areaServed": {
           "@type": "AdministrativeArea",
-          "name": "Garsfontein Extension 16, Ward 45, Pretoria",
+          "name": "%site.area.name%",
           "containedInPlace": {
             "@type": "AdministrativeArea",
-            "name": "Region 6, City of Tshwane",
-            "containedInPlace": { "@type": "City", "name": "City of Tshwane" },
-            "address": { "@type": "PostalAddress", "addressRegion": "Gauteng", "addressCountry": "ZA" }
+            "name": "%site.area.region%",
+            "containedInPlace": { "@type": "City", "name": "%site.area.city%" },
+            "address": { "@type": "PostalAddress", "addressRegion": "%site.area.province%", "addressCountry": "%site.area.country%" }
           }
         },
         "availableChannel": {
           "@type": "ServiceChannel",
-          "serviceUrl": "https://garsfontein.timothybrits.co.za/api/status"
+          "serviceUrl": "%site.url%/api/status"
         },
         "provider": {
           "@type": "Person",
-          "name": "Timothy Brits",
+          "name": "%site.operator.name%",
           "description": "Resident of Garsfontein Extension 16. Not affiliated with the City of Tshwane or Eskom."
         },
         "isAccessibleForFree": true
@@ -80,13 +83,13 @@
   <body>
     <div id="root">
       <!-- Static loading state. Mirrors the app's masthead and src/components/Skeletons.tsx box for box
-           (zero layout shift). The data-i18n* elements are filled from src/i18n in both languages at
+           (zero layout shift). The data-i18n* elements are filled from src/i18n in every language at
            build time (staticI18n in vite.config.ts). -->
       <div class="gg-shell">
         <header class="gg-masthead">
           <div>
             <p class="gg-eyebrow" data-i18n="masthead.eyebrow"></p>
-            <h1 class="gg-title">Lights On?</h1>
+            <h1 class="gg-title">%site.brand.short%</h1>
           </div>
           <div class="gg-masthead-actions">
             <button type="button" class="gg-icon-button gg-lang-button" data-i18n-switch data-i18n-label="lang.switchTo" disabled></button>

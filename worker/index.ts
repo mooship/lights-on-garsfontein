@@ -11,7 +11,11 @@ import { STATUS_PATH, statusRoutes } from './routes/status';
 /** The hourly housekeeping cron in wrangler.toml. */
 const HOURLY_CRON = '0 * * * *';
 
-/** Every Worker endpoint, keyed by "METHOD /path". */
+/**
+ * Every Worker endpoint, keyed by "METHOD /path". Adding one means: its handler in a file under
+ * routes/, its route map spread here, the path in wrangler's `assets.run_worker_first` if it is
+ * outside /api/, and the path in vite.config.ts's dev `server.proxy`.
+ */
 const routes: Routes = { ...statusRoutes, ...historyRoutes, ...authRoutes, ...adminRoutes, ...seoRoutes };
 
 // public/_headers only covers static assets; Worker responses (API, SEO) get these.

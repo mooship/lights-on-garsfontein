@@ -29,9 +29,7 @@
   --gg-font-body: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* The index.html shell carries every string in both languages (vite.config.ts); show the one
-   the boot script picked. */
-html[lang="en"] [data-l="af"],
-html:not([lang="en"]) [data-l="en"] {
-  display: none;
-}
+/* The index.html shell carries every string in each language (vite.config.ts); show the one
+   the boot script picked. localeVisibility in vite.config.ts replaces the marker below with the
+   rules for every locale in site.config.ts; the default shows unless lang is another locale. */
+/* @locale-visibility */
