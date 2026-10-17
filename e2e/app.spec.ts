@@ -71,7 +71,7 @@ test.describe('language', () => {
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'af');
     await expect(page.getByRole('status')).toContainText('Die krag is aan');
-    await expect(page.getByRole('heading', { name: 'In syfers' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Statistiek' })).toBeVisible();
     await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0);
     await expect(page).toHaveTitle('AAN · Lights On?');
     await context.close();
@@ -104,7 +104,7 @@ test.describe('language', () => {
     await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'af');
-    await expect(page.getByRole('heading', { name: 'In syfers' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Statistiek' })).toBeVisible();
 
     await inEnglish(page);
     await page.reload();

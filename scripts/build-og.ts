@@ -5,8 +5,9 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
-const font = (file: string) =>
-  `data:font/woff2;base64,${readFileSync(new URL(`../public/fonts/${file}`, import.meta.url)).toString('base64')}`;
+// Fontsource's Latin weight-axis files, the same ones the site bundles.
+const font = (pkg: string, file: string) =>
+  `data:font/woff2;base64,${readFileSync(new URL(import.meta.resolve(`@fontsource-variable/${pkg}/files/${file}`))).toString('base64')}`;
 
 const CARDS = {
   on: {
@@ -29,8 +30,8 @@ const CARDS = {
 
 const html = (card: (typeof CARDS)[keyof typeof CARDS]) => `<!doctype html>
 <html lang="af"><head><style>
-@font-face { font-family: Fraunces; src: url(${font('fraunces-latin-wght.woff2')}); font-weight: 100 900; }
-@font-face { font-family: Jakarta; src: url(${font('plus-jakarta-sans-latin-wght.woff2')}); font-weight: 200 800; }
+@font-face { font-family: Fraunces; src: url(${font('fraunces', 'fraunces-latin-wght-normal.woff2')}); font-weight: 100 900; }
+@font-face { font-family: Jakarta; src: url(${font('plus-jakarta-sans', 'plus-jakarta-sans-latin-wght-normal.woff2')}); font-weight: 200 800; }
 * { margin: 0; box-sizing: border-box; }
 body { width: 1200px; height: 630px; background: #F6F4EF; color: #1F2120; font-family: Jakarta, sans-serif;
   padding: 72px 80px; display: flex; flex-direction: column; justify-content: space-between; }
@@ -48,7 +49,7 @@ h1 { font-family: Fraunces, serif; font-size: 88px; font-weight: 700; margin-top
 <div class="status"><div class="icon"><svg width="64" height="64" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="${card.glyph}"/></svg></div>
   <div><p class="label">${card.label}</p><p class="english" lang="en">${card.english}</p></div></div>
-<p class="foot">Deur ’n inwoner van Garsfontein · nie die Stad Tshwane of Eskom nie</p>
+<p class="foot">Onafhanklike diens · Nie verbonde aan die Stad Tshwane of Eskom nie</p>
 </body></html>`;
 
 const outDir = new URL('../public/og/', import.meta.url);

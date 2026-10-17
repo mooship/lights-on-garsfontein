@@ -2,7 +2,7 @@
   "name": "Lights On, Garsfontein?",
   "id": "/",
   "short_name": "Lights On?",
-  "description": "Lewendige kragstatus en onderbrekingsgeskiedenis vir Garsfontein, Pretoria, gemeet in Uitbreiding 16 (Wyk 45). Live power status and outage history for Garsfontein, Pretoria, measured in Extension 16 (Ward 45).",
+  "description": "Intydse kragstatus en onderbrekingsgeskiedenis vir Garsfontein, Pretoria, gemeet in Uitbreiding 16 (Wyk 45). Live power status and outage history for Garsfontein, Pretoria, measured in Extension 16 (Ward 45).",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

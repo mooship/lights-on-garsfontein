@@ -25,7 +25,7 @@ export const BANNERS: readonly Banner[] = [
     from: '2026-10-17T00:00:00+02:00',
     until: '2026-11-05T00:00:00+02:00',
     text: {
-      af: 'Die plaaslike regeringsverkiesing vind op Woensdag 4 November 2026 plaas. Kyk of jy geregistreer is en waar jy kan stem.',
+      af: 'Die plaaslike regeringsverkiesing vind op Woensdag 4 November 2026 plaas. Kyk of jy geregistreer is en waar jou stemlokaal is.',
       en: 'Local government elections take place on Wednesday 4 November 2026. Check your registration and voting station.',
     },
     link: {
