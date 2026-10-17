@@ -3,7 +3,7 @@ import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
-import { DAY_MS, HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
+import { HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
 import { formatCalendarDay, formatDate, formatDuration, formatHours } from '../lib/format';
 import { AXIS_WIDTH } from './chart';
 import { TRENDS_TABLE_LABEL, TRENDS_TITLE } from './Skeletons';
@@ -201,13 +201,9 @@ export const Trends: Component<TrendsProps> = (props) => {
   const started = () => props.now >= since();
   const s = () => props.stats.last30;
   const prev = () => props.stats.previous30;
-  // Comparing 30 days with the 30 before needs 60 days of records.
-  const firstComparison = () => formatDate(new Date(since() + 60 * DAY_MS).toISOString());
-
   const subtitle = () => {
     if (!started()) return `Tracking starts on ${formatDate(props.stats.trackingSince)}.`;
-    const range = s().trackedHours < 30 * 24 ? `Since ${formatDate(props.stats.trackingSince)}.` : 'The last 30 days.';
-    return prev() ? range : `${range} Comparisons with the month before start on ${firstComparison()}.`;
+    return s().trackedHours < 30 * 24 ? `Since ${formatDate(props.stats.trackingSince)}.` : 'The last 30 days.';
   };
 
   return (

@@ -103,7 +103,7 @@ globalStyle('.gg-status-detail', {
 });
 
 // The trends body is fixed; only the user-opened weekly table below it may grow the card.
-globalStyle('.gg-trends-body', { height: '34rem', overflow: 'hidden' });
+globalStyle('.gg-trends-body', { height: '32.75rem', overflow: 'hidden' });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
 
@@ -114,9 +114,6 @@ globalStyle('.gg-trends-details > summary', {
   display: 'flex',
   alignItems: 'center',
 });
-
-globalStyle('.gg-prose', { display: 'flex', flexDirection: 'column', gap: '0.75rem', color: vars.color.muted });
-globalStyle('.gg-prose .gg-card-title', { marginBottom: 0, color: vars.color.text });
 
 globalStyle('.gg-card-title', {
   fontFamily: vars.font.display,

@@ -2,12 +2,10 @@ import { globalStyle, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 import { AXIS_WIDTH } from './chart';
 
-// Two lines reserved: the subtitle wraps while it mentions when comparisons begin.
 export const subtitle = style({
   marginTop: '-0.5rem',
   marginBottom: '1rem',
-  height: '2.5rem',
-  lineHeight: 1.4,
+  height: '1.25rem',
   fontSize: '0.875rem',
   color: vars.color.muted,
 });
