@@ -118,8 +118,11 @@ async function postStillOff(ctx: RouteContext): Promise<Response> {
   return json(body, 201);
 }
 
-async function postHeartbeat({ db }: RouteContext): Promise<Response> {
-  const closed = await recordHeartbeat(db, new Date());
+async function postHeartbeat({ db, request }: RouteContext): Promise<Response> {
+  const { closed, changed } = await recordHeartbeat(db, new Date());
+  // The route purges the status (its live reading); the other views only when an outage changed,
+  // so a sensor posting every minute does not keep emptying them.
+  if (changed) await purgeEdgeCache(new URL(request.url).origin, OUTAGE_VIEWS);
   return json({ ok: true, closedOutages: closed });
 }
 
@@ -147,7 +150,6 @@ export const statusRoutes: Routes = {
   'POST /api/heartbeat': {
     handler: postHeartbeat,
     authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),
-    // Any heartbeat may close an outage or record one it missed.
-    purges: OUTAGE_VIEWS,
+    purges: [STATUS_PATH],
   },
 };

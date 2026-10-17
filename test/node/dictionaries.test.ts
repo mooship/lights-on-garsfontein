@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { site } from '../../site.config';
 import { HEAD } from '../../src/i18n/head';
@@ -23,6 +25,16 @@ describe('public copy', () => {
       const all = [...strings(publicCopy, locale), ...strings(HEAD[locale], `head.${locale}`)];
       expect(all.length).toBeGreaterThan(100);
       expect(all.filter(([, text]) => RECORDING_METHOD.test(text))).toEqual([]);
+    });
+  }
+});
+
+describe('public static files', () => {
+  // These ship as-is to every visitor and crawler, outside the dictionaries.
+  for (const file of ['templates/llms.txt', 'templates/site.webmanifest', 'index.html', 'privacy.html']) {
+    it(`never says how an outage was recorded (${file})`, () => {
+      const text = readFileSync(resolve(import.meta.dirname, '../..', file), 'utf8');
+      expect(text.split('\n').filter((line) => RECORDING_METHOD.test(line))).toEqual([]);
     });
   }
 });

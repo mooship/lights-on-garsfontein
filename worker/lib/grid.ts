@@ -187,7 +187,7 @@ export async function detectOutage(db: Db, now: Date): Promise<{ outage?: Outage
  * opened for it (power came back between two cron runs), the gap is recorded as a closed sensor
  * outage, unless the gap is already on record or an open outage (closed here) covers it.
  */
-export async function recordHeartbeat(db: Db, now: Date): Promise<number> {
+export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: number; changed: boolean }> {
   const iso = now.toISOString();
   const staleBefore = new Date(now.getTime() - HEARTBEAT_THRESHOLD_MS).toISOString();
   const anyOpen = isNull(outages.endTime);
@@ -209,7 +209,7 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<number> {
         sql`not exists (select 1 from ${outages} where ${outages.startTime} >= ${heartbeats.lastSeen} or ${anyOpen})`,
       ),
     );
-  const [, , closed] = await db.batch([
+  const [missed, , closed] = await db.batch([
     db.insert(outages).select(missedOutage),
     db
       .insert(heartbeats)
@@ -217,13 +217,14 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<number> {
       .onConflictDoUpdate({ target: heartbeats.id, set: { lastSeen: iso } }),
     db.update(outages).set({ endTime: iso }).where(anyOpen).returning({ id: outages.id }),
   ]);
-  return closed.length;
+  return { closed: closed.length, changed: closed.length > 0 || missed.meta.changes > 0 };
 }
 
 export async function purgeExpiredSessions(db: Db, now: Date): Promise<void> {
   await db.delete(sessions).where(lt(sessions.expiresAt, now.toISOString()));
 }
 
+// privacy.html states this period (both languages): change it there too.
 const FINGERPRINT_DAYS = 30;
 
 /**
@@ -238,11 +239,12 @@ export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
     .where(and(lt(outageConfirmations.createdAt, cutoff), sql`${outageConfirmations.clientHash} not like 'purged:%'`));
 }
 
+// privacy.html states this period (both languages): change it there too.
 const STILL_OFF_KEEP_DAYS = 90;
 
 /**
  * "Still off" fingerprints go after FINGERPRINT_DAYS, like confirmations, and the rows after
- * STILL_OFF_KEEP_DAYS (they only ever count for an hour).
+ * STILL_OFF_KEEP_DAYS (they only count for STILL_OFF_WINDOW_MS).
  */
 export async function purgeOldStillOffReports(db: Db, now: Date): Promise<void> {
   const fingerprintCutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();

@@ -32,7 +32,7 @@ All public endpoints are free to use; the JSON API, the CSV and the feed allow a
 - `since`: when the current state began (ISO 8601), or null
 - `outage`: the outage in progress (`id`, `startTime`, `endTime`, `planned`, `confirmations`), or null
 - `recent`: the five most recent outages, newest first
-- `monitored`: true while the sensor at the measuring point is reporting. When false, `"ON"` only means that no outage has been reported, not that power was measured.
+- `monitored`: true while a live reading from the measuring point is current. When false, `"ON"` only means that no outage has been reported, not that power was measured.
 - `stillOffReports`: while `status` is `"ON"`, how many residents reported in the last hour that their power is still off where they are (always 0 while `"OFF"`). Reports never change `status`.
 - `generatedAt`: server time of the response
 

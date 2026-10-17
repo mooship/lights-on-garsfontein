@@ -106,10 +106,10 @@ export const DAY_MS = 24 * HOUR_MS;
 /** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
 export type TurnstileAction = 'confirm' | 'login' | 'still_off' | 'contact';
 
-/** How far back "still off" reports are counted. */
+/** How far back "still off" reports are counted. Copy: `stillOff.count` in src/i18n ("last hour"). */
 export const STILL_OFF_WINDOW_MS = HOUR_MS;
 
-/** One "still off" report per client per this long. */
+/** One "still off" report per client per this long. Copy: `already_reported` in src/i18n, privacy.html. */
 export const STILL_OFF_DEDUPE_MS = 2 * HOUR_MS;
 
 /** Admin punch clock: punch out when the power goes off, punch in when it comes back. */

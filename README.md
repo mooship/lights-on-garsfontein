@@ -41,7 +41,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 - `monitored` is `true` while the sensor's last heartbeat is fresh. When it is `false`, `ON` means only that no outage has been reported.
 - `confirmations` (on each outage) and `stillOffReports` (reports in the last hour, always `0` while `OFF`) are counts from residents, not measurements, and never change `status`.
 - Only the admin API exposes an outage's `source`.
-- `POST /api/confirm` takes `{ "token", "outageId"? }` and answers `201` with `{ "confirmations": n }`, or `409` with `no_active_outage`, `outage_changed` or `already_confirmed`. `POST /api/still-off` takes `{ "token" }` and answers `201` with `{ "reports": n }`, or `409` with `outage_in_progress` or `already_reported`. Each token is a Turnstile token solved for that action (`confirm`, `still_off`).
+- `POST /api/confirm` takes `{ "token", "outageId"? }` and answers `201` with `{ "confirmations": n }`, or `409` with `no_active_outage`, `outage_changed` or `already_confirmed`. `POST /api/still-off` takes `{ "token" }` and answers `201` with `{ "reports": n }`, or `409` with `outage_in_progress` or `already_reported`. `POST /api/contact` takes `{ "token" }` and answers `200` with `{ "email" }`, or `404` with `not_configured`. Each token is a Turnstile token solved for that action (`confirm`, `still_off`, `contact`).
 
 ### CSV contract
 

@@ -91,6 +91,7 @@ export const af = {
     unknown: 'Iets het skeefgeloop. Probeer asseblief weer.',
   },
   stillOff: {
+    // The hour and two hours below are STILL_OFF_WINDOW_MS and STILL_OFF_DEDUPE_MS (shared/api.ts).
     button: 'Steeds af by jou?',
     busy: 'Stuur tans…',
     done: 'Dankie, aangeteken.',

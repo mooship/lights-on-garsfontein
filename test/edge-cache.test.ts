@@ -12,6 +12,9 @@ const admin = (path: string, body: unknown) =>
 
 const openOutage = () => insertOutage({});
 
+const heartbeat = () =>
+  call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
+
 /** A silent sensor with nothing on record yet: the next check opens an outage. */
 async function staleHeartbeat(): Promise<undefined> {
   await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 60);
@@ -58,6 +61,12 @@ const WRITES: Write[] = [
     act: () => call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } }),
     status: 200,
   },
+  {
+    name: 'a heartbeat that records a missed outage',
+    arrange: staleHeartbeat,
+    act: () => heartbeat(),
+    status: 200,
+  },
   { name: 'outage detection opening an outage', arrange: staleHeartbeat, act: async () => void (await runCron()) },
   {
     name: 'a confirmation that opens an outage',
@@ -88,6 +97,14 @@ describe('edge cache purges', () => {
     }
     expect((await act(id))?.status).toBe(status);
     for (const path of EDGE_CACHED) expect(await isCached(path), path).toBe(false);
+  });
+
+  it('a routine heartbeat purges only the status, whose live reading it changes', async () => {
+    await setHeartbeat(30);
+    for (const path of EDGE_CACHED) await call(path);
+    expect((await heartbeat()).status).toBe(200);
+    expect(await isCached('/api/status')).toBe(false);
+    for (const path of EDGE_CACHED.filter((p) => p !== '/api/status')) expect(await isCached(path), path).toBe(true);
   });
 
   it('a confirmation purges the CSV, whose confirmation counts it changes', async () => {

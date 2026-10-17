@@ -61,7 +61,7 @@ To add an endpoint or a language, follow "Adding an endpoint" and "Adding a lang
 ## Hard rules
 
 - **Never reveal how an outage was recorded** in public copy or public API responses; only the admin API exposes `source`. `test/node/dictionaries.test.ts` and `e2e/app.spec.ts` (`RECORDING_METHOD`) forbid words such as sensor, by hand, voeler and handmatig; admin copy is exempt.
-- **Afrikaans is the default.** `src/i18n/af.ts` is the source and defines `Messages`; `en.ts` must `satisfy` it. Every user-facing string goes in both (banners may omit English, which falls back to Afrikaans; still write it). Afrikaans must be natural, professional and AWS-correct.
+- **Afrikaans is the default.** `src/i18n/af.ts` is the source and defines `Messages`; `en.ts` must `satisfy` it. Every user-facing string goes in both (banners may omit English, which falls back to Afrikaans; still write it). The one exception is the Atom feed (`worker/routes/history.ts`), which is English-only because feeds are read by software. Afrikaans must be natural, professional and AWS-correct.
 - **Public contracts are stable.** CSV columns are only ever appended; API response fields are only added. Document changes in the README.
 - **Placeholders.** Static files use `%site.<path>%` and `%since.<locale>%`, and `index.html` also uses `%page.*%` (`build/html.ts`, `vite.config.ts`). An unknown or leftover placeholder fails the build.
 - **Inline scripts are frozen.** The boot scripts in `index.html` and `privacy.html` are CSP-hashed in `public/_headers`. Any edit, comments included, needs the hash updated (`test/csp.test.ts` fails otherwise). They must stay static: values reach them through `<html lang>` and `<html data-locales>`, never placeholders.

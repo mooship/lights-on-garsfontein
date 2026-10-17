@@ -2,6 +2,8 @@
 <!-- FORKERS: review the legal basis for your jurisdiction. This page is written for POPIA (South
      Africa) and describes this deployment's data handling; check every claim against your code,
      your wrangler.toml and your Cloudflare plan. -->
+<!-- The retention periods below mirror FINGERPRINT_DAYS and STILL_OFF_KEEP_DAYS (worker/lib/grid.ts)
+     and the two hours STILL_OFF_DEDUPE_MS (shared/api.ts): change them together. -->
 <html lang="af">
   <head>
     <meta charset="UTF-8" />
@@ -98,7 +100,7 @@
           </li>
           <li>
             <strong>Instellings in jou blaaier.</strong> Jou blaaier stoor jou tema (lig of donker), jou taal, watter
-            kennisgewings jy toegemaak het en of jy ’n onderbreking reeds bevestig het. Sodat die webwerf sonder ’n verbinding
+            kennisgewings jy toegemaak het, of jy ’n onderbreking reeds bevestig het en wanneer jy laas gemeld het dat jou krag steeds af is. Sodat die webwerf sonder ’n verbinding
             werk, hou jou blaaier ook ’n kopie van die bladsye en die laaste status. Dit bly op jou toestel en word nie
             na ons gestuur nie.
           </li>
@@ -249,7 +251,7 @@
           </li>
           <li>
             <strong>Settings in your browser.</strong> Your browser stores your theme (light or dark), your language,
-            which notices you have dismissed and whether you have already confirmed an outage. So that the site works
+            which notices you have dismissed, whether you have already confirmed an outage and when you last reported that your power is still off. So that the site works
             without a connection, your browser also keeps a copy of the pages and the last status. These stay on your
             device and are not sent to us.
           </li>
