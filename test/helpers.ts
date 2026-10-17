@@ -33,12 +33,16 @@ export async function call(path: string, options: CallOptions = {}): Promise<Res
   return worker.fetch(request as Request<unknown, IncomingRequestCfProperties>, options.env ?? env);
 }
 
-/** Stubs the Turnstile siteverify call with the given outcome. */
-export function mockTurnstile(success: boolean) {
+/** Stubs the Turnstile siteverify call: a token solved on our host for `action`. */
+export function mockTurnstile(
+  success: boolean,
+  action: 'confirm' | 'login' = 'confirm',
+  hostname = 'garsfontein.example',
+) {
   const realFetch = globalThis.fetch;
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
-    if (new URL(url).hostname === 'challenges.cloudflare.com') return Response.json({ success });
+    if (new URL(url).hostname === 'challenges.cloudflare.com') return Response.json({ success, action, hostname });
     return realFetch(input, init);
   });
   vi.stubGlobal('fetch', spy);
@@ -72,7 +76,7 @@ export async function insertOutage(values: {
 }
 
 export async function login(password = 'test-password'): Promise<string> {
-  mockTurnstile(true);
+  mockTurnstile(true, 'login');
   const res = await call('/api/admin/login', { method: 'POST', body: { password, token: 'turnstile-token' } });
   if (res.status !== 200) throw new Error(`login failed: ${res.status}`);
   const cookie = res.headers.get('Set-Cookie') ?? '';

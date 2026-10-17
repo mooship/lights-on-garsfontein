@@ -3,11 +3,13 @@ import { z } from 'zod';
 import type { Db } from '../db/client';
 import { sessions } from '../db/schema';
 import { randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
-import { errors, json, parseBody } from '../lib/http';
+import { errors, isRateLimited, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { verifyTurnstile } from '../lib/turnstile';
 
-const SESSION_COOKIE = 'admin_session';
+// __Host- prefix: the browser only accepts it from this exact host (no sibling-subdomain cookie tossing).
+const SESSION_COOKIE = '__Host-admin_session';
+const SESSION_TOKEN = /^[\w-]{43}$/;
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const ADMIN_USER_ID = 'admin';
 
@@ -30,7 +32,8 @@ function readCookie(request: Request, name: string): string | null {
 /** Returns the session's user id when the request carries a valid, unexpired session cookie. */
 export async function getSessionUser(request: Request, db: Db): Promise<string | null> {
   const token = readCookie(request, SESSION_COOKIE);
-  if (!token) return null;
+  // Skip the database for anything that cannot be one of our tokens.
+  if (!token || !SESSION_TOKEN.test(token)) return null;
   const id = await sha256Hex(token);
   const session = await db.query.sessions.findFirst({
     where: and(eq(sessions.id, id), gt(sessions.expiresAt, new Date().toISOString())),
@@ -41,8 +44,12 @@ export async function getSessionUser(request: Request, db: Db): Promise<string |
 async function login({ request, env, db, ip }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, loginSchema);
   if ('response' in parsed) return parsed.response;
+  // A site-wide cap on top of the per-connection limit, so spreading guesses over many
+  // addresses does not help either.
+  if (await isRateLimited(env.LOGIN_GLOBAL_LIMITER, 'login')) return errors.rateLimited();
   // Turnstile keeps bots off the sign-in form; scripts use ADMIN_API_TOKEN instead.
-  if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip))) {
+  const expected = { action: 'login' as const, hostname: new URL(env.SITE_URL).hostname };
+  if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip, expected))) {
     return errors.forbidden('turnstile_failed');
   }
   if (!env.ADMIN_PASSWORD_HASH || !(await verifyPassword(parsed.data.password, env.ADMIN_PASSWORD_HASH))) {

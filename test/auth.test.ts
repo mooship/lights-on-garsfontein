@@ -8,13 +8,13 @@ const attempt = (password: string, extra: Parameters<typeof call>[1] = {}) =>
 
 describe('admin auth', () => {
   it('refuses all logins while no password hash is configured', async () => {
-    mockTurnstile(true);
+    mockTurnstile(true, 'login');
     const res = await attempt('test-password', { env: { ...env, ADMIN_PASSWORD_HASH: '' } as Env });
     expect(res.status).toBe(401);
   });
 
   it('requires a passing Turnstile check before checking the password', async () => {
-    mockTurnstile(false);
+    mockTurnstile(false, 'login');
     const res = await attempt('test-password');
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: 'turnstile_failed' });
@@ -22,19 +22,26 @@ describe('admin auth', () => {
     expect(noToken.status).toBe(400);
   });
 
+  it('rejects a Turnstile token solved for another action or host', async () => {
+    mockTurnstile(true, 'confirm');
+    expect((await attempt('test-password')).status).toBe(403);
+    mockTurnstile(true, 'login', 'evil.example');
+    expect((await attempt('test-password')).status).toBe(403);
+  });
+
   it('rejects a wrong password', async () => {
-    mockTurnstile(true);
+    mockTurnstile(true, 'login');
     const res = await attempt('wrong');
     expect(res.status).toBe(401);
     expect(res.headers.get('Set-Cookie')).toBeNull();
   });
 
   it('sets a hardened session cookie and stores only its hash', async () => {
-    mockTurnstile(true);
+    mockTurnstile(true, 'login');
     const res = await attempt('test-password');
     expect(res.status).toBe(200);
     const cookie = res.headers.get('Set-Cookie') ?? '';
-    expect(cookie).toMatch(/^admin_session=[\w-]{43};/);
+    expect(cookie).toMatch(/^__Host-admin_session=[\w-]{43};/);
     for (const flag of ['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/']) expect(cookie).toContain(flag);
 
     const token = cookie.split(';')[0]?.split('=')[1] ?? '';
@@ -73,7 +80,7 @@ describe('admin auth', () => {
   });
 
   it('rate limits login attempts at 5 per minute per IP', async () => {
-    mockTurnstile(true);
+    mockTurnstile(true, 'login');
     const ip = uniqueIp();
     const codes: number[] = [];
     for (let i = 0; i < 6; i++) codes.push((await attempt('nope', { ip })).status);

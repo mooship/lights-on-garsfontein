@@ -37,6 +37,12 @@ name = "LOGIN_LIMITER"
 namespace_id = "4503"
 simple = { limit = 5, period = 60 }
 
+# Site-wide cap on sign-in attempts, whatever address they come from.
+[[ratelimits]]
+name = "LOGIN_GLOBAL_LIMITER"
+namespace_id = "4504"
+simple = { limit = 30, period = 60 }
+
 [triggers]
 crons = ["* * * * *"]
 

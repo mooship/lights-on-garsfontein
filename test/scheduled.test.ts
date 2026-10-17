@@ -51,3 +51,20 @@ describe('scheduled outage detection', () => {
     expect(rows.results.map((r) => r.id)).toEqual(['new']);
   });
 });
+
+describe('confirmation fingerprints', () => {
+  it('are replaced after 30 days while the count stays', async () => {
+    const id = await insertOutage({});
+    const old = new Date(Date.now() - 31 * 86_400_000).toISOString();
+    await env.DB.prepare(
+      'INSERT INTO outage_confirmations (outage_id, created_at, client_hash) VALUES (?, ?, ?), (?, ?, ?)',
+    )
+      .bind(id, old, 'aaa', id, new Date().toISOString(), 'bbb')
+      .run();
+    await runCron();
+    const rows = await env.DB.prepare('SELECT client_hash FROM outage_confirmations ORDER BY id').all<{
+      client_hash: string;
+    }>();
+    expect(rows.results.map((r) => r.client_hash)).toEqual([expect.stringMatching(/^purged:\d+$/), 'bbb']);
+  });
+});

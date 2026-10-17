@@ -18,7 +18,7 @@ async function login(page: Page) {
   await password.fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(dashboard).toBeVisible();
-  sessionCookies = (await page.context().cookies()).filter((c) => c.name === 'admin_session');
+  sessionCookies = (await page.context().cookies()).filter((c) => c.name === '__Host-admin_session');
 }
 
 test.describe('theme boot', () => {
@@ -103,7 +103,7 @@ test.describe('admin', () => {
 
   test('sets an HttpOnly, Strict session cookie', async ({ page, context }) => {
     await login(page);
-    const cookie = (await context.cookies()).find((c) => c.name === 'admin_session');
+    const cookie = (await context.cookies()).find((c) => c.name === '__Host-admin_session');
     expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: 'Strict' });
   });
 

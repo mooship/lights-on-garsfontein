@@ -1,5 +1,5 @@
 import { createDb } from './db/client';
-import { detectOutage, purgeExpiredSessions } from './lib/grid';
+import { detectOutage, purgeExpiredSessions, purgeOldFingerprints } from './lib/grid';
 import { errors } from './lib/http';
 import { dispatch, type Routes } from './lib/router';
 import { adminRoutes } from './routes/admin';
@@ -52,6 +52,6 @@ export default {
   async scheduled(controller, env) {
     const db = createDb(env.DB);
     const now = new Date(controller.scheduledTime);
-    await Promise.all([detectOutage(db, now), purgeExpiredSessions(db, now)]);
+    await Promise.all([detectOutage(db, now), purgeExpiredSessions(db, now), purgeOldFingerprints(db, now)]);
   },
 } satisfies ExportedHandler<Env>;

@@ -44,7 +44,7 @@ const LoginForm: Component<{ onLoggedIn: () => void }> = (props) => {
     try {
       // The public status response carries the Turnstile site key.
       const { turnstileSiteKey } = await api.status();
-      const token = await getTurnstileToken(widget, turnstileSiteKey);
+      const token = await getTurnstileToken(widget, turnstileSiteKey, 'login');
       await api.login(String(password ?? ''), token);
       props.onLoggedIn();
     } catch (e) {

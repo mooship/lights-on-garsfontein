@@ -1,5 +1,5 @@
 import { createDb, type Db } from '../db/client';
-import { clientIp, errors, isCrossOrigin, isRateLimited } from './http';
+import { clientIp, errors, isCrossOrigin, isRateLimited, rateLimitKey } from './http';
 
 export interface RouteContext {
   request: Request;
@@ -7,6 +7,8 @@ export interface RouteContext {
   url: URL;
   db: Db;
   ip: string;
+  /** Key for per-connection rate limits (IPv6 grouped by /64). */
+  limitKey: string;
 }
 
 /**
@@ -29,10 +31,11 @@ export interface Route {
 export type Routes = Record<string, Route>;
 
 export async function dispatch(route: Route, request: Request, env: Env, url: URL): Promise<Response> {
-  const ctx: RouteContext = { request, env, url, db: createDb(env.DB), ip: clientIp(request) };
+  const ip = clientIp(request);
+  const ctx: RouteContext = { request, env, url, db: createDb(env.DB), ip, limitKey: rateLimitKey(ip) };
   let response: Response | null = null;
   if (route.sameOrigin && isCrossOrigin(request)) response = errors.forbidden();
-  else if (route.limiter && (await isRateLimited(env[route.limiter], ctx.ip))) response = errors.rateLimited();
+  else if (route.limiter && (await isRateLimited(env[route.limiter], ctx.limitKey))) response = errors.rateLimited();
   else if (route.authorize) response = await route.authorize(ctx);
   response ??= await route.handler(ctx);
   if (route.cors) response.headers.set('Access-Control-Allow-Origin', '*');

@@ -3,7 +3,7 @@ import type { ConfirmResponse, StatusResponse } from '../../shared/api';
 import { outageConfirmations } from '../db/schema';
 import { safeEqual, sha256Hex } from '../lib/crypto';
 import { countConfirmations, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
-import { bearerToken, errors, json, parseBody } from '../lib/http';
+import { bearerToken, errors, isRateLimited, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { verifyTurnstile } from '../lib/turnstile';
 
@@ -22,7 +22,10 @@ async function getStatus({ env, db }: RouteContext): Promise<Response> {
 async function postConfirm({ request, env, db, ip }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, confirmSchema);
   if ('response' in parsed) return parsed.response;
-  if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip))) {
+  // Without the salt the stored fingerprints would be trivially reversible.
+  if (!env.IP_SALT) return errors.internal();
+  const expected = { action: 'confirm' as const, hostname: new URL(env.SITE_URL).hostname };
+  if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip, expected))) {
     return errors.forbidden('turnstile_failed');
   }
 
@@ -41,10 +44,14 @@ async function postConfirm({ request, env, db, ip }: RouteContext): Promise<Resp
   return json(body, 201);
 }
 
-async function postHeartbeat({ request, env, db }: RouteContext): Promise<Response> {
+async function postHeartbeat({ request, env, db, limitKey }: RouteContext): Promise<Response> {
   const token = bearerToken(request);
   // No sensor configured yet: refuse every heartbeat rather than compare against an unset secret.
-  if (!env.HEARTBEAT_TOKEN || !token || !(await safeEqual(token, env.HEARTBEAT_TOKEN))) return errors.unauthorized();
+  if (!env.HEARTBEAT_TOKEN || !token || !(await safeEqual(token, env.HEARTBEAT_TOKEN))) {
+    // Wrong tokens share the login rate limit, so they cannot be brute-forced.
+    if (await isRateLimited(env.LOGIN_LIMITER, limitKey)) return errors.rateLimited();
+    return errors.unauthorized();
+  }
   const closed = await recordHeartbeat(db, new Date());
   return json({ ok: true, closedOutages: closed });
 }

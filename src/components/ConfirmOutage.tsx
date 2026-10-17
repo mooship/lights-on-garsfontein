@@ -40,7 +40,7 @@ export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
     setBusy(true);
     setMessage('');
     try {
-      const token = await getTurnstileToken(widget, props.siteKey);
+      const token = await getTurnstileToken(widget, props.siteKey, 'confirm');
       const res = await api.confirm(token);
       setCount(res.confirmations);
       setConfirmed(true);

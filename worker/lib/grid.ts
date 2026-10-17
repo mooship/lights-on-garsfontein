@@ -1,5 +1,5 @@
 import { and, count, desc, eq, isNull, lt, type SQL, sql } from 'drizzle-orm';
-import { HEARTBEAT_THRESHOLD_MS, type OutageSummary, type PowerStatus } from '../../shared/api';
+import { DAY_MS, HEARTBEAT_THRESHOLD_MS, type OutageSummary, type PowerStatus } from '../../shared/api';
 import type { Db } from '../db/client';
 import { heartbeats, type Outage, outageConfirmations, outages, sessions } from '../db/schema';
 
@@ -124,4 +124,18 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<number> {
 
 export async function purgeExpiredSessions(db: Db, now: Date): Promise<void> {
   await db.delete(sessions).where(lt(sessions.expiresAt, now.toISOString()));
+}
+
+const FINGERPRINT_DAYS = 30;
+
+/**
+ * Replaces confirmation fingerprints (salted IP hashes) older than 30 days with a
+ * per-row placeholder: the count survives, the link to an address does not.
+ */
+export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
+  const cutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();
+  await db
+    .update(outageConfirmations)
+    .set({ clientHash: sql`'purged:' || ${outageConfirmations.id}` })
+    .where(and(lt(outageConfirmations.createdAt, cutoff), sql`${outageConfirmations.clientHash} not like 'purged:%'`));
 }

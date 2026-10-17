@@ -120,11 +120,11 @@ async function checkApiToken(request: Request, env: Env): Promise<boolean | null
 }
 
 /** Admin auth: a valid API token, or a session cookie on a same-origin request. */
-async function authorizeAdmin({ request, env, db, ip }: RouteContext): Promise<Response | null> {
+async function authorizeAdmin({ request, env, db, limitKey }: RouteContext): Promise<Response | null> {
   const token = await checkApiToken(request, env);
   if (token === false) {
     // Wrong tokens share the login rate limit, so they cannot be brute-forced.
-    if (await isRateLimited(env.LOGIN_LIMITER, ip)) return errors.rateLimited();
+    if (await isRateLimited(env.LOGIN_LIMITER, limitKey)) return errors.rateLimited();
     return errors.unauthorized();
   }
   if (token === null) {

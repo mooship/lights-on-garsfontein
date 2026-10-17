@@ -38,7 +38,8 @@
         <li>
           <strong>Outage confirmations.</strong> When you tap “My power’s off too”, we store a scrambled fingerprint of
           your IP address (a salted SHA-256 hash), along with the outage and the time. It lets us count each connection
-          once per outage. It cannot be turned back into your IP address, and the address itself is never stored.
+          once per outage. The address itself is never stored, and the fingerprint can’t be turned back into it without
+          a secret key that only the site holds. Fingerprints are deleted after 30 days; the count stays.
         </li>
         <li>
           <strong>Bot protection.</strong> Confirmations are checked by Cloudflare Turnstile, which only loads when you

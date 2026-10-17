@@ -80,11 +80,6 @@ const Footer: Component = () => (
     <nav aria-label="Site">
       <a href="/privacy.html">Privacy</a>
       <a href="/api/outages.csv">Download the data (CSV)</a>
-      <a href="/api/status">Status API</a>
-      <a href="/llms.txt">llms.txt</a>
-      <a href="https://github.com/mooship/garsfontein-grid" rel="noopener">
-        Source code
-      </a>
     </nav>
   </footer>
 );

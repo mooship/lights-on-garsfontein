@@ -31,7 +31,11 @@ function loadTurnstile(): Promise<TurnstileApi> {
 }
 
 /** Runs a Turnstile challenge in `container` and resolves with the token. */
-export async function getTurnstileToken(container: HTMLElement, siteKey: string): Promise<string> {
+export async function getTurnstileToken(
+  container: HTMLElement,
+  siteKey: string,
+  action: 'confirm' | 'login',
+): Promise<string> {
   const turnstile = await loadTurnstile();
   return new Promise<string>((resolve, reject) => {
     let widgetId = '';
@@ -41,7 +45,7 @@ export async function getTurnstileToken(container: HTMLElement, siteKey: string)
     };
     widgetId = turnstile.render(container, {
       sitekey: siteKey,
-      action: 'confirm',
+      action,
       appearance: 'interaction-only',
       callback: (token: string) => done(() => resolve(token)),
       'error-callback': () => done(() => reject(new Error('turnstile_error'))),

@@ -31,6 +31,22 @@ export function clientIp(request: Request): string {
   return request.headers.get('CF-Connecting-IP') ?? '127.0.0.1';
 }
 
+/**
+ * Rate-limit key for a connection: the IPv4 address, or the /64 prefix for IPv6 (one
+ * household usually gets a whole /64, so per-address limits would be trivial to dodge).
+ */
+export function rateLimitKey(ip: string): string {
+  if (!ip.includes(':')) return ip;
+  const [head = '', tail = ''] = ip.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const groups = ip.includes('::') ? [...left, ...Array(8 - left.length - right.length).fill('0'), ...right] : left;
+  return `${groups
+    .slice(0, 4)
+    .map((g) => g.toLowerCase().replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`;
+}
+
 export async function isRateLimited(limiter: RateLimit, key: string): Promise<boolean> {
   const { success } = await limiter.limit({ key });
   return !success;

@@ -43,7 +43,7 @@ async function ogImage({ request, env, db }: RouteContext): Promise<Response> {
 const pages: Routes = {
   '/sitemap.xml': { handler: sitemap },
   '/robots.txt': { handler: robots },
-  '/og.png': { handler: ogImage },
+  '/og.png': { handler: ogImage, limiter: 'STATUS_LIMITER' },
 };
 
 /** Each page answers both GET and HEAD. */
