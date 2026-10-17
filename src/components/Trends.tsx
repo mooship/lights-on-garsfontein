@@ -212,7 +212,7 @@ export const Trends: Component<TrendsProps> = (props) => {
         <p class={css.subtitle}>{subtitle()}</p>
         <div class={css.tiles}>
           <Tile
-            label="Hours without power"
+            label="Without power"
             value={started() ? formatHours(s().hoursOff) : '—'}
             delta={prev() ? delta(s().hoursOff, (prev() as WindowStats).hoursOff, formatHours, true) : null}
           />
@@ -226,13 +226,13 @@ export const Trends: Component<TrendsProps> = (props) => {
             }
             note={s().plannedOutages > 0 ? `${s().plannedOutages} planned` : undefined}
           />
-          <Tile label="Days with an outage" value={started() ? `${s().daysWithOutage} of ${s().daysTracked}` : '—'} />
+          <Tile label="Days affected" value={started() ? `${s().daysWithOutage} of ${s().daysTracked}` : '—'} />
           <Tile
             label="Longest outage"
             value={
               s().outages === 0 ? '—' : s().longestMinutes > 0 ? formatDuration(s().longestMinutes * 60_000) : '< 1 min'
             }
-            note={s().outages > 0 ? `Last 7 days: ${formatHours(props.stats.last7.hoursOff)} off` : undefined}
+            note={s().outages > 1 ? `Average ${formatDuration((s().hoursOff / s().outages) * 3_600_000)}` : undefined}
           />
         </div>
         <Show

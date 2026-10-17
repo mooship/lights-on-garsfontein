@@ -9,7 +9,7 @@ export interface OutageHistoryProps {
 }
 
 export const OutageHistory: Component<OutageHistoryProps> = (props) => (
-  <Show when={props.outages.length > 0} fallback={<p class={css.empty}>Nothing yet. Long may it last.</p>}>
+  <Show when={props.outages.length > 0} fallback={<p class={css.empty}>No outages recorded yet.</p>}>
     <ul class={css.list}>
       <For each={props.outages}>
         {(outage) => {

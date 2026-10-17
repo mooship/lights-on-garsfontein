@@ -64,15 +64,13 @@ const AreaCard: Component = () => (
       Where this applies
     </h2>
     <p>
-      This is one Garsfontein household’s record of power cuts, kept since {formatDate(TRACKING_SINCE)} and shared with
-      the neighbourhood.
+      Garsfontein is in Ward 45, Region 6 of the City of Tshwane, Pretoria. The ward has a DA councillor. This record
+      has been kept since {formatDate(TRACKING_SINCE)}.
     </p>
-    <p>Garsfontein is in Ward 45, in Region 6 of the City of Tshwane, Pretoria. The ward has a DA councillor.</p>
     <p>
-      Homes here get their electricity from the Garsfontein substation, which is fed from the Highlands substation,
-      which in turn is fed from Njala. The older substations along that chain have little modern protection, so a fault
-      almost anywhere tends to cut the whole Garsfontein substation area at once. If the power is off here, it is
-      probably off on your street too.
+      Power reaches Garsfontein through three substations: Njala feeds Highlands, which feeds the Garsfontein
+      substation. Much of that equipment is old and has little modern protection, so a single fault usually cuts the
+      whole area the Garsfontein substation serves. If the power is off here, it is very likely off on your street too.
     </p>
   </section>
 );

@@ -56,7 +56,6 @@ globalStyle('.gg-masthead', {
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: '1rem',
-  height: '5.5rem',
   paddingTop: '0.5rem',
 });
 
@@ -71,7 +70,7 @@ globalStyle('.gg-eyebrow', {
 globalStyle('.gg-title', {
   fontFamily: vars.font.display,
   fontWeight: 700,
-  fontSize: '2.25rem',
+  fontSize: 'clamp(1.75rem, 8.5vw, 2.25rem)',
   lineHeight: 1.1,
   letterSpacing: '-0.01em',
   marginTop: '0.25rem',
@@ -102,8 +101,6 @@ globalStyle('.gg-status-detail', {
   fontVariantNumeric: 'tabular-nums',
   minHeight: '2.5rem',
 });
-
-globalStyle('.gg-history-card', { height: '23.5rem', overflow: 'hidden' });
 
 // The trends body is fixed; only the user-opened weekly table below it may grow the card.
 globalStyle('.gg-trends-body', { height: '34rem', overflow: 'hidden' });
@@ -179,7 +176,6 @@ globalStyle('*', {
 });
 
 globalStyle('.gg-notice', {
-  marginTop: '-0.25rem',
   padding: '0.5rem 0.75rem',
   borderRadius: vars.radius.control,
   border: `1px dashed ${vars.color.border}`,
