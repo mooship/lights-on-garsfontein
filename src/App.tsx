@@ -3,11 +3,12 @@ import { type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shar
 import * as css from './App.css';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { OutageHistory } from './components/OutageHistory';
+import { HistorySkeleton, STATUS_NOTE, StatusSkeleton, TrendsSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api } from './lib/api';
-import { formatDate, formatDuration } from './lib/format';
+import { formatDate, formatRelativeDay, formatTime } from './lib/format';
 import { useNow } from './lib/now';
 import { useStatusTab } from './lib/tab';
 import { syncThemeColor, watchSystemTheme } from './lib/theme';
@@ -41,28 +42,42 @@ export const Masthead: Component = () => (
       </div>
       <ThemeToggle />
     </header>
-    <p class="gg-notice">A volunteer project. Not affiliated with the City of Tshwane, Eskom or any government body.</p>
+    <p class="gg-notice">Run by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.</p>
   </>
 );
 
 const Footer: Component = () => (
   <footer class="gg-footer">
     <p>
-      A community record of how often Ward 45 loses power, kept so we can see whether things are getting better or
-      worse. Tracking since {formatDate(TRACKING_SINCE)}. Outages are logged by hand for now; a mains-powered sensor
-      that checks in every minute will take over once it is installed.
+      An open record of power cuts for homes on the Garsfontein substation, kept since {formatDate(TRACKING_SINCE)}. A
+      fault on that substation usually takes out the whole area, so if it’s off here, it’s probably off for you too.
     </p>
     <nav aria-label="Site">
       <a href="/privacy.html">Privacy</a>
+      <a href="/api/outages.csv">Download the data (CSV)</a>
       <a href="/api/status">Status API</a>
-      <a href="/api/outages.csv">Outage data (CSV)</a>
       <a href="/llms.txt">llms.txt</a>
       <a href="https://github.com/mooship/garsfontein-grid" rel="noopener">
-        Source (GPL-3.0)
+        Source code
       </a>
     </nav>
   </footer>
 );
+
+/** One line of context under the badge: when it went off, or when the last outage was. */
+function statusDetail(s: StatusResponse, now: number): string {
+  const on = (iso: string) => {
+    const day = formatRelativeDay(iso, now);
+    return day === 'today' || day === 'yesterday' ? day : `on ${day}`;
+  };
+  if (s.status === 'OFF') {
+    const start = s.outage?.startTime ?? s.since;
+    return start ? `Went off at ${formatTime(start)} ${on(start)}.` : '';
+  }
+  const last = s.recent.find((o) => o.endTime);
+  if (!last?.endTime) return `No outages since tracking began on ${formatDate(TRACKING_SINCE)}.`;
+  return `Last outage: ${formatTime(last.startTime)} to ${formatTime(last.endTime)} ${on(last.startTime)}.`;
+}
 
 const PublicView: Component<{ initial: InitialData }> = (props) => {
   const now = useNow(1000);
@@ -96,32 +111,18 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             {(s) => (
               <>
                 <StatusBadge status={s().status} since={s().since} now={now()} />
-                <p class={css.meta}>
-                  {s().mode === 'sensor' && s().lastSeen
-                    ? `Sensor last checked in ${formatDuration(now() - Date.parse(s().lastSeen as string))} ago`
-                    : 'Reported by hand by a Ward 45 resident until our sensor is installed.'}
-                </p>
-                <div class={css.bottom}>
-                  <Show
-                    when={s().status === 'OFF' && s().outage}
-                    fallback={
-                      <p class={css.note}>
-                        When the power goes off, neighbours can confirm it here to help everyone see how widespread it
-                        is.
-                      </p>
-                    }
-                  >
-                    {(outage) => <ConfirmOutage outage={outage()} siteKey={s().turnstileSiteKey} />}
-                  </Show>
-                </div>
+                <p class="gg-status-detail">{statusDetail(s(), now())}</p>
+                <Show when={s().status === 'OFF' && s().outage} fallback={<p class="gg-status-note">{STATUS_NOTE}</p>}>
+                  {(outage) => <ConfirmOutage outage={outage()} siteKey={s().turnstileSiteKey} />}
+                </Show>
               </>
             )}
           </Match>
           <Match when={status.error}>
-            <p class={css.error}>Could not reach the grid monitor. Retrying…</p>
+            <p class={css.error}>Couldn’t reach the server. Trying again shortly…</p>
           </Match>
           <Match when={true}>
-            <p class="gg-status-loading">Checking the grid status…</p>
+            <StatusSkeleton />
           </Match>
         </Switch>
       </section>
@@ -133,11 +134,12 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             <>
               <div class="gg-trends-body">
                 <h2 id="trends-heading" class="gg-card-title">
-                  How bad is it?
+                  By the numbers
                 </h2>
+                <TrendsSkeleton />
               </div>
               <details class="gg-trends-details">
-                <summary>Show weekly table</summary>
+                <summary>Show the weekly numbers</summary>
               </details>
             </>
           }
@@ -150,7 +152,9 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
         <h2 id="history-heading" class="gg-card-title">
           Recent outages
         </h2>
-        <Show when={data()}>{(s) => <OutageHistory outages={s().recent} now={now()} />}</Show>
+        <Show when={data()} fallback={<HistorySkeleton />}>
+          {(s) => <OutageHistory outages={s().recent} now={now()} />}
+        </Show>
       </section>
     </>
   );
@@ -168,7 +172,7 @@ export const App: Component<{ initial: InitialData }> = (props) => {
       <Masthead />
       <main class="gg-main">
         <Show when={isAdmin} fallback={<PublicView initial={props.initial} />}>
-          <Suspense fallback={<p class="gg-status-loading">Loading…</p>}>
+          <Suspense fallback={<p class="gg-status-note">Loading…</p>}>
             <Admin />
           </Suspense>
         </Show>

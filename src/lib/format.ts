@@ -1,37 +1,40 @@
 const TIME_ZONE = 'Africa/Johannesburg';
 
-const dayFormat = new Intl.DateTimeFormat('en-ZA', {
-  timeZone: TIME_ZONE,
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-});
-const timeFormat = new Intl.DateTimeFormat('en-ZA', {
-  timeZone: TIME_ZONE,
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-});
+/** Builds a formatter on first use: time-zone formatters are costly to create on slow phones. */
+function lazyFormat(options: Intl.DateTimeFormatOptions): (date: Date) => string {
+  let formatter: Intl.DateTimeFormat | undefined;
+  return (date) => {
+    formatter ??= new Intl.DateTimeFormat('en-ZA', options);
+    return formatter.format(date);
+  };
+}
 
-const dateFormat = new Intl.DateTimeFormat('en-ZA', {
-  timeZone: TIME_ZONE,
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-});
-const shortDateFormat = new Intl.DateTimeFormat('en-ZA', { timeZone: 'UTC', day: 'numeric', month: 'short' });
+const dayFormat = lazyFormat({ timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' });
+const timeFormat = lazyFormat({ timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const dateFormat = lazyFormat({ timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
+const shortDateFormat = lazyFormat({ timeZone: 'UTC', day: 'numeric', month: 'short' });
 
-export const formatDay = (iso: string) => dayFormat.format(new Date(iso));
-/** "18 Oct 2026" */
-export const formatDate = (iso: string) => dateFormat.format(new Date(iso));
+export const formatDay = (iso: string) => dayFormat(new Date(iso));
+/** "17 Oct 2026" */
+export const formatDate = (iso: string) => dateFormat(new Date(iso));
 /** Formats a plain YYYY-MM-DD calendar date as "19 Oct". */
-export const formatCalendarDay = (ymd: string) => shortDateFormat.format(new Date(`${ymd}T00:00:00Z`));
+export const formatCalendarDay = (ymd: string) => shortDateFormat(new Date(`${ymd}T00:00:00Z`));
 
 /** "12.5 h" with one decimal below 100 hours. */
 export function formatHours(hours: number): string {
   return `${hours >= 100 ? Math.round(hours) : Math.round(hours * 10) / 10} h`;
 }
-export const formatTime = (iso: string) => timeFormat.format(new Date(iso));
+export const formatTime = (iso: string) => timeFormat(new Date(iso));
+
+const sastDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** "today", "yesterday" or "Sat, 17 Oct", judged in South African time. */
+export function formatRelativeDay(iso: string, now: number): string {
+  const day = sastDay(new Date(iso));
+  if (day === sastDay(new Date(now))) return 'today';
+  if (day === sastDay(new Date(now - 86_400_000))) return 'yesterday';
+  return formatDay(iso);
+}
 
 /** "3 d 4 h", "2 h 14 min", "5 min", "40 s" */
 export function formatDuration(ms: number): string {

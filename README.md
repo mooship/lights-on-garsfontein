@@ -1,24 +1,26 @@
 # Garsfontein Grid
 
-**How bad are the power outages in Garsfontein?** Garsfontein Grid is a community record of electricity outages in Ward 45, Garsfontein, Pretoria. It shows whether the power is on right now, and it keeps a history so anyone can see whether things are getting better or worse.
+Garsfontein Grid shows whether the power is on in Garsfontein, Pretoria, and keeps an open record of every outage, so residents can see how often it goes off and whether that is changing.
 
-> **A volunteer project.** Not affiliated with the City of Tshwane, Eskom or any government body.
+> Run by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.
 
 Live at **https://garsfontein.timothybrits.co.za** · Outage tracking began on **17 October 2026**.
+
+## Which homes this covers
+
+The record applies to homes supplied by the **Garsfontein substation** (in Ward 45). Garsfontein is fed from the Highlands substation, which is fed from Njala. The local substations have little modern protection, so a fault almost anywhere on the Garsfontein substation cuts the whole area at once. That is why one record is a fair guide for the neighbourhood, and why the site talks about the substation rather than a street or extension.
 
 ## What it does
 
 - **Live status.** ON or OFF, with how long it has been that way.
-- **"How bad is it?"** Hours without power, outage count, share of time with power and the longest outage over the last 30 days, compared with the previous 30 days. Includes a weekly chart.
+- **By the numbers.** Hours without power, number of outages, share of time with power and the longest outage over the last 30 days, compared with the 30 days before. Includes a weekly chart.
 - **History and open data.** Recent outages on the page, and every outage as CSV at [`/api/outages.csv`](https://garsfontein.timothybrits.co.za/api/outages.csv).
-- **"My power is off too".** Neighbours can confirm an outage: one confirmation per connection per outage, protected by Cloudflare Turnstile and rate limiting. IP addresses are stored only as salted hashes.
+- **"My power's off too".** Neighbours can confirm an outage: one confirmation per connection per outage, protected by Cloudflare Turnstile and rate limiting. IP addresses are stored only as salted hashes.
 - **Works without a sensor.** Until a sensor is installed, the admin's punch clock drives the status (see [Running without a sensor](#running-without-a-sensor)).
 
 ## Stack
 
 SolidJS + Vite + Vanilla Extract on the front end. Cloudflare Workers (static assets plus API), D1 with Drizzle ORM, Zod and Turnstile on the back end. Testing and tooling: Vitest in the Workers runtime (`@cloudflare/vitest-plugin`), Playwright, Biome, Lefthook and GitHub Actions. Icons come from [Lucide](https://lucide.dev).
-
-See [`SPEC.md`](SPEC.md) for the original specification and [Changes from the spec](#changes-from-the-spec) for where this differs.
 
 ## Local development
 
@@ -70,7 +72,7 @@ Until the first sensor heartbeat arrives, the site runs in **manual mode**:
 - The status is **ON** unless an outage is open.
 - Sign in at `/admin`. When the power goes off, tap **Punch out**: the status turns OFF and a timer starts. When it comes back, tap **Punch in**.
 - Use **Log a past outage** to add outages after the fact, and **False positive** or **Delete** to correct mistakes.
-- The page tells visitors the status is reported by hand.
+- The public page never says how an outage was recorded, so manual and sensor mode look the same to visitors.
 
 Outages from before 17 October 2026 can be added and will appear in the history and CSV. The statistics only count time from the tracking start, so untracked days never make the numbers look better than they were. To change the start date, edit `TRACKING_SINCE` in `shared/api.ts`.
 
@@ -137,26 +139,17 @@ All times are UTC ISO 8601. Public endpoints allow any origin (CORS) and are rat
 
 | Endpoint | Description |
 | --- | --- |
-| `GET /api/status` | `status` (`ON`/`OFF`), `mode` (`manual`/`sensor`), `since`, `lastSeen`, open `outage`, five `recent` outages |
+| `GET /api/status` | `status` (`ON`/`OFF`), `since`, open `outage`, five `recent` outages |
 | `GET /api/stats` | Last 7, 30 and 365 days, previous 30 days, and weekly totals |
 | `GET /api/outages.csv` | Every outage, false positives removed |
+
+Public responses never say how an outage was recorded. Only the admin API includes `source` (`sensor` or `manual`).
 | `POST /api/confirm` | `{ token }` from Turnstile. 5 a minute per IP, one per IP per outage |
 | `POST /api/heartbeat` | Sensor check-in. `Authorization: Bearer <HEARTBEAT_TOKEN>` |
 | `POST /api/admin/login`, `/logout` | Session cookie `admin_session` (HttpOnly, Secure, SameSite=Strict, 12 h) |
 | `GET/POST /api/admin/outages`, `POST /api/admin/timer` | Admin only |
 
 Machine-readable summary: [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt).
-
-## Changes from the spec
-
-- **Storybook dropped.** Components are covered by Playwright instead.
-- **Manual mode added** so the site works before a sensor exists. The `UNKNOWN` status was removed, so the status is always `ON` or `OFF`.
-- **Trend statistics, the weekly chart, `/api/stats` and the CSV export added**, because the point of the site is to show change over time.
-- **`robots.txt` is served by the Worker** (as is the sitemap), so `public/robots.txt` does not exist.
-- **Social cards are pre-rendered PNGs** (one per status). `/og.png` serves the one matching the live status, which avoids shipping an image renderer in the Worker.
-- **Heartbeats need a bearer token**, which the spec left open.
-- **Passwords use PBKDF2-SHA256 through Web Crypto** (100,000 iterations, the Workers maximum).
-- **JSON-LD uses `Service`, not `GovernmentService`,** so search engines never present a volunteer project as an official one.
 
 ## Licence
 

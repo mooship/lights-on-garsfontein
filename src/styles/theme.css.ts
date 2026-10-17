@@ -3,8 +3,8 @@ import { createGlobalTheme, createThemeContract, globalFontFace } from '@vanilla
 const latinRange =
   'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
 
-// font-display: optional + preload keeps CLS at zero: the font is used only if it
-// is ready before first paint, otherwise the metric-matched fallback stays.
+// font-display: optional keeps CLS at zero: a font is used only if it is ready before
+// first paint, otherwise the system fallback stays for that visit.
 globalFontFace('Fraunces', {
   src: "url('/fonts/fraunces-latin-wght.woff2') format('woff2')",
   fontWeight: '100 900',
@@ -13,8 +13,7 @@ globalFontFace('Fraunces', {
   unicodeRange: latinRange,
 });
 
-// Registered as 'Jakarta' (no spaces): Fontaine mis-parses multi-word family names.
-globalFontFace('Jakarta', {
+globalFontFace('Plus Jakarta Sans', {
   src: "url('/fonts/plus-jakarta-sans-latin-wght.woff2') format('woff2')",
   fontWeight: '200 800',
   fontStyle: 'normal',
@@ -44,8 +43,8 @@ export const vars = createThemeContract({
 });
 
 const fonts = {
-  display: "Fraunces, 'Fraunces fallback', Georgia, serif",
-  body: "Jakarta, 'Jakarta fallback', Arial, sans-serif",
+  display: "Fraunces, Georgia, 'Times New Roman', serif",
+  body: "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
 };
 const radius = { card: '1.25rem', pill: '999px', control: '0.75rem' };
 

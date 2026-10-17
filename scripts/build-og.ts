@@ -45,7 +45,7 @@ h1 { font-family: Fraunces, serif; font-size: 88px; font-weight: 700; margin-top
 <div class="status"><div class="icon"><svg width="64" height="64" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="${card.glyph}"/></svg></div>
   <p class="label">${card.label}</p></div>
-<p class="foot">Volunteer project · not affiliated with the City of Tshwane or Eskom</p>
+<p class="foot">Run by a Garsfontein resident · not the City of Tshwane or Eskom</p>
 </body></html>`;
 
 const outDir = new URL('../public/og/', import.meta.url);

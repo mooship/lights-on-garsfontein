@@ -57,8 +57,8 @@ test.describe('public page', () => {
     await page.goto('/');
     const status = page.getByRole('status');
     await expect(status).toContainText('Power is on');
-    await expect(page.getByText('Reported by hand')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'How bad is it?' })).toBeVisible();
+    await expect(page.getByText(/by hand|sensor/i)).toHaveCount(0); // never says how outages are recorded
+    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
   });
 
   test('has zero cumulative layout shift while loading', async ({ page }) => {
@@ -74,6 +74,15 @@ test.describe('public page', () => {
     await expect(page.getByRole('status')).toBeVisible();
     await page.waitForTimeout(1000);
     expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
+  });
+
+  test('loads without CSP violations or console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('/');
+    await expect(page.getByRole('status')).toBeVisible();
+    expect(errors).toEqual([]);
   });
 
   test('serves the SEO manifests', async ({ request }) => {
@@ -134,8 +143,8 @@ test.describe('community confirmation', () => {
     await page.goto('/');
     // Cloudflare's test site key passes Turnstile without a challenge.
     await page.getByTestId('confirm-outage').click();
-    await expect(page.getByTestId('confirm-outage')).toHaveText('Thanks for confirming', { timeout: 20_000 });
-    await expect(page.getByText('1 neighbour has confirmed')).toBeVisible();
+    await expect(page.getByTestId('confirm-outage')).toHaveText('Thanks for letting us know', { timeout: 20_000 });
+    await expect(page.getByText('1 neighbour says theirs is off too.')).toBeVisible();
 
     // Same client again: one confirmation per outage, then 5 requests per minute.
     const codes: number[] = [];

@@ -28,43 +28,45 @@
       <p class="updated">Last updated 17 October 2026</p>
 
       <p>
-        Garsfontein Grid is a volunteer, open-source project that shows whether the electricity supply in Ward 45,
-        Garsfontein, is on. It is not run by the City of Tshwane or Eskom. This notice explains what information the
-        site processes, in line with the Protection of Personal Information Act (POPIA).
+        Garsfontein Grid keeps an open record of power cuts for homes on the Garsfontein substation in Pretoria. It is
+        run by a local resident and is not affiliated with the City of Tshwane or Eskom. This notice explains what the
+        site does with information about you, in line with the Protection of Personal Information Act (POPIA).
       </p>
 
       <h2>What we collect</h2>
       <ul>
         <li>
-          <strong>Outage confirmations.</strong> When you tap "My power is off too", we store a one-way, salted SHA-256
-          hash of your IP address together with the outage and the time. The hash lets us count one confirmation per
-          connection per outage. We cannot turn it back into your IP address, and we do not store the IP itself.
+          <strong>Outage confirmations.</strong> When you tap “My power’s off too”, we store a scrambled fingerprint of
+          your IP address (a salted SHA-256 hash), along with the outage and the time. It lets us count each connection
+          once per outage. It cannot be turned back into your IP address, and the address itself is never stored.
         </li>
         <li>
-          <strong>Bot protection.</strong> Confirmations are protected by Cloudflare Turnstile, which loads only when you
-          tap the button. Cloudflare processes signals from your browser to tell people from bots. See
-          <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Cloudflare's Turnstile privacy addendum</a>.
+          <strong>Bot protection.</strong> Confirmations are checked by Cloudflare Turnstile, which only loads when you
+          tap the button. Cloudflare looks at signals from your browser to tell people from bots; see
+          <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Cloudflare’s Turnstile privacy addendum</a>.
         </li>
         <li>
-          <strong>Rate limiting and security.</strong> Your IP address is used briefly, in memory, to limit how often
-          the API can be called. Cloudflare may keep standard request logs to operate and secure the service.
+          <strong>Request logs.</strong> Like most websites, the site is protected by rate limits and keeps short-lived
+          request logs (which include IP addresses) to fix problems and stop abuse. Cloudflare, our host, deletes these
+          logs automatically after a few days.
         </li>
         <li>
-          <strong>Your theme choice.</strong> If you pick light or dark mode, the choice is saved in your browser's
-          local storage. It never leaves your device.
+          <strong>Your theme.</strong> If you choose light or dark mode, your browser remembers it locally. It never
+          leaves your device.
         </li>
       </ul>
 
-      <h2>What we do not do</h2>
+      <h2>What we don’t do</h2>
       <ul>
-        <li>No accounts, no tracking cookies, no analytics and no advertising.</li>
-        <li>We do not sell or share information with anyone.</li>
+        <li>No accounts, tracking cookies, analytics or adverts.</li>
+        <li>We don’t sell or share your information.</li>
       </ul>
 
-      <h2>Retention</h2>
+      <h2>How long we keep things</h2>
       <p>
-        Outage records and their confirmation counts are kept as a public history of the local grid. You can ask for
-        a confirmation to be removed; because we only hold a hash, include the date and time you confirmed.
+        Outages and their confirmation counts stay on the site as a public history. If you want your confirmation
+        removed, tell us roughly when you made it; because we only hold the scrambled fingerprint, that is how we can
+        find it.
       </p>
 
       <h2>Contact</h2>

@@ -12,10 +12,10 @@ export interface ConfirmOutageProps {
 }
 
 const MESSAGES: Record<string, string> = {
-  already_confirmed: 'You have already confirmed this outage. Thank you.',
-  rate_limited: 'Too many attempts. Please wait a minute.',
-  no_active_outage: 'The power seems to be back on.',
-  turnstile_failed: 'We could not verify you are human. Please try again.',
+  already_confirmed: 'You’ve already confirmed this one. Thanks!',
+  rate_limited: 'Too many tries. Give it a minute.',
+  no_active_outage: 'Looks like the power’s back.',
+  turnstile_failed: 'We couldn’t check that you’re human. Please try again.',
 };
 
 const storageKey = (id: number) => `confirmed:${id}`;
@@ -66,13 +66,17 @@ export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
         data-testid="confirm-outage"
       >
         <Users size={18} aria-hidden="true" />
-        {confirmed() ? 'Thanks for confirming' : busy() ? 'Checking…' : 'My power is off too'}
+        {confirmed() ? 'Thanks for letting us know' : busy() ? 'Checking…' : 'My power’s off too'}
       </button>
       <div ref={widget} class={css.widget} />
       <p class={message() ? errorText : muted} aria-live="polite">
         <Show
           when={message()}
-          fallback={<>{total() === 1 ? '1 neighbour has' : `${total()} neighbours have`} confirmed</>}
+          fallback={
+            total() === 0
+              ? 'Be the first neighbour to confirm.'
+              : `${total()} ${total() === 1 ? 'neighbour says theirs is' : 'neighbours say theirs is'} off too.`
+          }
         >
           {message()}
         </Show>

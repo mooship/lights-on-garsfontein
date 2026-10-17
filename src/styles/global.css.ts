@@ -1,4 +1,4 @@
-import { globalStyle } from '@vanilla-extract/css';
+import { globalKeyframes, globalStyle } from '@vanilla-extract/css';
 import { vars } from './theme.css';
 
 // Layout classes use stable global names (gg-*) because the static loading
@@ -85,17 +85,28 @@ globalStyle('.gg-card', {
   padding: '1.25rem',
 });
 
+// Fixed height so loading, ON and OFF states occupy the same box (zero layout shift).
 globalStyle('.gg-status-card', {
-  height: '19rem',
+  height: '16rem',
   display: 'flex',
   flexDirection: 'column',
+  gap: '1rem',
   overflow: 'hidden',
+});
+
+globalStyle('.gg-status-detail', {
+  paddingTop: '1rem',
+  borderTop: `1px solid ${vars.color.border}`,
+  color: vars.color.muted,
+  fontSize: '0.9375rem',
+  fontVariantNumeric: 'tabular-nums',
+  minHeight: '2.5rem',
 });
 
 globalStyle('.gg-history-card', { height: '23.5rem', overflow: 'hidden' });
 
 // The trends body is fixed; only the user-opened weekly table below it may grow the card.
-globalStyle('.gg-trends-body', { height: '32.5rem', overflow: 'hidden' });
+globalStyle('.gg-trends-body', { height: '34rem', overflow: 'hidden' });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
 
@@ -126,15 +137,6 @@ globalStyle('.gg-icon-button', {
   border: `1px solid ${vars.color.border}`,
   background: vars.color.card,
   cursor: 'pointer',
-});
-
-globalStyle('.gg-status-loading', {
-  fontFamily: vars.font.display,
-  fontSize: '2rem',
-  lineHeight: 1.15,
-  fontWeight: 650,
-  color: vars.color.muted,
-  margin: 'auto 0',
 });
 
 globalStyle('.gg-footer', {
@@ -182,3 +184,43 @@ globalStyle('.gg-notice', {
   lineHeight: 1.4,
   color: vars.color.muted,
 });
+
+globalStyle('.gg-status-note', { color: vars.color.muted, fontSize: '0.9375rem' });
+
+// Skeleton placeholders. Global names because the static HTML in index.html uses them too.
+globalKeyframes('gg-shimmer', { to: { transform: 'translateX(100%)' } });
+
+globalStyle('.gg-skel', {
+  display: 'block',
+  position: 'relative',
+  overflow: 'hidden',
+  borderRadius: '0.375rem',
+  background: vars.color.border,
+});
+
+globalStyle('.gg-skel::after', {
+  content: '""',
+  position: 'absolute',
+  inset: 0,
+  transform: 'translateX(-100%)',
+  background: `linear-gradient(90deg, transparent, ${vars.color.card}, transparent)`,
+  opacity: 0.6,
+  animation: 'gg-shimmer 1.4s ease-in-out infinite',
+});
+
+globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem' });
+globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1 });
+globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' });
+globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.25rem' });
+
+globalStyle('.gg-skel-badge', { width: '4rem', height: '4rem', borderRadius: vars.radius.pill, flex: 'none' });
+globalStyle('.gg-skel-heading', { height: '1.75rem' });
+globalStyle('.gg-skel-text', { height: '0.875rem' });
+globalStyle('.gg-skel-tile', { height: '5.75rem', borderRadius: vars.radius.control });
+globalStyle('.gg-skel-chart', { height: '11.5rem', marginTop: '1.25rem', borderRadius: vars.radius.control });
+globalStyle('.gg-skel-item', { height: '2.25rem' });
+
+globalStyle('.gg-w-30', { width: '30%' });
+globalStyle('.gg-w-45', { width: '45%' });
+globalStyle('.gg-w-60', { width: '60%' });
+globalStyle('.gg-w-80', { width: '80%' });

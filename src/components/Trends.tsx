@@ -23,10 +23,10 @@ interface Delta {
 
 function delta(current: number, previous: number, format: (n: number) => string, upIsBad: boolean): Delta {
   const diff = Math.round((current - previous) * 10) / 10;
-  if (diff === 0) return { text: 'Same as previous 30 days', tone: 'same', direction: 'flat' };
+  if (diff === 0) return { text: 'Same as the 30 days before', tone: 'same', direction: 'flat' };
   const up = diff > 0;
   return {
-    text: `${up ? '+' : '−'}${format(Math.abs(diff))} vs previous 30 days`,
+    text: `${up ? '+' : '−'}${format(Math.abs(diff))} on the 30 days before`,
     tone: up === upIsBad ? 'worse' : 'better',
     direction: up ? 'up' : 'down',
   };
@@ -105,7 +105,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
 
   return (
     <div class={css.chartBlock}>
-      <h3 class={css.chartTitle}>Hours without power per week</h3>
+      <h3 class={css.chartTitle}>Hours without power, week by week</h3>
       <p class={css.readout} aria-live="polite">
         <Show when={activeWeek()}>
           {(w) => (
@@ -194,20 +194,20 @@ export const Trends: Component<TrendsProps> = (props) => {
   const started = () => props.now >= since();
   const s = (): WindowStats => props.stats.last30;
   const prev = () => props.stats.previous30;
-  const comparisonFrom = () => formatDate(new Date(since() + 60 * DAY_MS).toISOString());
-  const pending = () => `Trend from ${comparisonFrom()}`;
+  // Comparing 30 days with the 30 before needs 60 days of records.
+  const firstComparison = () => formatDate(new Date(since() + 60 * DAY_MS).toISOString());
 
   const subtitle = () => {
-    if (!started()) return `Tracking starts ${formatDate(props.stats.trackingSince)}`;
-    if (s().trackedHours < 30 * 24) return `Since tracking began on ${formatDate(props.stats.trackingSince)}`;
-    return `Last 30 days · tracking since ${formatDate(props.stats.trackingSince)}`;
+    if (!started()) return `Tracking starts on ${formatDate(props.stats.trackingSince)}.`;
+    const range = s().trackedHours < 30 * 24 ? `Since ${formatDate(props.stats.trackingSince)}.` : 'The last 30 days.';
+    return prev() ? range : `${range} Comparisons with the month before start on ${firstComparison()}.`;
   };
 
   return (
     <>
       <div class="gg-trends-body">
         <h2 id="trends-heading" class="gg-card-title">
-          How bad is it?
+          By the numbers
         </h2>
         <p class={css.subtitle}>{subtitle()}</p>
         <div class={css.tiles}>
@@ -215,36 +215,33 @@ export const Trends: Component<TrendsProps> = (props) => {
             label="Hours without power"
             value={started() ? formatHours(s().hoursOff) : '—'}
             delta={prev() ? delta(s().hoursOff, prev()?.hoursOff ?? 0, formatHours, true) : null}
-            note={started() ? pending() : undefined}
           />
           <Tile
             label="Outages"
             value={started() ? String(s().outages) : '—'}
             delta={prev() ? delta(s().outages, prev()?.outages ?? 0, String, true) : null}
-            note={started() ? pending() : undefined}
           />
           <Tile
-            label="Grid on"
+            label="Time with power"
             value={s().availability === null ? '—' : `${(Math.floor((s().availability ?? 0) * 1000) / 10).toFixed(1)}%`}
-            note="of tracked time"
           />
           <Tile
             label="Longest outage"
-            value={s().longestMinutes > 0 ? formatDuration(s().longestMinutes * 60_000) : '—'}
-            note={s().outages > 0 ? `${formatHours(props.stats.last7.hoursOff)} off in the last 7 days` : undefined}
+            value={
+              s().outages === 0 ? '—' : s().longestMinutes > 0 ? formatDuration(s().longestMinutes * 60_000) : '< 1 min'
+            }
+            note={s().outages > 0 ? `Last 7 days: ${formatHours(props.stats.last7.hoursOff)} off` : undefined}
           />
         </div>
         <Show
           when={props.stats.weeks.length > 0}
-          fallback={
-            <p class={css.chartEmpty}>A weekly chart of hours without power appears here once tracking starts.</p>
-          }
+          fallback={<p class={css.chartEmpty}>The weekly chart fills in once tracking starts.</p>}
         >
           <WeeklyChart weeks={props.stats.weeks} />
         </Show>
       </div>
       <details class="gg-trends-details">
-        <summary>Show weekly table</summary>
+        <summary>Show the weekly numbers</summary>
         <table class={css.table}>
           <thead>
             <tr>
@@ -272,7 +269,7 @@ export const Trends: Component<TrendsProps> = (props) => {
           </tbody>
         </table>
         <a class={css.download} href="/api/outages.csv" download="garsfontein-grid-outages.csv">
-          <Download size={14} aria-hidden="true" /> Download every outage (CSV)
+          <Download size={14} aria-hidden="true" /> Download the full record (CSV)
         </a>
       </details>
     </>

@@ -9,7 +9,7 @@ export interface OutageHistoryProps {
 }
 
 export const OutageHistory: Component<OutageHistoryProps> = (props) => (
-  <Show when={props.outages.length > 0} fallback={<p class={css.empty}>No outages recorded yet.</p>}>
+  <Show when={props.outages.length > 0} fallback={<p class={css.empty}>Nothing yet. Long may it last.</p>}>
     <ul class={css.list}>
       <For each={props.outages}>
         {(outage) => {
@@ -19,7 +19,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
               <div>
                 <div class={css.primary}>{formatDay(outage.startTime)}</div>
                 <div class={css.secondary}>
-                  {formatTime(outage.startTime)} – {outage.endTime ? formatTime(outage.endTime) : 'now'}
+                  {formatTime(outage.startTime)} to {outage.endTime ? formatTime(outage.endTime) : 'now'}
                 </div>
               </div>
               <div class={css.end}>
@@ -27,8 +27,9 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
                   {formatDuration(end() - Date.parse(outage.startTime))}
                 </div>
                 <div class={css.secondary}>
-                  {outage.source === 'sensor' ? 'Sensor' : 'Logged'}
-                  {outage.confirmations > 0 ? ` · ${outage.confirmations} confirmed` : ''}
+                  {[outage.endTime ? '' : 'Ongoing', outage.confirmations ? `${outage.confirmations} confirmed` : '']
+                    .filter(Boolean)
+                    .join(' · ') || ' '}
                 </div>
               </div>
             </li>
