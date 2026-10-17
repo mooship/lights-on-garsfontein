@@ -83,6 +83,7 @@ const OutageRow: Component<{ outage: AdminOutage; now: number; onChange: () => v
         <div class={css.itemMeta}>
           {formatDuration(end() - Date.parse(props.outage.startTime))} · {props.outage.source} ·{' '}
           {props.outage.confirmations} confirmed
+          {props.outage.planned ? ' · planned' : ''}
           {props.outage.isFalsePositive ? ' · false positive' : ''}
         </div>
       </div>
@@ -104,6 +105,14 @@ const OutageRow: Component<{ outage: AdminOutage; now: number; onChange: () => v
           }
         >
           {props.outage.isFalsePositive ? 'Not a false positive' : 'False positive'}
+        </button>
+        <button
+          type="button"
+          class={clsx(button.ghost, smallButton)}
+          aria-pressed={props.outage.planned}
+          onClick={() => run(() => api.updateOutage(props.outage.id, { isPlanned: !props.outage.planned }))}
+        >
+          {props.outage.planned ? 'Not planned' : 'Planned'}
         </button>
         <button
           type="button"
@@ -131,7 +140,11 @@ const LogOutageForm: Component<{ onLogged: () => void }> = (props) => {
     const end = String(data.get('end') ?? '');
     setError('');
     try {
-      await api.createOutage(new Date(start).toISOString(), end ? new Date(end).toISOString() : null);
+      await api.createOutage(
+        new Date(start).toISOString(),
+        end ? new Date(end).toISOString() : null,
+        data.get('planned') === 'on',
+      );
       form.reset();
       props.onLogged();
     } catch (e) {
@@ -159,6 +172,9 @@ const LogOutageForm: Component<{ onLogged: () => void }> = (props) => {
             <input class={input} type="datetime-local" name="end" />
           </label>
         </div>
+        <label class={css.checkbox}>
+          <input type="checkbox" name="planned" /> Planned (announced maintenance or upgrades)
+        </label>
         <Show when={error()}>
           <p class={errorText}>{error()}</p>
         </Show>

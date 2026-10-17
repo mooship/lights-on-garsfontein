@@ -30,9 +30,9 @@ export const api = {
   logout: () => post<{ ok: true }>('/api/admin/logout'),
   outages: () => request<AdminOutagesResponse>('/api/admin/outages'),
   punch: (action: 'punch_out' | 'punch_in') => post('/api/admin/timer', { action }),
-  createOutage: (startTime: string, endTime: string | null) =>
-    post('/api/admin/outages', { action: 'create', startTime, endTime }),
-  updateOutage: (id: number, changes: { endTime?: string | null; isFalsePositive?: boolean }) =>
+  createOutage: (startTime: string, endTime: string | null, isPlanned: boolean) =>
+    post('/api/admin/outages', { action: 'create', startTime, endTime, isPlanned }),
+  updateOutage: (id: number, changes: { endTime?: string | null; isFalsePositive?: boolean; isPlanned?: boolean }) =>
     post('/api/admin/outages', { action: 'update', id, ...changes }),
   deleteOutage: (id: number) => post('/api/admin/outages', { action: 'delete', id }),
 };

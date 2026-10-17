@@ -70,6 +70,32 @@ describe('admin auth', () => {
     expect(codes).toEqual([401, 401, 401, 401, 401, 429]);
   });
 
+  it('accepts the admin API token so agents can log outages', async () => {
+    const headers = { Authorization: 'Bearer test-admin-api-token' };
+    const out = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' }, headers });
+    expect(out.status).toBe(201);
+    expect((await call('/api/admin/outages', { headers })).status).toBe(200);
+  });
+
+  it('rejects a wrong API token without falling back to cookies, and rate limits guesses', async () => {
+    const cookie = await login();
+    const ip = uniqueIp();
+    const codes: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const res = await call('/api/admin/outages', { cookie, ip, headers: { Authorization: 'Bearer nope' } });
+      codes.push(res.status);
+    }
+    expect(codes).toEqual([401, 401, 401, 401, 401, 429]);
+  });
+
+  it('refuses API tokens when none is configured', async () => {
+    const res = await call('/api/admin/outages', {
+      headers: { Authorization: 'Bearer ' },
+      env: { ...env, ADMIN_API_TOKEN: '' } as Env,
+    });
+    expect(res.status).toBe(401);
+  });
+
   it('rejects cross-site admin writes', async () => {
     const cookie = await login();
     const res = await call('/api/admin/timer', {

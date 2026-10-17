@@ -13,10 +13,11 @@ The record applies to homes supplied by the **Garsfontein substation** (in Ward 
 ## What it does
 
 - **Live status.** ON or OFF, with how long it has been that way.
-- **By the numbers.** Hours without power, number of outages, share of time with power and the longest outage over the last 30 days, compared with the 30 days before. Includes a weekly chart.
+- **By the numbers.** Hours without power, number of outages, days with an outage and the longest outage over the last 30 days, compared with the 30 days before. Includes a weekly chart.
+- **Planned work.** Outages announced in advance (maintenance, upgrades) are tagged as planned. They still count as time without power, but are shown separately.
 - **History and open data.** Recent outages on the page, and every outage as CSV at [`/api/outages.csv`](https://garsfontein.timothybrits.co.za/api/outages.csv).
 - **"My power's off too".** Neighbours can confirm an outage: one confirmation per connection per outage, protected by Cloudflare Turnstile and rate limiting. IP addresses are stored only as salted hashes.
-- **Works without a sensor.** Until a sensor is installed, the admin's punch clock drives the status (see [Running without a sensor](#running-without-a-sensor)).
+- **Two ways to record outages.** An admin punch clock and an optional heartbeat sensor. They can be used together (see [Recording outages](#recording-outages)).
 
 ## Stack
 
@@ -57,7 +58,7 @@ npx wrangler secret put IP_SALT                # any long random string; never c
 npm run deploy
 ```
 
-`HEARTBEAT_TOKEN` is needed only once you add a sensor.
+`HEARTBEAT_TOKEN` (sensor) and `ADMIN_API_TOKEN` (scripts and agents) are optional.
 
 **Continuous deployment.** CI runs on every PR and every push to `main`. To deploy automatically from `main`:
 
@@ -65,20 +66,35 @@ npm run deploy
 2. Add the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 3. Set the repository variable `DEPLOY_ENABLED` to `true`.
 
-## Running without a sensor
+## Recording outages
 
-Until the first sensor heartbeat arrives, the site runs in **manual mode**:
+**Admin punch clock.** Sign in at `/admin`. When the power goes off, tap **Punch out**: the status turns OFF and a timer starts. When it comes back, tap **Punch in**. Use **Log a past outage** for anything missed, **Planned** for announced maintenance, and **False positive** or **Delete** to correct mistakes. With no open outage and no sensor reporting, the status is ON.
 
-- The status is **ON** unless an outage is open.
-- Sign in at `/admin`. When the power goes off, tap **Punch out**: the status turns OFF and a timer starts. When it comes back, tap **Punch in**.
-- Use **Log a past outage** to add outages after the fact, and **False positive** or **Delete** to correct mistakes.
-- The public page never says how an outage was recorded, so manual and sensor mode look the same to visitors.
+The public site never says how an outage was recorded.
 
-Outages from before 17 October 2026 can be added and will appear in the history and CSV. The statistics only count time from the tracking start, so untracked days never make the numbers look better than they were. To change the start date, edit `TRACKING_SINCE` in `shared/api.ts`.
+Outages from before 17 October 2026 can be added; they appear in the history and CSV, but the statistics only count time from the tracking start, so untracked days never make the numbers look better than they were. To change the start date, edit `TRACKING_SINCE` in `shared/api.ts`.
 
-## Adding a sensor
+**Scripts and AI agents.** Every admin endpoint also accepts `Authorization: Bearer <ADMIN_API_TOKEN>`. Wrong tokens count against the login rate limit (5 a minute).
 
-Any always-on device that runs from **mains power without a UPS** works. When the power goes off it stops checking in, and after 3 minutes of silence the site opens an outage automatically. When it checks in again, the outage closes.
+```sh
+# Power just went off / came back
+curl -X POST "$GARSFONTEIN_URL/api/admin/timer" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"action":"punch_out"}'      # or "punch_in"
+
+# Log an outage after the fact (times with an offset; SAST is +02:00)
+curl -X POST "$GARSFONTEIN_URL/api/admin/outages" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"create","startTime":"2026-10-17T05:52:00+02:00","endTime":"2026-10-17T11:15:00+02:00","isPlanned":false}'
+
+# List recent outages (to find an id), then correct one
+curl "$GARSFONTEIN_URL/api/admin/outages" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN"
+curl -X POST "$GARSFONTEIN_URL/api/admin/outages" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"action":"update","id":3,"endTime":"2026-10-17T11:20:00+02:00"}'
+```
+
+Locally, keep the URL and token in a git-ignored `.env` (`GARSFONTEIN_URL`, `GARSFONTEIN_ADMIN_TOKEN`). To rotate the token, generate a new one and `npx wrangler secret put ADMIN_API_TOKEN`.
+
+**Heartbeat sensor.** Any always-on device that runs from **mains power without a UPS** works. When the power goes off it stops checking in, and after 3 minutes of silence the site opens an outage automatically. When it checks in again, the outage closes. No deploy or config change is needed beyond the token:
 
 1. Pick a long random token and store it:
    ```sh
@@ -89,7 +105,7 @@ Any always-on device that runs from **mains power without a UPS** works. When th
    curl -fsS -X POST -H "Authorization: Bearer $HEARTBEAT_TOKEN" https://garsfontein.timothybrits.co.za/api/heartbeat
    ```
 
-That is all. The first heartbeat switches the site to **sensor mode** with no deploy or config change.
+Heartbeats are refused until `HEARTBEAT_TOKEN` is set.
 
 **Raspberry Pi or old phone running Termux** (crontab):
 
@@ -131,7 +147,7 @@ void loop() {
 
 **Caveats.**
 - If your internet drops while the power stays on, the sensor goes quiet and an outage is logged. Mark it as a **False positive** in `/admin`.
-- The punch clock still works in sensor mode. Sensor heartbeats close only sensor outages, so manual outages stay yours to close.
+- The punch clock keeps working alongside a sensor. Heartbeats close only outages the sensor opened.
 
 ## API
 

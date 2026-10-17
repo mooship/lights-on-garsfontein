@@ -13,12 +13,16 @@ async function getStats(request: Request, env: Env): Promise<Response> {
   const earliest = new Date(Math.max(since, now - 365 * DAY_MS)).toISOString();
 
   const rows = await createDb(env.DB)
-    .select({ startTime: outages.startTime, endTime: outages.endTime })
+    .select({ startTime: outages.startTime, endTime: outages.endTime, isPlanned: outages.isPlanned })
     .from(outages)
     .where(and(eq(outages.isFalsePositive, 0), or(isNull(outages.endTime), gte(outages.endTime, earliest))));
   const intervals = mergeOutages(rows, now);
+  const planned = mergeOutages(
+    rows.filter((r) => r.isPlanned === 1),
+    now,
+  );
   const window = (days: number, offsetDays = 0) =>
-    windowStats(intervals, now - (days + offsetDays) * DAY_MS, now - offsetDays * DAY_MS, since);
+    windowStats(intervals, now - (days + offsetDays) * DAY_MS, now - offsetDays * DAY_MS, since, planned);
 
   const body: StatsResponse = {
     trackingSince: new Date(since).toISOString(),
@@ -45,10 +49,12 @@ async function getOutagesCsv(request: Request, env: Env): Promise<Response> {
     asc(outages.startTime),
   );
   const lines = [
-    'id,start_time_utc,end_time_utc,duration_minutes,confirmations',
+    'id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations',
     ...rows.map((r) => {
       const minutes = r.endTime ? Math.round((Date.parse(r.endTime) - Date.parse(r.startTime)) / 60_000) : null;
-      return [r.id, r.startTime, r.endTime, minutes, r.confirmations].map(csvField).join(',');
+      return [r.id, r.startTime, r.endTime, minutes, r.isPlanned === 1 ? 'yes' : 'no', r.confirmations]
+        .map(csvField)
+        .join(',');
     }),
   ];
   return new Response(`${lines.join('\n')}\n`, {

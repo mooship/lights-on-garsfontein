@@ -12,8 +12,8 @@ Source code (GPL-3.0-only): https://github.com/mooship/garsfontein-grid
 All public endpoints are free to use, allow any origin (CORS), and are rate limited to 60 requests a minute per IP. Please poll no more than once every 30 seconds.
 
 - [Live status (JSON)](https://garsfontein.timothybrits.co.za/api/status)
-- [Statistics (JSON)](https://garsfontein.timothybrits.co.za/api/stats): hours without power, number of outages, share of time with power and the longest outage for the last 7, 30 and 365 days; the 30 days before that for comparison; and weekly totals. Only time since tracking began is counted.
-- [Every outage (CSV)](https://garsfontein.timothybrits.co.za/api/outages.csv): one row per outage, with start, end, duration and the number of residents who confirmed it.
+- [Statistics (JSON)](https://garsfontein.timothybrits.co.za/api/stats): hours without power, number of outages (and how many were planned), days with an outage, share of time with power and the longest outage for the last 7, 30 and 365 days; the 30 days before that for comparison; and weekly totals. Only time since tracking began is counted.
+- [Every outage (CSV)](https://garsfontein.timothybrits.co.za/api/outages.csv): one row per outage, with start, end, duration, whether it was planned, and the number of residents who confirmed it.
 - [Sitemap](https://garsfontein.timothybrits.co.za/sitemap.xml)
 - [Privacy notice](https://garsfontein.timothybrits.co.za/privacy.html)
 
@@ -21,10 +21,12 @@ All public endpoints are free to use, allow any origin (CORS), and are rate limi
 
 - `status`: `"ON"` or `"OFF"`
 - `since`: when the current state began (ISO 8601), or null
-- `outage`: the outage in progress (`id`, `startTime`, `endTime`, `confirmations`), or null
+- `outage`: the outage in progress (`id`, `startTime`, `endTime`, `planned`, `confirmations`), or null
 - `recent`: the five most recent outages, newest first
 - `generatedAt`: server time of the response
 
 All times are UTC. Local time is Africa/Johannesburg (UTC+2, no daylight saving).
+
+`planned` is true for outages announced in advance (maintenance or upgrades). They still count as time without power.
 
 `confirmations` counts residents who reported that their power was off too: at most one per connection per outage, checked with Cloudflare Turnstile.

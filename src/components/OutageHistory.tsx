@@ -27,7 +27,11 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
                   {formatDuration(end() - Date.parse(outage.startTime))}
                 </div>
                 <div class={css.secondary}>
-                  {[outage.endTime ? '' : 'Ongoing', outage.confirmations ? `${outage.confirmations} confirmed` : '']
+                  {[
+                    outage.endTime ? '' : 'Ongoing',
+                    outage.planned ? 'Planned work' : '',
+                    outage.confirmations ? `${outage.confirmations} confirmed` : '',
+                  ]
                     .filter(Boolean)
                     .join(' · ') || ' '}
                 </div>

@@ -24,3 +24,12 @@ export const itemMeta = style({ fontSize: '0.875rem', color: vars.color.muted })
 export const flagged = style({ opacity: 0.55, textDecoration: 'line-through' });
 
 export const actions = style({ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' });
+
+export const checkbox = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  fontSize: '0.9375rem',
+  minHeight: '2.75rem',
+  cursor: 'pointer',
+});

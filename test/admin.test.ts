@@ -92,6 +92,22 @@ describe('/api/admin/outages', () => {
     expect(n).toBe(0);
   });
 
+  it('marks outages as planned and shows it publicly', async () => {
+    const created = await post('/api/admin/outages', {
+      action: 'create',
+      startTime: '2026-10-18T08:00:00+02:00',
+      endTime: '2026-10-18T12:00:00+02:00',
+      isPlanned: true,
+    });
+    const { outage } = (await created.json()) as { outage: { id: number } };
+    const status = (await (await call('/api/status')).json()) as StatusResponse;
+    expect(status.recent[0]).toMatchObject({ id: outage.id, planned: true });
+
+    await post('/api/admin/outages', { action: 'update', id: outage.id, isPlanned: false });
+    const list = (await (await call('/api/admin/outages', { cookie })).json()) as AdminOutagesResponse;
+    expect(list.outages[0]).toMatchObject({ id: outage.id, planned: false });
+  });
+
   it('returns 404 for unknown outages', async () => {
     expect((await post('/api/admin/outages', { action: 'delete', id: 999 })).status).toBe(404);
   });

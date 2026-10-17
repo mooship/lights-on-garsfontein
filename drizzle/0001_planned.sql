@@ -1,0 +1,1 @@
+ALTER TABLE `outages` ADD `is_planned` integer DEFAULT 0 NOT NULL;

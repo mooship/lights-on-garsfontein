@@ -16,6 +16,7 @@ export default defineConfig({
           ADMIN_PASSWORD_HASH:
             'pbkdf2_sha256$100000$n7SohUIkjgbP01xFrUR50w==$G4dp7lkqVXazO3SBFzPjLKXgdzhDeh99ZXefTHRlxEg=',
           HEARTBEAT_TOKEN: 'test-heartbeat-token',
+          ADMIN_API_TOKEN: 'test-admin-api-token',
           IP_SALT: 'test-salt',
         },
       },

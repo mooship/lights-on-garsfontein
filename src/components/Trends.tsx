@@ -219,12 +219,10 @@ export const Trends: Component<TrendsProps> = (props) => {
           <Tile
             label="Outages"
             value={started() ? String(s().outages) : '—'}
-            delta={prev() ? delta(s().outages, prev()?.outages ?? 0, String, true) : null}
+            delta={prev() && s().plannedOutages === 0 ? delta(s().outages, prev()?.outages ?? 0, String, true) : null}
+            note={s().plannedOutages > 0 ? `${s().plannedOutages} planned` : undefined}
           />
-          <Tile
-            label="Time with power"
-            value={s().availability === null ? '—' : `${(Math.floor((s().availability ?? 0) * 1000) / 10).toFixed(1)}%`}
-          />
+          <Tile label="Days with an outage" value={started() ? `${s().daysWithOutage} of ${s().daysTracked}` : '—'} />
           <Tile
             label="Longest outage"
             value={

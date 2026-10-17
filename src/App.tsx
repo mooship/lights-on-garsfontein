@@ -72,7 +72,9 @@ function statusDetail(s: StatusResponse, now: number): string {
   };
   if (s.status === 'OFF') {
     const start = s.outage?.startTime ?? s.since;
-    return start ? `Went off at ${formatTime(start)} ${on(start)}.` : '';
+    if (!start) return '';
+    const when = `${formatTime(start)} ${on(start)}`;
+    return s.outage?.planned ? `Planned work on the grid since ${when}.` : `Went off at ${when}.`;
   }
   const last = s.recent.find((o) => o.endTime);
   if (!last?.endTime) return `No outages since tracking began on ${formatDate(TRACKING_SINCE)}.`;

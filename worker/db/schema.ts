@@ -11,6 +11,7 @@ export const outages = sqliteTable('outages', {
   endTime: text('end_time'),
   source: text('source', { enum: ['sensor', 'manual'] }).notNull(),
   isFalsePositive: integer('is_false_positive').notNull().default(0),
+  isPlanned: integer('is_planned').notNull().default(0),
 });
 
 export const outageConfirmations = sqliteTable(

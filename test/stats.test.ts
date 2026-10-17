@@ -46,6 +46,9 @@ describe('windowStats', () => {
       outages: 2,
       availability: 0.9635,
       longestMinutes: 150,
+      daysTracked: 5,
+      daysWithOutage: 2,
+      plannedOutages: 0,
     });
   });
 
@@ -60,6 +63,23 @@ describe('windowStats', () => {
     const stats = windowStats(intervals, since - 10 * 24 * H, since + 24 * H, since);
     expect(stats.trackedHours).toBe(24);
     expect(stats.hoursOff).toBe(2);
+  });
+
+  it('counts South African calendar days with any outage', () => {
+    // 23:30–00:30 SAST spans two days; the third day is clean.
+    const intervals = [{ start: t('2026-11-02T23:30:00+02:00'), end: t('2026-11-03T00:30:00+02:00') }];
+    const stats = windowStats(intervals, t('2026-11-02T00:00:00+02:00'), t('2026-11-05T00:00:00+02:00'), since);
+    expect(stats).toMatchObject({ daysTracked: 3, daysWithOutage: 2 });
+  });
+
+  it('counts planned outages separately but still as time without power', () => {
+    const all = [
+      { start: t('2026-11-02T08:00:00Z'), end: t('2026-11-02T10:00:00Z') },
+      { start: t('2026-11-03T08:00:00Z'), end: t('2026-11-03T09:00:00Z') },
+    ];
+    const planned = [all[0] as (typeof all)[number]];
+    const stats = windowStats(all, t('2026-11-01T00:00:00Z'), t('2026-11-05T00:00:00Z'), since, planned);
+    expect(stats).toMatchObject({ hoursOff: 3, outages: 2, plannedOutages: 1 });
   });
 
   it('reports null availability before tracking starts', () => {
@@ -136,10 +156,10 @@ describe('GET /api/outages.csv', () => {
     const res = await call('/api/outages.csv');
     expect(res.headers.get('Content-Type')).toContain('text/csv');
     const lines = (await res.text()).trim().split('\n');
-    expect(lines[0]).toBe('id,start_time_utc,end_time_utc,duration_minutes,confirmations');
+    expect(lines[0]).toBe('id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations');
     expect(lines.slice(1).map((l) => l.split(',').slice(1).join(','))).toEqual([
-      '2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,0',
-      '2026-10-21T10:00:00.000Z,,,0',
+      '2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,no,0',
+      '2026-10-21T10:00:00.000Z,,,no,0',
     ]);
   });
 });

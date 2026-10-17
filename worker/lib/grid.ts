@@ -33,6 +33,7 @@ export function outagesWithCounts(db: Db, where?: SQL) {
       endTime: outages.endTime,
       source: outages.source,
       isFalsePositive: outages.isFalsePositive,
+      isPlanned: outages.isPlanned,
       confirmations: count(outageConfirmations.id),
     })
     .from(outages)
@@ -49,9 +50,12 @@ export async function countConfirmations(db: Db, outageId: number): Promise<numb
   return row?.total ?? 0;
 }
 
-function summarise(outage: Pick<Outage, 'id' | 'startTime' | 'endTime'>, confirmations: number): OutageSummary {
-  const { id, startTime, endTime } = outage;
-  return { id, startTime, endTime, confirmations };
+function summarise(
+  outage: Pick<Outage, 'id' | 'startTime' | 'endTime' | 'isPlanned'>,
+  confirmations: number,
+): OutageSummary {
+  const { id, startTime, endTime, isPlanned } = outage;
+  return { id, startTime, endTime, confirmations, planned: isPlanned === 1 };
 }
 
 export async function getGridState(db: Db, now: Date) {

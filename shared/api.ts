@@ -11,6 +11,8 @@ export interface OutageSummary {
   startTime: string;
   endTime: string | null;
   confirmations: number;
+  /** Announced in advance, e.g. maintenance or upgrades. */
+  planned: boolean;
 }
 
 export interface AdminOutage extends OutageSummary {
@@ -44,6 +46,12 @@ export interface WindowStats {
   /** Share of tracked time with power (0–1), or null before any time was tracked. */
   availability: number | null;
   longestMinutes: number;
+  /** South African calendar days the window covers since tracking began. */
+  daysTracked: number;
+  /** How many of those days had at least one outage. */
+  daysWithOutage: number;
+  /** Outages in the window that were planned. */
+  plannedOutages: number;
 }
 
 export interface WeekStats {

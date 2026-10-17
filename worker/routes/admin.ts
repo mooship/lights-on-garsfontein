@@ -3,8 +3,9 @@ import { z } from 'zod';
 import type { AdminOutagesResponse } from '../../shared/api';
 import { createDb } from '../db/client';
 import { outages } from '../db/schema';
+import { safeEqual } from '../lib/crypto';
 import { getOpenOutage, outagesWithCounts } from '../lib/grid';
-import { errors, isCrossOrigin, json, parseBody } from '../lib/http';
+import { clientIp, errors, isCrossOrigin, isRateLimited, json, parseBody } from '../lib/http';
 import { getSessionUser } from './auth';
 
 const isoDate = z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
@@ -16,12 +17,14 @@ const outageSchema = z.discriminatedUnion('action', [
     action: z.literal('create'),
     startTime: isoDate,
     endTime: isoDate.nullable().optional(),
+    isPlanned: z.boolean().optional(),
   }),
   z.object({
     action: z.literal('update'),
     id: z.number().int().positive(),
     endTime: isoDate.nullable().optional(),
     isFalsePositive: z.boolean().optional(),
+    isPlanned: z.boolean().optional(),
   }),
   z.object({ action: z.literal('delete'), id: z.number().int().positive() }),
 ]);
@@ -29,7 +32,11 @@ const outageSchema = z.discriminatedUnion('action', [
 async function listOutages(env: Env): Promise<Response> {
   const rows = await outagesWithCounts(createDb(env.DB)).orderBy(desc(outages.startTime)).limit(50);
   const body: AdminOutagesResponse = {
-    outages: rows.map((r) => ({ ...r, isFalsePositive: r.isFalsePositive === 1 })),
+    outages: rows.map(({ isPlanned, ...r }) => ({
+      ...r,
+      planned: isPlanned === 1,
+      isFalsePositive: r.isFalsePositive === 1,
+    })),
   };
   return json(body);
 }
@@ -67,7 +74,12 @@ async function mutateOutage(request: Request, env: Env): Promise<Response> {
     if (input.endTime && input.endTime < input.startTime) return errors.badRequest('end_before_start');
     const [outage] = await db
       .insert(outages)
-      .values({ startTime: input.startTime, endTime: input.endTime ?? null, source: 'manual' })
+      .values({
+        startTime: input.startTime,
+        endTime: input.endTime ?? null,
+        source: 'manual',
+        isPlanned: input.isPlanned ? 1 : 0,
+      })
       .returning();
     return json({ outage }, 201);
   }
@@ -82,6 +94,7 @@ async function mutateOutage(request: Request, env: Env): Promise<Response> {
 
   const changes: Partial<typeof outages.$inferInsert> = {};
   if (input.endTime !== undefined) changes.endTime = input.endTime;
+  if (input.isPlanned !== undefined) changes.isPlanned = input.isPlanned ? 1 : 0;
   if (input.isFalsePositive !== undefined) {
     changes.isFalsePositive = input.isFalsePositive ? 1 : 0;
     // A false positive should not stay open and keep the grid "OFF".
@@ -97,6 +110,17 @@ async function mutateOutage(request: Request, env: Env): Promise<Response> {
   return json({ outage });
 }
 
+/**
+ * Admin access for scripts and AI agents: `Authorization: Bearer <ADMIN_API_TOKEN>`.
+ * Returns null when no bearer token was sent, so the session cookie is checked instead.
+ */
+async function checkApiToken(request: Request, env: Env): Promise<boolean | null> {
+  const auth = request.headers.get('Authorization');
+  if (!auth?.startsWith('Bearer ')) return null;
+  if (!env.ADMIN_API_TOKEN) return false;
+  return safeEqual(auth.slice(7), env.ADMIN_API_TOKEN);
+}
+
 export async function handleAdminRoutes(request: Request, env: Env, url: URL): Promise<Response | null> {
   const route = `${request.method} ${url.pathname}`;
   const handlers: Record<string, () => Promise<Response>> = {
@@ -106,7 +130,15 @@ export async function handleAdminRoutes(request: Request, env: Env, url: URL): P
   };
   const handler = handlers[route];
   if (!handler) return null;
-  if (request.method !== 'GET' && isCrossOrigin(request)) return errors.forbidden();
-  if (!(await getSessionUser(request, env))) return errors.unauthorized();
+  const token = await checkApiToken(request, env);
+  if (token === false) {
+    // Wrong tokens share the login rate limit, so they cannot be brute-forced.
+    if (await isRateLimited(env.LOGIN_LIMITER, clientIp(request))) return errors.rateLimited();
+    return errors.unauthorized();
+  }
+  if (token === null) {
+    if (request.method !== 'GET' && isCrossOrigin(request)) return errors.forbidden();
+    if (!(await getSessionUser(request, env))) return errors.unauthorized();
+  }
   return handler();
 }
