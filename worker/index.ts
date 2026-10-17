@@ -1,12 +1,12 @@
 import { createDb } from './db/client';
 import { detectOutage, purgeExpiredSessions, purgeOldFingerprints } from './lib/grid';
 import { errors } from './lib/http';
-import { dispatch, type Routes } from './lib/router';
+import { dispatch, purgeEdgeCache, type Routes } from './lib/router';
 import { adminRoutes } from './routes/admin';
 import { authRoutes } from './routes/auth';
 import { historyRoutes } from './routes/history';
 import { seoRoutes } from './routes/seo';
-import { statusRoutes } from './routes/status';
+import { STATUS_PATH, statusRoutes } from './routes/status';
 
 /** The hourly housekeeping cron in wrangler.toml. */
 const HOURLY_CRON = '0 * * * *';
@@ -59,7 +59,9 @@ export default {
     if (controller.cron === HOURLY_CRON) {
       await Promise.all([purgeExpiredSessions(db, now), purgeOldFingerprints(db, now)]);
     } else {
-      await detectOutage(db, now);
+      // Purges only this datacentre's copy; elsewhere the status edge TTL bounds the delay.
+      const { opened } = await detectOutage(db, now);
+      if (opened) await purgeEdgeCache(env.SITE_URL, STATUS_PATH);
     }
   },
 } satisfies ExportedHandler<Env>;

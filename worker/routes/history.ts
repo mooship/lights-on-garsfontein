@@ -57,7 +57,7 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   return new Response(`${lines.join('\n')}\n`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="garsfontein-grid-outages.csv"',
+      'Content-Disposition': 'attachment; filename="lights-on-garsfontein-outages.csv"',
       // About 80 bytes per outage, so even decades of data stay a few MB; a short cache keeps repeat downloads cheap.
       'Cache-Control': 'public, max-age=300',
     },

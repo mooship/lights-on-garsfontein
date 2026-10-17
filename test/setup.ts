@@ -13,7 +13,7 @@ declare global {
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 
 /** Routes with `edgeCache`; the Cache API outlives a test, so empty it like the tables. */
-const EDGE_CACHED = ['/api/stats', '/api/outages.csv', '/og.png'];
+const EDGE_CACHED = ['/api/status', '/api/stats', '/api/outages.csv', '/og.png'];
 
 beforeEach(async () => {
   await Promise.all([

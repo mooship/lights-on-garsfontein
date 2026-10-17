@@ -65,10 +65,14 @@ function isStale(lastSeen: string, now: Date): boolean {
 /**
  * Confirmations per outage as a correlated subquery, so it only touches the outages the outer
  * query returns (covered by the unique (outage_id, client_hash) index). No bound parameter per
- * outage either: D1 allows at most 100 per query.
+ * outage either: D1 allows at most 100 per query. Drizzle leaves columns unqualified in a
+ * single-table select, where a bare "id" would mean the confirmation's own id, so both sides
+ * name their table.
  */
+const qualified = (table: typeof outages | typeof outageConfirmations, column: { name: string }) =>
+  sql`${table}.${sql.identifier(column.name)}`;
 const confirmationCount =
-  sql<number>`(select count(*) from ${outageConfirmations} where ${outageConfirmations.outageId} = ${outages.id})`.mapWith(
+  sql<number>`(select count(*) from ${outageConfirmations} where ${qualified(outageConfirmations, outageConfirmations.outageId)} = ${qualified(outages, outages.id)})`.mapWith(
     Number,
   );
 
@@ -144,16 +148,16 @@ export async function getGridState(db: Db, now: Date) {
 }
 
 /**
- * Opens a sensor outage when the heartbeat has gone stale and nothing is open yet.
- * Returns the open outage, if any. Safe to call repeatedly and concurrently.
+ * Opens a sensor outage when the heartbeat has gone stale and nothing is open yet. Returns the
+ * open outage, if any, and whether this call opened it. Safe to call repeatedly and concurrently.
  */
-export async function detectOutage(db: Db, now: Date): Promise<Outage | undefined> {
+export async function detectOutage(db: Db, now: Date): Promise<{ outage?: Outage; opened: boolean }> {
   const [[heartbeat], [open]] = await db.batch([heartbeatQuery(db), openOutageQuery(db)]);
-  if (open) return open;
-  if (!heartbeat || heartbeat.onRecord || !isStale(heartbeat.lastSeen, now)) return undefined;
+  if (open) return { outage: open, opened: false };
+  if (!heartbeat || heartbeat.onRecord || !isStale(heartbeat.lastSeen, now)) return { opened: false };
   // The insert re-checks both conditions, in case another request got there first.
-  await openOutage(db, heartbeat.lastSeen, 'sensor', gte(outages.startTime, heartbeat.lastSeen));
-  return getOpenOutage(db);
+  const opened = await openOutage(db, heartbeat.lastSeen, 'sensor', gte(outages.startTime, heartbeat.lastSeen));
+  return { outage: await getOpenOutage(db), opened };
 }
 
 /**

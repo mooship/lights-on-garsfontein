@@ -67,7 +67,9 @@ describe('scheduled outage detection', () => {
 
 describe('housekeeping (hourly cron)', () => {
   it('purges expired sessions', async () => {
-    await env.DB.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?), (?, ?, ?)')
+    await env.DB.prepare(
+      "INSERT INTO sessions (id, user_id, expires_at, created_at, password_fingerprint) VALUES (?, ?, ?, '', ''), (?, ?, ?, '', '')",
+    )
       .bind('old', 'admin', '2000-01-01T00:00:00.000Z', 'new', 'admin', '2999-01-01T00:00:00.000Z')
       .run();
     await runCron(HOURLY_CRON);
@@ -76,7 +78,9 @@ describe('housekeeping (hourly cron)', () => {
   });
 
   it('does not run on the per-minute cron', async () => {
-    await env.DB.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)')
+    await env.DB.prepare(
+      "INSERT INTO sessions (id, user_id, expires_at, created_at, password_fingerprint) VALUES (?, ?, ?, '', '')",
+    )
       .bind('old', 'admin', '2000-01-01T00:00:00.000Z')
       .run();
     await runCron();

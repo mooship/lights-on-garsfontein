@@ -5,13 +5,22 @@ import { requireBearer } from '../lib/auth';
 import { sha256Hex } from '../lib/crypto';
 import { countConfirmations, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
 import { errors, json, parseBody } from '../lib/http';
-import type { RouteContext, Routes } from '../lib/router';
+import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
 
 const confirmSchema = z.object({
   token: z.string().min(1).max(2048),
   outageId: z.number().int().positive().optional(),
 }) satisfies z.ZodType<ConfirmRequest>;
+
+export const STATUS_PATH = '/api/status';
+
+/**
+ * Edge TTL for the status, which every open tab polls. Writes purge it (in the datacentre that
+ * handled them), so mostly it only delays OFF after a heartbeat goes stale, by up to this much on
+ * top of HEARTBEAT_THRESHOLD_MS. Browsers still get `no-store`.
+ */
+const STATUS_EDGE_TTL_SECONDS = 12;
 
 /** The outage was deleted between reading it and inserting the confirmation. */
 function isForeignKeyError(error: unknown): boolean {
@@ -40,7 +49,9 @@ async function postConfirm(ctx: RouteContext): Promise<Response> {
   const refused = await checkTurnstile(ctx, parsed.data.token, 'confirm');
   if (refused) return refused;
 
-  const outage = await detectOutage(db, new Date());
+  const { outage, opened } = await detectOutage(db, new Date());
+  // The route purges after a successful confirm; this covers the refusals below.
+  if (opened) await purgeEdgeCache(new URL(request.url).origin, STATUS_PATH);
   if (!outage) return errors.conflict('no_active_outage');
   // The visitor saw an outage that has since ended and another began: do not count them for it.
   if (parsed.data.outageId !== undefined && parsed.data.outageId !== outage.id) {
@@ -72,8 +83,22 @@ async function postHeartbeat({ db }: RouteContext): Promise<Response> {
 }
 
 export const statusRoutes: Routes = {
-  'GET /api/status': { handler: getStatus, limiter: 'STATUS_LIMITER', cors: true },
-  'POST /api/confirm': { handler: postConfirm, sameOrigin: true, limiter: 'CONFIRM_LIMITER' },
+  [`GET ${STATUS_PATH}`]: {
+    handler: getStatus,
+    limiter: 'STATUS_LIMITER',
+    cors: true,
+    edgeCache: STATUS_EDGE_TTL_SECONDS,
+  },
+  'POST /api/confirm': {
+    handler: postConfirm,
+    sameOrigin: true,
+    limiter: 'CONFIRM_LIMITER',
+    purges: [STATUS_PATH],
+  },
   // Until HEARTBEAT_TOKEN is set (no sensor yet), every heartbeat is refused.
-  'POST /api/heartbeat': { handler: postHeartbeat, authorize: requireBearer((env) => env.HEARTBEAT_TOKEN) },
+  'POST /api/heartbeat': {
+    handler: postHeartbeat,
+    authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),
+    purges: [STATUS_PATH],
+  },
 };

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../shared/api';
-import { call, insertOutage, setHeartbeat, getStatus as status, uniqueIp } from './helpers';
+import { call, insertOutage, mockTurnstile, runCron, setHeartbeat, getStatus as status, uniqueIp } from './helpers';
 
 describe('GET /api/status', () => {
   it('is ON in manual mode before any sensor heartbeat arrives', async () => {
@@ -45,6 +45,21 @@ describe('GET /api/status', () => {
     expect(body.outage?.id).toBe(id);
   });
 
+  it('counts confirmations against the outage they belong to', async () => {
+    const ago = (minutes: number) => new Date(Date.now() - minutes * MINUTE_MS).toISOString();
+    const older = await insertOutage({ startTime: ago(60), endTime: ago(50) });
+    const newer = await insertOutage({ startTime: ago(10) });
+    // The confirmation's own id is the older outage's id, which must not make it count there.
+    await env.DB.prepare(
+      'INSERT INTO outage_confirmations (id, outage_id, created_at, client_hash) VALUES (?, ?, ?, ?)',
+    )
+      .bind(older, newer, new Date().toISOString(), 'fingerprint')
+      .run();
+    const body = await status();
+    expect(body.outage).toMatchObject({ id: newer, confirmations: 1 });
+    expect(body.recent.find((o) => o.id === older)?.confirmations).toBe(0);
+  });
+
   it('ignores false-positive outages', async () => {
     await setHeartbeat(10);
     await insertOutage({ isFalsePositive: 1 });
@@ -72,9 +87,12 @@ describe('GET /api/status', () => {
     expect(await status()).toMatchObject({ status: 'ON', since: lastEnd });
   });
 
-  it('is never cached', async () => {
-    const res = await call('/api/status');
-    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  it('is never cached by browsers, from the edge cache or not', async () => {
+    for (let i = 0; i < 2; i++) {
+      const res = await call('/api/status');
+      expect(res.headers.get('Cache-Control')).toBe('no-store');
+      expect(res.headers.has('X-Browser-Cache-Control')).toBe(false);
+    }
   });
 
   it('rate limits at 60 requests per minute per IP', async () => {
@@ -84,6 +102,64 @@ describe('GET /api/status', () => {
     }
     expect((await call('/api/status', { ip })).status).toBe(429);
     expect((await call('/api/status')).status).toBe(200);
+  });
+});
+
+describe('GET /api/status edge cache', () => {
+  const heartbeat = () =>
+    call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
+  const admin = { Authorization: 'Bearer test-admin-api-token' };
+
+  it('serves a repeat request within the TTL from the edge cache', async () => {
+    const first = await status();
+    // Written straight to D1, so nothing purges the cached copy.
+    await insertOutage({ source: 'manual' });
+    expect(await status()).toEqual(first);
+  });
+
+  it('is purged by a heartbeat', async () => {
+    expect((await status()).status).toBe('ON');
+    await insertOutage({ source: 'manual' });
+    expect((await heartbeat()).status).toBe(200);
+    expect((await status()).status).toBe('OFF');
+  });
+
+  it('is purged by admin writes', async () => {
+    expect((await status()).status).toBe('ON');
+    const out = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' }, headers: admin });
+    expect(out.status).toBe(201);
+    const { outage } = (await out.json()) as { outage: { id: number } };
+    expect((await status()).status).toBe('OFF');
+    const update = { action: 'update', id: outage.id, isPlanned: true };
+    expect((await call('/api/admin/outages', { method: 'POST', body: update, headers: admin })).status).toBe(200);
+    expect((await status()).outage?.planned).toBe(true);
+    const remove = { action: 'delete', id: outage.id };
+    expect((await call('/api/admin/outages', { method: 'POST', body: remove, headers: admin })).status).toBe(200);
+    expect(await status()).toMatchObject({ status: 'ON', recent: [] });
+  });
+
+  it('is not purged by a refused admin write', async () => {
+    const first = await status();
+    await insertOutage({ source: 'manual' });
+    const res = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' }, headers: admin });
+    expect(res.status).toBe(409);
+    expect(await status()).toEqual(first);
+  });
+
+  it('is purged by a confirmation', async () => {
+    mockTurnstile(true);
+    await insertOutage({});
+    expect((await status()).outage?.confirmations).toBe(0);
+    const res = await call('/api/confirm', { method: 'POST', body: { token: 'turnstile-token' } });
+    expect(res.status).toBe(201);
+    expect((await status()).outage?.confirmations).toBe(1);
+  });
+
+  it('is purged when outage detection opens an outage', async () => {
+    await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 60);
+    expect(await status()).toMatchObject({ status: 'OFF', outage: null });
+    await runCron();
+    expect((await status()).outage).not.toBeNull();
   });
 });
 

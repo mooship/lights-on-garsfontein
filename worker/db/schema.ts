@@ -45,6 +45,10 @@ export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(), // Hashed session token
   userId: text('user_id').notNull(),
   expiresAt: text('expires_at').notNull(),
+  /** Sign-in time: however much it is used, a session ends at the absolute maximum after this. */
+  createdAt: text('created_at').notNull(),
+  /** Short hash of ADMIN_PASSWORD_HASH at sign-in; a new password signs every session out. */
+  passwordFingerprint: text('password_fingerprint').notNull(),
 });
 
 export type Outage = typeof outages.$inferSelect;

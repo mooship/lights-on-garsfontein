@@ -1,4 +1,4 @@
-import { and, eq, gt } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { DAY_MS } from '../../shared/api';
 import { sessions } from '../db/schema';
@@ -13,6 +13,8 @@ const SESSION_TOKEN = /^[\w-]{43}$/;
 // Stay signed in for 30 days after the last visit; renewing at most daily keeps writes rare.
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const RENEW_AFTER_MS = DAY_MS;
+// However often it is used, a session ends 90 days after sign-in.
+const SESSION_MAX_AGE_MS = 90 * DAY_MS;
 const ADMIN_USER_ID = 'admin';
 
 const loginSchema = z.object({
@@ -35,28 +37,42 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-const sessionExpiry = (now: number) => new Date(now + SESSION_TTL_SECONDS * 1000).toISOString();
+/** 30 days from now, but never past the absolute maximum after sign-in. */
+const sessionExpiry = (now: number, createdAt: number) =>
+  Math.min(now + SESSION_TTL_SECONDS * 1000, createdAt + SESSION_MAX_AGE_MS);
+
+/** Changes whenever ADMIN_PASSWORD_HASH does, so a new password signs every session out. */
+const passwordFingerprint = async (env: Env) => (await sha256Hex(`session:${env.ADMIN_PASSWORD_HASH}`)).slice(0, 16);
 
 /**
  * True when the request carries a valid, unexpired session cookie. Sessions slide: once a
- * day of the 30 has been used, the expiry and the cookie are pushed back out to 30 days.
+ * day of the 30 has been used, the expiry and the cookie are pushed back out to 30 days, up to
+ * 90 days after sign-in. Sessions signed in under another password are deleted.
  */
-export async function checkSession({ request, db, headers }: RouteContext): Promise<boolean> {
+export async function checkSession({ request, env, db, headers }: RouteContext): Promise<boolean> {
   const token = readCookie(request, SESSION_COOKIE);
   // Skip the database for anything that cannot be one of our tokens.
   if (!token || !SESSION_TOKEN.test(token)) return false;
   const id = await sha256Hex(token);
   const now = Date.now();
-  const session = await db.query.sessions.findFirst({
-    where: and(eq(sessions.id, id), gt(sessions.expiresAt, new Date(now).toISOString())),
-  });
+  const [session, fingerprint] = await Promise.all([
+    db.query.sessions.findFirst({ where: eq(sessions.id, id) }),
+    passwordFingerprint(env),
+  ]);
   if (!session) return false;
-  if (Date.parse(session.expiresAt) < now + SESSION_TTL_SECONDS * 1000 - RENEW_AFTER_MS) {
+  const createdAt = Date.parse(session.createdAt);
+  const expiresAt = Date.parse(session.expiresAt);
+  if (session.passwordFingerprint !== fingerprint || !(expiresAt > now) || !(createdAt + SESSION_MAX_AGE_MS > now)) {
+    await db.delete(sessions).where(eq(sessions.id, id));
+    return false;
+  }
+  const renewed = sessionExpiry(now, createdAt);
+  if (expiresAt < renewed - RENEW_AFTER_MS) {
     await db
       .update(sessions)
-      .set({ expiresAt: sessionExpiry(now) })
+      .set({ expiresAt: new Date(renewed).toISOString() })
       .where(eq(sessions.id, id));
-    headers.append('Set-Cookie', sessionCookie(token, SESSION_TTL_SECONDS));
+    headers.append('Set-Cookie', sessionCookie(token, Math.floor((renewed - now) / 1000)));
   }
   return true;
 }
@@ -81,10 +97,13 @@ async function login(ctx: RouteContext): Promise<Response> {
   if (!userOk || !passwordOk) return errors.unauthorized();
 
   const token = randomToken();
+  const now = Date.now();
   await db.insert(sessions).values({
     id: await sha256Hex(token),
     userId: ADMIN_USER_ID,
-    expiresAt: sessionExpiry(Date.now()),
+    expiresAt: new Date(sessionExpiry(now, now)).toISOString(),
+    createdAt: new Date(now).toISOString(),
+    passwordFingerprint: await passwordFingerprint(env),
   });
   return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SECONDS) });
 }
