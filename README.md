@@ -1,27 +1,31 @@
 # Garsfontein Grid
 
-Garsfontein Grid shows whether the power is on in Garsfontein, Pretoria, and keeps an open record of every outage, so residents can see how often it goes off and whether that is changing.
+A running record of power outages in Garsfontein, Pretoria. It shows whether the power is on right now and keeps a history of every outage, so it is easy to see how often the power goes off and whether that is changing.
+
+Live at **https://garsfontein.timothybrits.co.za**. Records start on **17 October 2026**.
 
 > Run by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.
 
-Live at **https://garsfontein.timothybrits.co.za** · Outage tracking began on **17 October 2026**.
+## Area covered
 
-## Which homes this covers
+Garsfontein is in Ward 45, Region 6 of the City of Tshwane. Homes are supplied by the **Garsfontein substation**, which is fed from **Highlands**, which is fed from **Njala**. Much of that equipment has little modern protection, so a single fault usually cuts the whole Garsfontein substation area at once. One household's record is therefore a fair guide for the neighbourhood.
 
-The record applies to homes supplied by the **Garsfontein substation** (in Ward 45). Garsfontein is fed from the Highlands substation, which is fed from Njala. The local substations have little modern protection, so a fault almost anywhere on the Garsfontein substation cuts the whole area at once. That is why one record is a fair guide for the neighbourhood, and why the site talks about the substation rather than a street or extension.
+## Features
 
-## What it does
+- **Live status**: on or off, and for how long. The tab title and favicon follow the status.
+- **By the numbers**: hours without power, number of outages, days affected and the longest outage over the last 30 days, compared with the 30 days before once there is enough data. Includes a weekly chart and table.
+- **Planned work**: outages announced in advance can be tagged as planned. They still count as time without power.
+- **"My power's off too"**: during an outage, neighbours can add a confirmation. One per connection per outage, behind Cloudflare Turnstile.
+- **Open data**: every outage as CSV, plus a public JSON API.
 
-- **Live status.** ON or OFF, with how long it has been that way.
-- **By the numbers.** Hours without power, number of outages, days with an outage and the longest outage over the last 30 days, compared with the 30 days before. Includes a weekly chart.
-- **Planned work.** Outages announced in advance (maintenance, upgrades) are tagged as planned. They still count as time without power, but are shown separately.
-- **History and open data.** Recent outages on the page, and every outage as CSV at [`/api/outages.csv`](https://garsfontein.timothybrits.co.za/api/outages.csv).
-- **"My power's off too".** Neighbours can confirm an outage: one confirmation per connection per outage, protected by Cloudflare Turnstile and rate limiting. IP addresses are stored only as salted hashes.
-- **Two ways to record outages.** An admin punch clock and an optional heartbeat sensor. They can be used together (see [Recording outages](#recording-outages)).
+## Tech stack
 
-## Stack
-
-SolidJS + Vite + Vanilla Extract on the front end. Cloudflare Workers (static assets plus API), D1 with Drizzle ORM, Zod and Turnstile on the back end. Testing and tooling: Vitest in the Workers runtime (`@cloudflare/vitest-plugin`), Playwright, Biome, Lefthook and GitHub Actions. Icons come from [Lucide](https://lucide.dev).
+| Layer | Tools |
+| --- | --- |
+| Front end | SolidJS, Vite, Vanilla Extract, Lucide icons |
+| Back end | Cloudflare Workers (static assets and API), D1 with Drizzle ORM, Zod |
+| Security | Cloudflare Turnstile, Workers rate limiting, PBKDF2 password hashing, strict CSP |
+| Quality | Vitest in the Workers runtime, Playwright, Biome, Lefthook, GitHub Actions, Dependabot |
 
 ## Local development
 
@@ -29,91 +33,88 @@ Requires Node 24.
 
 ```sh
 npm install
-cp .dev.vars.example .dev.vars     # local test keys; admin password is "test-password"
+cp .dev.vars.example .dev.vars   # local test keys; the admin password is "test-password"
 npm run db:migrate:local
-npm run preview                    # build + wrangler dev on http://localhost:8787
+npm run preview                  # build, then serve on http://localhost:8787
 ```
 
-For hot reload, run `npm run dev:worker` and `npm run dev` side by side. Vite serves the UI on port 5173 and proxies the API to the Worker.
+For hot reload, run `npm run dev:worker` and `npm run dev` side by side. Vite serves the UI on port 5173 and proxies API calls to the Worker.
 
-| Command | What it does |
+| Command | Purpose |
 | --- | --- |
-| `npm test` | Worker unit and integration tests (Vitest in workerd) |
-| `npm run test:e2e` | Playwright against a fresh local Worker and D1 |
-| `npm run lint` / `lint:fix` | Biome |
-| `npm run typecheck` | TypeScript for app, Worker and scripts |
-| `npm run db:generate` | New Drizzle migration after editing `worker/db/schema.ts` |
-| `npm run hash-password` | Prints an `ADMIN_PASSWORD_HASH` value (input hidden) |
-| `npm run og` / `npm run icons` | Re-render social cards and app icons |
+| `npm test` | Worker unit and integration tests |
+| `npm run test:e2e` | Browser tests against a fresh local Worker and database |
+| `npm run lint` / `npm run lint:fix` | Lint and format with Biome |
+| `npm run typecheck` | Type-check the app, Worker and scripts |
+| `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
+| `npm run hash-password` | Print an `ADMIN_PASSWORD_HASH` value (input hidden) |
+| `npm run og` / `npm run icons` | Re-render the social cards and app icons |
 
-## Deploying
+## Deployment
 
-The Worker, D1 database and custom domain are defined in `wrangler.toml`. Set the secrets once:
+The Worker, database, rate limits and custom domain are defined in `wrangler.toml`.
 
 ```sh
 npx wrangler login
 npm run --silent hash-password | npx wrangler secret put ADMIN_PASSWORD_HASH
 npx wrangler secret put TURNSTILE_SECRET_KEY   # from the Turnstile widget
-npx wrangler secret put IP_SALT                # any long random string; never change it
-npm run deploy
+npx wrangler secret put IP_SALT                # a long random string; never change it
+npm run deploy                                 # build, apply migrations, deploy
 ```
 
-`HEARTBEAT_TOKEN` (sensor) and `ADMIN_API_TOKEN` (scripts and agents) are optional.
+Optional secrets: `ADMIN_API_TOKEN` (scripts and agents) and `HEARTBEAT_TOKEN` (a sensor).
 
-**Continuous deployment.** CI runs on every PR and every push to `main`. To deploy automatically from `main`:
+**Changing the admin password.** Set a new hash as above, then sign out every existing session:
 
-1. Create a Cloudflare API token with the *Edit Cloudflare Workers* template plus *D1: Edit*.
-2. Add the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-3. Set the repository variable `DEPLOY_ENABLED` to `true`.
+```sh
+npx wrangler d1 execute DB --remote --command "DELETE FROM sessions"
+```
+
+**Continuous deployment.** CI runs on every pull request and every push to `main`. To deploy automatically from `main`, create a Cloudflare API token limited to *Workers Scripts: Edit* and *D1: Edit* on this account, add it with your account ID as the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and set the repository variable `DEPLOY_ENABLED` to `true`.
 
 ## Recording outages
 
-**Admin punch clock.** Sign in at `/admin`. When the power goes off, tap **Punch out**: the status turns OFF and a timer starts. When it comes back, tap **Punch in**. Use **Log a past outage** for anything missed, **Planned** for announced maintenance, and **False positive** or **Delete** to correct mistakes. With no open outage and no sensor reporting, the status is ON.
+**Admin page.** Sign in at `/admin`. Tap **Punch out** when the power goes off and **Punch in** when it returns. **Log a past outage** adds anything missed. Each outage can be marked **Planned** or **False positive**, closed or deleted. With no open outage and no sensor reporting, the status is on.
 
-The public site never says how an outage was recorded.
+The public site and API never say how an outage was recorded.
 
-Outages from before 17 October 2026 can be added; they appear in the history and CSV, but the statistics only count time from the tracking start, so untracked days never make the numbers look better than they were. To change the start date, edit `TRACKING_SINCE` in `shared/api.ts`.
+Outages from before 17 October 2026 can be added for the history and CSV, but statistics only count time from the start date, so days nobody was tracking never improve the numbers. To change the start date, edit `TRACKING_SINCE` in `shared/api.ts`.
 
-**Scripts and AI agents.** Every admin endpoint also accepts `Authorization: Bearer <ADMIN_API_TOKEN>`. Wrong tokens count against the login rate limit (5 a minute).
+**Scripts and AI agents.** Admin endpoints also accept `Authorization: Bearer <ADMIN_API_TOKEN>`. Failed attempts count towards the sign-in rate limit. Keep the URL and token in a git-ignored `.env` (`GARSFONTEIN_URL`, `GARSFONTEIN_ADMIN_TOKEN`).
 
 ```sh
-# Power just went off / came back
-curl -X POST "$GARSFONTEIN_URL/api/admin/timer" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" \
-  -H "Content-Type: application/json" -d '{"action":"punch_out"}'      # or "punch_in"
+# The power went off (use "punch_in" when it returns)
+curl -X POST "$GARSFONTEIN_URL/api/admin/timer" \
+  -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"action":"punch_out"}'
 
-# Log an outage after the fact (times with an offset; SAST is +02:00)
-curl -X POST "$GARSFONTEIN_URL/api/admin/outages" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
+# Log an outage after the fact (include the offset; SAST is +02:00)
+curl -X POST "$GARSFONTEIN_URL/api/admin/outages" \
+  -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" -H "Content-Type: application/json" \
   -d '{"action":"create","startTime":"2026-10-17T05:52:00+02:00","endTime":"2026-10-17T11:15:00+02:00","isPlanned":false}'
 
-# List recent outages (to find an id), then correct one
+# List recent outages, then correct one by id
 curl "$GARSFONTEIN_URL/api/admin/outages" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN"
-curl -X POST "$GARSFONTEIN_URL/api/admin/outages" -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" \
-  -H "Content-Type: application/json" -d '{"action":"update","id":3,"endTime":"2026-10-17T11:20:00+02:00"}'
+curl -X POST "$GARSFONTEIN_URL/api/admin/outages" \
+  -H "Authorization: Bearer $GARSFONTEIN_ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"action":"update","id":3,"endTime":"2026-10-17T11:20:00+02:00"}'
 ```
 
-Locally, keep the URL and token in a git-ignored `.env` (`GARSFONTEIN_URL`, `GARSFONTEIN_ADMIN_TOKEN`). To rotate the token, generate a new one and `npx wrangler secret put ADMIN_API_TOKEN`.
+To rotate the token, generate a new one, run `npx wrangler secret put ADMIN_API_TOKEN` and update `.env`.
 
-**Heartbeat sensor.** Any always-on device that runs from **mains power without a UPS** works. When the power goes off it stops checking in, and after 3 minutes of silence the site opens an outage automatically. When it checks in again, the outage closes. No deploy or config change is needed beyond the token:
+**Heartbeat sensor.** Any always-on device powered from the mains without a UPS will do. It sends a heartbeat every minute. After three minutes of silence an outage opens automatically, and the next heartbeat closes it. Heartbeats are refused until `HEARTBEAT_TOKEN` is set.
 
-1. Pick a long random token and store it:
-   ```sh
-   npx wrangler secret put HEARTBEAT_TOKEN
-   ```
-2. Make the device send this once a minute:
-   ```sh
-   curl -fsS -X POST -H "Authorization: Bearer $HEARTBEAT_TOKEN" https://garsfontein.timothybrits.co.za/api/heartbeat
-   ```
+```sh
+npx wrangler secret put HEARTBEAT_TOKEN
+```
 
-Heartbeats are refused until `HEARTBEAT_TOKEN` is set.
-
-**Raspberry Pi or old phone running Termux** (crontab):
+Raspberry Pi, or an old Android phone with Termux (crontab):
 
 ```cron
 * * * * * curl -fsS -m 20 -X POST -H "Authorization: Bearer YOUR_TOKEN" https://garsfontein.timothybrits.co.za/api/heartbeat >/dev/null
 ```
 
-**ESP32** (Arduino IDE, about R100 of hardware plus a USB charger in a wall socket):
+ESP32 (Arduino IDE; about R100 of hardware and a USB charger):
 
 ```cpp
 #include <WiFi.h>
@@ -132,7 +133,7 @@ void setup() {
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     WiFiClientSecure client;
-    client.setInsecure();  // token auth; skip CA pinning to keep the sketch simple
+    client.setInsecure();  // token auth; skips certificate pinning to keep the sketch short
     HTTPClient http;
     http.begin(client, URL);
     http.addHeader("Authorization", String("Bearer ") + TOKEN);
@@ -145,27 +146,23 @@ void loop() {
 }
 ```
 
-**Caveats.**
-- If your internet drops while the power stays on, the sensor goes quiet and an outage is logged. Mark it as a **False positive** in `/admin`.
-- The punch clock keeps working alongside a sensor. Heartbeats close only outages the sensor opened.
+If the internet drops while the power stays on, the sensor goes quiet and an outage is logged; mark it as a false positive. The punch clock keeps working alongside a sensor, and heartbeats only close outages the sensor opened.
 
 ## API
 
-All times are UTC ISO 8601. Public endpoints allow any origin (CORS) and are rate limited to 60 requests a minute per IP.
+Times are UTC (ISO 8601). Public endpoints allow any origin and are limited to 60 requests a minute per connection.
 
-| Endpoint | Description |
-| --- | --- |
-| `GET /api/status` | `status` (`ON`/`OFF`), `since`, open `outage`, five `recent` outages |
-| `GET /api/stats` | Last 7, 30 and 365 days, previous 30 days, and weekly totals |
-| `GET /api/outages.csv` | Every outage, false positives removed |
+| Endpoint | Access | Description |
+| --- | --- | --- |
+| `GET /api/status` | Public | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages |
+| `GET /api/stats` | Public | Last 7, 30 and 365 days, the previous 30 days, and weekly totals |
+| `GET /api/outages.csv` | Public | Every outage, false positives removed |
+| `POST /api/confirm` | Public, Turnstile | "My power's off too": once per connection per outage, 5 requests a minute |
+| `POST /api/heartbeat` | Sensor token | Sensor check-in |
+| `POST /api/admin/login`, `/logout` | Password, Turnstile | Sets an `HttpOnly`, `Secure`, `SameSite=Strict` session cookie for 12 hours |
+| `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Session or API token | Manage outages and the punch clock |
 
-Public responses never say how an outage was recorded. Only the admin API includes `source` (`sensor` or `manual`).
-| `POST /api/confirm` | `{ token }` from Turnstile. 5 a minute per IP, one per IP per outage |
-| `POST /api/heartbeat` | Sensor check-in. `Authorization: Bearer <HEARTBEAT_TOKEN>` |
-| `POST /api/admin/login`, `/logout` | Session cookie `admin_session` (HttpOnly, Secure, SameSite=Strict, 12 h) |
-| `GET/POST /api/admin/outages`, `POST /api/admin/timer` | Admin only |
-
-Machine-readable summary: [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt).
+A plain-text summary for language models is served at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt).
 
 ## Licence
 
