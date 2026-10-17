@@ -57,12 +57,32 @@ const Masthead: Component = () => (
   </>
 );
 
+/** Plain-language context on where the record applies; also what search engines read. */
+const AreaCard: Component = () => (
+  <section class="gg-card gg-prose" aria-labelledby="area-heading">
+    <h2 id="area-heading" class="gg-card-title">
+      Where this applies
+    </h2>
+    <p>
+      This is one Garsfontein household’s record of power cuts, kept since {formatDate(TRACKING_SINCE)} and shared with
+      the neighbourhood.
+    </p>
+    <p>
+      Garsfontein is currently in Ward 45, in Region 6 of the City of Tshwane, Pretoria; as of October 2026 its ward
+      councillor is from the DA. Ward boundaries are being redrawn for the next local elections, and part of Ward 45
+      moves to Ward 46.
+    </p>
+    <p>
+      Homes here get their electricity from the Garsfontein substation, which is fed from the Highlands substation,
+      which in turn is fed from Njala. The older substations along that chain have little modern protection, so a fault
+      almost anywhere tends to cut the whole Garsfontein substation area at once. If the power is off here, it is
+      probably off on your street too.
+    </p>
+  </section>
+);
+
 const Footer: Component = () => (
   <footer class="gg-footer">
-    <p>
-      An open record of power cuts for homes on the Garsfontein substation, kept since {formatDate(TRACKING_SINCE)}. A
-      fault on that substation usually takes out the whole area, so if it’s off here, it’s probably off for you too.
-    </p>
     <nav aria-label="Site">
       <a href="/privacy.html">Privacy</a>
       <a href="/api/outages.csv">Download the data (CSV)</a>
@@ -157,6 +177,8 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
           {(s) => <OutageHistory outages={s().recent} now={now()} />}
         </Show>
       </section>
+
+      <AreaCard />
     </>
   );
 };

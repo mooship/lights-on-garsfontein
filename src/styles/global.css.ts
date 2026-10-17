@@ -118,6 +118,9 @@ globalStyle('.gg-trends-details > summary', {
   alignItems: 'center',
 });
 
+globalStyle('.gg-prose', { display: 'flex', flexDirection: 'column', gap: '0.75rem', color: vars.color.muted });
+globalStyle('.gg-prose .gg-card-title', { marginBottom: 0, color: vars.color.text });
+
 globalStyle('.gg-card-title', {
   fontFamily: vars.font.display,
   fontWeight: 600,
