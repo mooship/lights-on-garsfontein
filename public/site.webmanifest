@@ -1,5 +1,6 @@
 {
   "name": "Garsfontein Grid",
+  "id": "/",
   "short_name": "Garsfontein Grid",
   "description": "Live power status and outage history for Ward 45, Garsfontein, Pretoria.",
   "start_url": "/",

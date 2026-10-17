@@ -18,7 +18,7 @@
     "dev:worker": "wrangler dev",
     "build": "vite build",
     "preview": "npm run build && wrangler dev",
-    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "lint:ci": "biome ci .",
@@ -31,10 +31,10 @@
     "cf-typegen": "wrangler types worker/worker-configuration.d.ts",
     "hash-password": "node scripts/hash-password.ts",
     "og": "node scripts/build-og.ts",
-    "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy",
+    "deploy": "npm run build && npm run deploy:ci",
     "prepare": "lefthook install",
     "icons": "node scripts/build-icons.ts",
-    "deploy:ci": "wrangler d1 migrations apply DB --remote && wrangler deploy"
+    "deploy:ci": "npm run db:migrate:remote && wrangler deploy"
   },
   "dependencies": {
     "clsx": "^2.1.1",

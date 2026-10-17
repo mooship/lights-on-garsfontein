@@ -38,21 +38,24 @@ npm run db:migrate:local
 npm run preview                  # build, then serve on http://localhost:8787
 ```
 
-For hot reload, run `npm run dev:worker` and `npm run dev` side by side. Vite serves the UI on port 5173 and proxies API calls to the Worker.
+For hot reload, run `npm run dev:worker` and `npm run dev` side by side. Vite serves the UI on port 5173 and proxies API calls to the Worker. Run `npm run build` once first: the Worker serves its static assets from `./dist` and will not start without it.
 
 | Command | Purpose |
 | --- | --- |
-| `npm test` | Worker unit and integration tests |
+| `npm test` / `npm run test:watch` | Worker unit and integration tests, once or in watch mode |
 | `npm run test:e2e` | Browser tests against a fresh local Worker and database |
 | `npm run lint` / `npm run lint:fix` | Lint and format with Biome |
-| `npm run typecheck` | Type-check the app, Worker and scripts |
+| `npm run lint:ci` | Lint and format check without writing changes, as CI runs it |
+| `npm run typecheck` | Type-check the app, Worker, tests and scripts |
+| `npm run cf-typegen` | Regenerate `worker/worker-configuration.d.ts` after changing `wrangler.toml` |
 | `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
+| `npm run db:migrate:remote` | Apply pending migrations to the production database |
 | `npm run hash-password` | Print an `ADMIN_PASSWORD_HASH` value (input hidden) |
 | `npm run og` / `npm run icons` | Re-render the social cards and app icons |
 
 ## Deployment
 
-The Worker, database, rate limits and custom domain are defined in `wrangler.toml`.
+The Worker, database, rate limits, cron triggers and custom domain are defined in `wrangler.toml`. Two cron triggers run the Worker on a schedule (`crons = ["* * * * *", "0 * * * *"]`): every minute it checks for a silent sensor and opens an outage, and every hour it does housekeeping, removing expired sessions and clearing the hashed connection fingerprints from old confirmations (the counts stay).
 
 ```sh
 npx wrangler login
@@ -123,7 +126,7 @@ Raspberry Pi, or an old Android phone with Termux (crontab):
 * * * * * curl -fsS -m 20 -X POST -H "Authorization: Bearer YOUR_TOKEN" https://garsfontein.timothybrits.co.za/api/heartbeat >/dev/null
 ```
 
-ESP32 (Arduino IDE; about R100 of hardware and a USB charger):
+ESP32 (Arduino IDE with ESP32 Arduino core 3.3 or later; about R100 of hardware and a USB charger). The sketch checks the server's certificate against the root certificates built into the core:
 
 ```cpp
 #include <WiFi.h>
@@ -142,7 +145,7 @@ void setup() {
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     WiFiClientSecure client;
-    client.setInsecure();  // token auth; skips certificate pinning to keep the sketch short
+    client.useBuiltinCACertBundle();  // verify the server against the core's root CA bundle
     HTTPClient http;
     http.begin(client, URL);
     http.addHeader("Authorization", String("Bearer ") + TOKEN);
@@ -159,7 +162,7 @@ If the internet drops while the power stays on, the sensor goes quiet and an out
 
 ## API
 
-Times are UTC (ISO 8601). Public endpoints allow any origin and are limited to 60 requests a minute per connection.
+Times are UTC (ISO 8601). The public `GET` endpoints allow any origin and share a limit of 60 requests a minute per connection, with IPv6 addresses counted per /64.
 
 | Endpoint | Access | Description |
 | --- | --- | --- |

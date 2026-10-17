@@ -16,14 +16,23 @@ jobs:
   check:
     name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint:ci
+      # Generated files must match their sources. Secret names come from .dev.vars, so use the example.
+      - run: cp .dev.vars.example .dev.vars
+      - run: npx wrangler types worker/worker-configuration.d.ts --check
+      - run: npx drizzle-kit generate
+      # `add -N` makes a newly generated migration show up in the diff.
+      - run: git add -N drizzle/ && git diff --exit-code drizzle/
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
@@ -31,8 +40,11 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
