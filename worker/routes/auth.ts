@@ -41,7 +41,7 @@ async function login(request: Request, env: Env): Promise<Response> {
   if (await isRateLimited(env.LOGIN_LIMITER, clientIp(request))) return errors.rateLimited();
   const parsed = await parseBody(request, loginSchema);
   if ('response' in parsed) return parsed.response;
-  if (!(await verifyPassword(parsed.data.password, env.ADMIN_PASSWORD_HASH))) {
+  if (!env.ADMIN_PASSWORD_HASH || !(await verifyPassword(parsed.data.password, env.ADMIN_PASSWORD_HASH))) {
     return errors.unauthorized();
   }
 

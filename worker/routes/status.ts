@@ -52,7 +52,8 @@ async function postConfirm(request: Request, env: Env): Promise<Response> {
 async function postHeartbeat(request: Request, env: Env): Promise<Response> {
   const auth = request.headers.get('Authorization') ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!token || !(await safeEqual(token, env.HEARTBEAT_TOKEN))) return errors.unauthorized();
+  // No sensor configured yet: refuse every heartbeat rather than compare against an unset secret.
+  if (!env.HEARTBEAT_TOKEN || !token || !(await safeEqual(token, env.HEARTBEAT_TOKEN))) return errors.unauthorized();
   const closed = await recordHeartbeat(createDb(env.DB), new Date());
   return json({ ok: true, closedOutages: closed });
 }

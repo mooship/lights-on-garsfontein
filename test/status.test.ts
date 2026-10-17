@@ -90,6 +90,22 @@ describe('POST /api/heartbeat', () => {
     expect(wrong.status).toBe(401);
   });
 
+  it('rejects every heartbeat while no sensor token is configured', async () => {
+    const noToken = { ...env, HEARTBEAT_TOKEN: '' } as Env;
+    const res = await call('/api/heartbeat', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer undefined' },
+      env: noToken,
+    });
+    expect(res.status).toBe(401);
+    const forged = await call('/api/heartbeat', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' },
+      env: noToken,
+    });
+    expect(forged.status).toBe(401);
+  });
+
   it('records the heartbeat', async () => {
     const res = await call('/api/heartbeat', { method: 'POST', headers: auth });
     expect(res.status).toBe(200);

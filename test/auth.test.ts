@@ -4,6 +4,15 @@ import { sha256Hex } from '../worker/lib/crypto';
 import { call, login, uniqueIp } from './helpers';
 
 describe('admin auth', () => {
+  it('refuses all logins while no password hash is configured', async () => {
+    const res = await call('/api/admin/login', {
+      method: 'POST',
+      body: { password: 'test-password' },
+      env: { ...env, ADMIN_PASSWORD_HASH: '' } as Env,
+    });
+    expect(res.status).toBe(401);
+  });
+
   it('rejects a wrong password', async () => {
     const res = await call('/api/admin/login', { method: 'POST', body: { password: 'wrong' } });
     expect(res.status).toBe(401);
