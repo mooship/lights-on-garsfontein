@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Lights On? Open-source power outage tracking for Garsfontein, Pretoria, measured in Extension 16 (Ward 45).",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",

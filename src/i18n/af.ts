@@ -17,7 +17,8 @@ export const af = {
     privacy: 'Privaatheid',
     csv: 'Laai die data af (CSV)',
     signIn: 'Teken in',
-    measured: 'Gemeet in Garsfontein Uitb. 16, Pretoria · Wyk 45 (DA) · Streek 6, Stad Tshwane · Garsfontein-substasie',
+    measured: 'Gemeet in Garsfontein Uitb. 16, Pretoria · Wyk 45 · Streek 6, Stad Tshwane · Garsfontein-substasie',
+    operator: 'Onafhanklik bedryf deur ’n inwoner van Garsfontein Uitb. 16.',
   },
   loading: 'Laai tans…',
   status: {

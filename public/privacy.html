@@ -98,51 +98,53 @@
         <p class="updated">Last updated 17 October 2026</p>
 
         <p>
-          This site keeps an open record of power cuts for homes on the Garsfontein substation in Pretoria. It is
-          run by a local resident and is not affiliated with the City of Tshwane or Eskom. This notice explains what the
-          site does with information about you, in line with the Protection of Personal Information Act (POPIA).
+          This site keeps an open record of power outages for homes supplied by the Garsfontein substation in
+          Pretoria. It is operated independently by a Garsfontein resident and is not affiliated with the City of
+          Tshwane or Eskom. This notice explains how the site handles information about you, in line with the
+          Protection of Personal Information Act (POPIA).
         </p>
 
         <h2>What we collect</h2>
         <ul>
           <li>
-            <strong>Outage confirmations.</strong> When you tap “My power’s off too”, we store a scrambled fingerprint of
-            your IP address (a salted SHA-256 hash), along with the outage and the time. It lets us count each connection
-            once per outage. The address itself is never stored, and the fingerprint can’t be turned back into it without
-            a secret key that only the site holds. Fingerprints are deleted after 30 days; the count stays.
+            <strong>Community confirmations.</strong> When you tap “My power is off too”, we store a one-way fingerprint
+            of your IP address (for IPv6, of its network prefix; a salted SHA-256 hash), together with the outage and the time. This allows each
+            connection to be counted once per outage. The address itself is never stored, and the fingerprint cannot be
+            converted back into the address without a secret key held only by the site. Fingerprints are deleted after
+            30 days; the count is kept.
           </li>
           <li>
-            <strong>Bot protection.</strong> Confirmations are checked by Cloudflare Turnstile, which only loads when you
-            tap the button. Cloudflare looks at signals from your browser to tell people from bots; see
+            <strong>Bot protection.</strong> Confirmations are checked by Cloudflare Turnstile, which loads only when you
+            tap the button. Cloudflare uses signals from your browser to distinguish people from automated traffic; see
             <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Cloudflare’s Turnstile privacy addendum</a>.
           </li>
           <li>
-            <strong>Request logs.</strong> Like most websites, the site is protected by rate limits and keeps short-lived
-            request logs (which include IP addresses) to fix problems and stop abuse. Cloudflare, our host, deletes these
-            logs automatically after a few days.
+            <strong>Request logs.</strong> As with most websites, the site is protected by rate limits and keeps
+            short-lived request logs (which include IP addresses) to resolve problems and prevent abuse. Cloudflare, our
+            hosting provider, deletes these logs automatically after a few days.
           </li>
           <li>
-            <strong>Visitor statistics.</strong> We use Cloudflare Web Analytics to see how many people visit and which
-            pages they read. It sets no cookies, doesn’t fingerprint your device and doesn’t follow you across other sites;
-            see <a href="https://www.cloudflare.com/web-analytics/">how Cloudflare Web Analytics works</a>.
+            <strong>Visitor statistics.</strong> We use Cloudflare Web Analytics to see how many people visit the site and
+            which pages they view. It sets no cookies, does not fingerprint your device and does not track you across
+            other sites; see <a href="https://www.cloudflare.com/web-analytics/">how Cloudflare Web Analytics works</a>.
           </li>
           <li>
-            <strong>Your theme and language.</strong> If you choose light or dark mode, or a language, your browser
-            remembers it locally. It never leaves your device.
+            <strong>Your theme and language.</strong> If you choose light or dark mode, or a language, your browser stores
+            the choice locally. It never leaves your device.
           </li>
         </ul>
 
-        <h2>What we don’t do</h2>
+        <h2>What we do not do</h2>
         <ul>
-          <li>No accounts, tracking cookies or adverts.</li>
-          <li>We don’t sell or share your information.</li>
+          <li>No accounts, tracking cookies or advertising.</li>
+          <li>We do not sell or share your information.</li>
         </ul>
 
-        <h2>How long we keep things</h2>
+        <h2>Retention</h2>
         <p>
-          Outages and their confirmation counts stay on the site as a public history. If you want your confirmation
-          removed, tell us roughly when you made it; because we only hold the scrambled fingerprint, that is how we can
-          find it.
+          Outages and their confirmation counts remain on the site as a public record. To have your confirmation
+          removed, tell us approximately when you made it. Because we hold only the one-way fingerprint, the time is how
+          we can identify it.
         </p>
 
         <h2>Contact</h2>

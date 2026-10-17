@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
 import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
 import * as css from './App.css';
+import { SiteBanner } from './components/Banner';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { LanguageToggle } from './components/LanguageToggle';
 import { OutageHistory } from './components/OutageHistory';
@@ -63,6 +64,7 @@ const Footer: Component<{ signIn: boolean }> = (props) => (
       </Show>
     </nav>
     <p>{t().footer.measured}</p>
+    <p>{t().footer.operator}</p>
   </footer>
 );
 
@@ -210,7 +212,8 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
   return (
     <div class="gg-shell">
       <Masthead notice={!!props.initial} />
-      <main class="gg-main">
+      {/* tabindex lets the banner hand focus here once it closes. */}
+      <main class="gg-main" tabindex="-1">
         <Show
           when={props.initial}
           fallback={
@@ -229,6 +232,9 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
         </Show>
       </main>
       <Footer signIn={!!props.initial} />
+      <Show when={props.initial}>
+        <SiteBanner />
+      </Show>
     </div>
   );
 };

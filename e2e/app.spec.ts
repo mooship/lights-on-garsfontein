@@ -1,4 +1,5 @@
 import { type Cookie, expect, type Page, test } from '@playwright/test';
+import { activeBanners, BANNERS, type Banner } from '../src/banners';
 
 // Tests share one local database and run in order.
 test.describe.configure({ mode: 'serial' });
@@ -86,7 +87,7 @@ test.describe('language', () => {
     await page.getByRole('button', { name: 'Switch to English' }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('status')).toContainText('Power is on');
-    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveAttribute('lang', 'af');
     expect(await page.evaluate(() => '__sameDocument' in window)).toBe(true); // no reload
 
@@ -108,9 +109,9 @@ test.describe('language', () => {
     await inEnglish(page);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent outages' })).toBeVisible();
-    await expect(page.getByText('Run by a Garsfontein resident.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Independent service.', { exact: false })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveText('AF');
     await context.close();
   });
@@ -122,7 +123,7 @@ test.describe('public page', () => {
     const status = page.getByRole('status');
     await expect(status).toContainText('Power is on');
     await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0); // never says how outages are recorded
-    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
   });
 
   for (const locale of ['af', 'en']) {
@@ -157,8 +158,8 @@ test.describe('public page', () => {
   test('says so when the server fails on first load', async ({ page }) => {
     await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
     await page.goto('/');
-    await expect(page.getByRole('alert')).toHaveText('Couldn’t reach the server. Trying again shortly…');
-    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveText('Unable to reach the server. Retrying shortly.');
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
   });
 
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
@@ -167,7 +168,9 @@ test.describe('public page', () => {
     await expect(page.getByText(/^Updated \d\d:\d\d$/)).toBeVisible();
     await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // polls now
-    await expect(page.getByRole('alert')).toHaveText(/^Can’t reach the server\. Showing status from \d\d:\d\d\.$/);
+    await expect(page.getByRole('alert')).toHaveText(
+      /^Unable to reach the server\. Showing the status as at \d\d:\d\d\.$/,
+    );
     await expect(page.getByRole('status')).toContainText('Power is on');
   });
 
@@ -189,7 +192,7 @@ test.describe('admin', () => {
     await page.getByLabel('Username').fill(ADMIN_USERNAME);
     await page.getByLabel('Password').fill('not-the-password');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('alert')).toHaveText('Wrong username or password.');
+    await expect(page.getByRole('alert')).toHaveText('Incorrect username or password.');
   });
 
   test('sets an HttpOnly, Strict session cookie', async ({ page, context }) => {
@@ -238,8 +241,8 @@ test.describe('community confirmation', () => {
       await page.goto('/');
       // Cloudflare's test site key passes Turnstile without a challenge.
       await page.getByTestId('confirm-outage').click();
-      await expect(page.getByTestId('confirm-outage')).toHaveText('Thanks for letting us know', { timeout: 20_000 });
-      await expect(page.getByText('1 neighbour says theirs is off too.')).toBeVisible();
+      await expect(page.getByTestId('confirm-outage')).toHaveText('Confirmation recorded', { timeout: 20_000 });
+      await expect(page.getByText('1 community confirmation.')).toBeVisible();
 
       // Same client again: one confirmation per outage, then 5 requests a minute. The limiter counts in
       // fixed one-minute windows, so a window boundary can reset the count: post until the first 429.
@@ -261,5 +264,96 @@ test.describe('admin session', () => {
     await login(page);
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page.getByLabel('Password')).toBeVisible();
+  });
+});
+
+test.describe('site banner', () => {
+  const VOTE = 'vote-2026-11-04';
+  const VOTE_UNTIL = '2026-11-05T00:00:00+02:00';
+  const DURING = new Date('2026-10-28T09:00:00+02:00');
+  const notice = (page: Page) => page.getByRole('region', { name: 'Notice' });
+
+  test('picks the banners active at a given time', () => {
+    const at = (iso: string) => activeBanners(Date.parse(iso)).map((b) => b.id);
+    expect(at('2026-10-16T23:59:59+02:00')).toEqual([]);
+    expect(at('2026-10-17T00:00:00+02:00')).toEqual([VOTE]);
+    expect(at('2026-11-04T23:59:59+02:00')).toEqual([VOTE]);
+    expect(at(VOTE_UNTIL)).toEqual([]); // `until` is exclusive
+    const later: Banner = {
+      id: 'later',
+      from: '2026-11-01T00:00:00+02:00',
+      until: VOTE_UNTIL,
+      text: { af: '', en: '' },
+    };
+    expect(activeBanners(DURING.getTime() + 7 * 864e5, [...BANNERS, later]).map((b) => b.id)).toEqual([VOTE, 'later']);
+  });
+
+  test('shows the election notice before its end date, in English', async ({ page }) => {
+    await page.clock.setFixedTime(DURING);
+    await page.goto('/');
+    await expect(notice(page)).toContainText('Local government elections take place on Wednesday 4 November 2026.');
+    const link = notice(page).getByRole('link', { name: 'Voter information from the IEC' });
+    await expect(link).toHaveAttribute('href', 'https://www.elections.org.za/pw/Voter/Voter-Information');
+    await expect(link).not.toHaveAttribute('target', /.*/);
+    await expect(notice(page).getByRole('button', { name: 'Dismiss' })).toBeVisible();
+  });
+
+  test('is in Afrikaans by default', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('locale', 'af')); // overrides the English beforeEach
+    await page.clock.setFixedTime(DURING);
+    await page.goto('/');
+    const region = page.getByRole('region', { name: 'Kennisgewing' });
+    await expect(region).toContainText('Die plaaslike regeringsverkiesing vind op Woensdag 4 November 2026 plaas.');
+    await expect(region.getByRole('link', { name: 'Kiesersinligting by die OVK' })).toBeVisible();
+    await expect(region.getByRole('button', { name: 'Maak toe' })).toBeVisible();
+  });
+
+  test('is gone once its end date passes', async ({ page }) => {
+    await page.clock.setFixedTime(VOTE_UNTIL);
+    await page.goto('/');
+    await expect(page.getByRole('status')).toBeVisible();
+    await expect(notice(page)).toHaveCount(0);
+  });
+
+  test('hides at its end date without a reload', async ({ page }) => {
+    await page.clock.install({ time: Date.parse(VOTE_UNTIL) - 30_000 });
+    await page.goto('/');
+    await expect(notice(page)).toBeVisible();
+    await page.clock.fastForward('02:00');
+    await expect(notice(page)).toHaveCount(0);
+  });
+
+  test('stays dismissed across a reload', async ({ page }) => {
+    await page.clock.setFixedTime(DURING);
+    await page.goto('/');
+    await notice(page).getByRole('button', { name: 'Dismiss' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(notice(page)).toHaveCount(0);
+    await expect(page.getByRole('main')).toBeFocused(); // focus lands on the content, not <body>
+    await page.reload();
+    await expect(page.getByRole('status')).toBeVisible();
+    await expect(notice(page)).toHaveCount(0);
+    expect(await page.evaluate((id) => localStorage.getItem(`banner-dismissed:${id}`), VOTE)).toBe('1');
+  });
+
+  test('causes no layout shift and never covers the footer', async ({ page }) => {
+    await page.clock.setFixedTime(DURING);
+    await page.addInitScript(() => {
+      (window as unknown as { __cls: number }).__cls = 0;
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
+          if (!entry.hadRecentInput) (window as unknown as { __cls: number }).__cls += entry.value;
+        }
+      }).observe({ type: 'layout-shift', buffered: true });
+    });
+    await page.goto('/');
+    await expect(notice(page)).toBeVisible();
+    await page.waitForTimeout(1000);
+    expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const footer = await page.locator('.gg-footer').boundingBox();
+    const banner = await notice(page).boundingBox();
+    expect(footer && banner && banner.y >= footer.y + footer.height).toBe(true);
   });
 });

@@ -47,9 +47,14 @@ globalStyle('.gg-shell', {
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
+  // Lets the bottom banner (components/Banner.css.ts) sit at the screen's foot on a short page.
+  minHeight: '100dvh',
 });
 
 globalStyle('.gg-main', { display: 'flex', flexDirection: 'column', gap: '1rem' });
+
+// Focused only from script (tabindex=-1, after the banner closes), so it needs no ring.
+globalStyle('.gg-main:focus', { outline: 'none' });
 
 globalStyle('.gg-masthead', {
   display: 'flex',
