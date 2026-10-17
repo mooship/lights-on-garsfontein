@@ -16,7 +16,7 @@ async function readPassword(): Promise<string> {
   }
   const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
   process.stderr.write('Admin password: ');
-  // Mute echo while the password is typed.
+  // Node has no public API for hidden input, so readline's private writer is silenced instead.
   (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = () => {};
   const answer = await new Promise<string>((resolve) => rl.question('', resolve));
   rl.close();

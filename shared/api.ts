@@ -1,4 +1,4 @@
-// Response shapes shared by the Worker and the SolidJS client.
+// Imported by both the Worker and the browser bundle, so nothing here may depend on either runtime.
 
 import { site } from '../site.config';
 
@@ -123,5 +123,5 @@ export function outageDurationMs(outage: { startTime: string; endTime: string | 
 /** Heartbeats older than this mean the grid is off. */
 export const HEARTBEAT_THRESHOLD_MS = 180_000;
 
-/** The public start of outage tracking (site.config.ts). Statistics never count time before it. */
+/** Statistics never count time before this. */
 export const TRACKING_SINCE = site.trackingSince;

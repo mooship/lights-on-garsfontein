@@ -42,7 +42,6 @@ function openOutageQuery(db: Db) {
   return db.select().from(outages).where(isOpen).orderBy(desc(outages.startTime)).limit(1);
 }
 
-/** The newest outage that is still open and not flagged as a false positive. */
 export async function getOpenOutage(db: Db): Promise<Outage | undefined> {
   const [open] = await openOutageQuery(db);
   return open;
@@ -65,11 +64,10 @@ function isStale(lastSeen: string, now: Date): boolean {
 }
 
 /**
- * Confirmations per outage as a correlated subquery, so it only touches the outages the outer
- * query returns (covered by the unique (outage_id, client_hash) index). No bound parameter per
- * outage either: D1 allows at most 100 per query. Drizzle leaves columns unqualified in a
- * single-table select, where a bare "id" would mean the confirmation's own id, so both sides
- * name their table.
+ * A correlated subquery: it touches only the outages the outer query returns (via the unique
+ * (outage_id, client_hash) index) and binds no parameter per outage (D1 allows 100 per query).
+ * Drizzle leaves columns unqualified in a single-table select, where a bare "id" would mean the
+ * confirmation's own id, so both sides name their table.
  */
 const qualified = (table: typeof outages | typeof outageConfirmations, column: { name: string }) =>
   sql`${table}.${sql.identifier(column.name)}`;
@@ -123,7 +121,6 @@ function powerState(
   return { status: 'ON', since: null };
 }
 
-/** "Still off" reports since `now - STILL_OFF_WINDOW_MS`. */
 function stillOffCountQuery(db: Db, now: Date) {
   const since = new Date(now.getTime() - STILL_OFF_WINDOW_MS).toISOString();
   return db.select({ total: count() }).from(stillOffReports).where(gte(stillOffReports.createdAt, since));
@@ -230,7 +227,7 @@ export async function purgeExpiredSessions(db: Db, now: Date): Promise<void> {
 const FINGERPRINT_DAYS = 30;
 
 /**
- * Replaces confirmation fingerprints (salted IP hashes) older than 30 days with a
+ * Replaces confirmation fingerprints (salted IP hashes) older than FINGERPRINT_DAYS with a
  * per-row placeholder: the count survives, the link to an address does not.
  */
 export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
@@ -244,8 +241,8 @@ export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
 const STILL_OFF_KEEP_DAYS = 90;
 
 /**
- * "Still off" reports: fingerprints go after 30 days, like confirmations, and the rows after 90
- * (they only ever count for an hour).
+ * "Still off" fingerprints go after FINGERPRINT_DAYS, like confirmations, and the rows after
+ * STILL_OFF_KEEP_DAYS (they only ever count for an hour).
  */
 export async function purgeOldStillOffReports(db: Db, now: Date): Promise<void> {
   const fingerprintCutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();

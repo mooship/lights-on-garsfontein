@@ -144,15 +144,14 @@ function localePages(): Plugin {
   };
 }
 
-/**
- * Builds src/sw/sw.ts into dist/sw.js once the site is written, with the pages and assets to
- * precache and a build id hashed from their names and contents and from src/sw/. Any change to
- * the shell or the worker so changes the worker's bytes, which is what makes browsers install
- * the new one, and its cache name. A build of its own, because a service worker must be one
- * classic script: as part of the app's build it would share chunks with it.
- */
 const SW_SOURCE = resolve(import.meta.dirname, 'src/sw');
 
+/**
+ * Builds src/sw/sw.ts into dist/sw.js once the site is written, with the pages and assets to
+ * precache and a build id hashed from them and from src/sw/. A change to either changes the
+ * worker's bytes (which is what makes browsers install it) and its cache name. A separate build,
+ * because a service worker must be one classic script; inside the app's build it would share chunks.
+ */
 function serviceWorker(): Plugin {
   let outDir = '';
   const url = (fileName: string) => `/${fileName.replace(/(^|\/)index\.html$/, '$1').replace(/\.html$/, '')}`;

@@ -108,7 +108,7 @@ describe('windowStats', () => {
       const intervals = mergeOutages(rows, base + 30 * D);
       const from = base + random() * 5 * D;
       const to = from + random() * 25 * D;
-      // The old scan: for each local day, does any interval overlap it?
+      // Reference: the plain per-day scan that windowStats's single forward pass replaces.
       const start = Math.max(from, since);
       let expected = 0;
       for (let day = Math.floor((start + OFFSET) / D) * D - OFFSET; day < to; day += D) {

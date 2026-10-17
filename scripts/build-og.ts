@@ -5,15 +5,13 @@
 // Usage: npm run og   (needs `npx playwright install chromium` once)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
+import { escapeHtml } from '../build/html.ts';
 import { site } from '../site.config.ts';
 import { DICTIONARIES } from '../src/i18n/index.ts';
 import { FONT_FILES } from '../src/styles/fonts.ts';
 
 const [PRIMARY, SECONDARY] = site.locales.map((locale) => ({ locale, m: DICTIONARIES[locale] }));
 if (!PRIMARY) throw new Error('site.locales is empty');
-
-const escapeHtml = (text: string) =>
-  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // The same font files the site bundles, inlined so the page needs no server.
 const fontUrl = (file: string) =>

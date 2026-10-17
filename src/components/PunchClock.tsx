@@ -17,7 +17,6 @@ interface PunchClockProps {
   onPunchIn: () => void;
 }
 
-/** Admin punch clock: punch out when the power goes off, punch in when it is back. */
 export const PunchClock: Component<PunchClockProps> = (props) => {
   const elapsed = () => (props.outage ? outageDurationMs(props.outage, props.now) : 0);
 
@@ -38,7 +37,6 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
             : t().admin.idle}
         </p>
       </div>
-      {/* Only the action that applies now, full width. */}
       <Show
         when={props.outage}
         fallback={

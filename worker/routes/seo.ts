@@ -50,11 +50,10 @@ async function ogImage({ request, env }: RouteContext): Promise<Response> {
 const pages: Routes = {
   '/sitemap.xml': { handler: sitemap },
   '/robots.txt': { handler: robots },
-  // A static asset now, with no D1 lookup to spare, so no limiter or edge cache.
+  // A static asset with no D1 work behind it, so it needs no limiter or edge cache.
   '/og.png': { handler: ogImage },
 };
 
-/** Each page answers both GET and HEAD. */
 export const seoRoutes: Routes = Object.fromEntries(
   Object.entries(pages).flatMap(([path, route]) => [
     [`GET ${path}`, route],

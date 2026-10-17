@@ -33,7 +33,6 @@ export { locale };
 /** The active dictionary: `t().status.ON`. */
 export const t = () => DICTIONARIES[locale()];
 
-/** The locale for Intl formatters. */
 export const intlLocale = () => site.intlLocales[locale()];
 
 function setLocale(next: Locale): void {

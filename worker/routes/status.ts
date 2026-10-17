@@ -6,6 +6,7 @@ import type {
   StillOffRequest,
   StillOffResponse,
 } from '../../shared/api';
+import { CSV_PATH, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
 import { outageConfirmations } from '../db/schema';
 import { requireBearer } from '../lib/auth';
 import { sha256Hex } from '../lib/crypto';
@@ -20,7 +21,6 @@ import {
 import { errors, json, parseBody } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
-import { CSV_PATH, OUTAGE_VIEWS, STATUS_PATH } from './paths';
 
 const confirmSchema = z.object({
   token: z.string().min(1).max(2048),

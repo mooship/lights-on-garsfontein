@@ -13,10 +13,8 @@
           var s = localStorage.getItem('theme');
           var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
           h.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
-          // Each language has its own page (shared/locale.ts), built with its lang, which picks the
-          // shell copy (base.css): there the URL wins. / sends a visitor who chose another language
-          // on to that page before anything renders. Other pages (/admin) are built in the default
-          // language, so they show the stored one.
+          // Language pages (shared/locale.ts) carry their own lang and the URL wins there; / forwards
+          // a visitor who chose another language before anything renders. /admin shows the stored choice.
           var all = h.getAttribute('data-locales').split(' ');
           var l = localStorage.getItem('locale');
           var home = function(c) { return c === all[0] ? '/' : '/' + c + '/'; };

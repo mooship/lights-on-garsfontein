@@ -25,10 +25,7 @@ function describeError(error: unknown): string {
   return (t().admin.errors as Record<string, string | undefined>)[code] ?? t().admin.requestFailed(code);
 }
 
-/**
- * Error line under a form or row; role="alert" so screen readers announce it. Forms keep the error
- * itself and it is described here, so the message follows a language switch.
- */
+/** Forms keep the raw error and it is described here, so the message follows a language switch. */
 const FormError: Component<{ error: unknown }> = (props) => (
   <Show when={props.error !== undefined}>
     <p class={errorText} role="alert">

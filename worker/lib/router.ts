@@ -20,7 +20,7 @@ export interface Route {
   handler: (ctx: RouteContext) => Promise<Response> | Response;
   /** Reject cross-site requests and non-JSON bodies (cookie-authenticated writes). */
   sameOrigin?: boolean;
-  /** Per-IP rate limit checked before anything else touches the request. */
+  /** Per-connection rate limit, checked before auth and the handler. */
   limiter?: 'STATUS_LIMITER' | 'CONFIRM_LIMITER' | 'LOGIN_LIMITER';
   /** Return a Response to refuse the request, or null to let it through (e.g. admin auth). */
   authorize?: (ctx: RouteContext) => Promise<Response | null>;

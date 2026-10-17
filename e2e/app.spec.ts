@@ -427,7 +427,6 @@ test.describe('still off where you are', () => {
     await expect(count).toBeVisible();
     await expect(page.getByTestId('still-off')).toHaveAttribute('aria-disabled', 'true');
 
-    // The server allows one report per client per two hours.
     const again = await request.post('/api/still-off', { data: { token: 'XXXX.DUMMY.TOKEN' } });
     expect(again.status()).toBe(409);
     expect(await again.json()).toMatchObject({ error: 'already_reported' });
@@ -521,7 +520,6 @@ test.describe('community confirmation', () => {
     await page.getByRole('button', { name: en.admin.punchOut }).click();
     await expect(page.getByRole('button', { name: en.admin.punchIn })).toBeEnabled();
     await page.goto('/');
-    // Cloudflare's test site key passes Turnstile without a challenge.
     await page.getByTestId('confirm-outage').click();
     await expect(page.getByTestId('confirm-outage')).toHaveText(en.confirm.done, { timeout: 20_000 });
     await expect(page.getByText(en.confirm.count(1))).toBeVisible();

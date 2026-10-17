@@ -35,7 +35,6 @@ const Admin = lazy(() => import('./admin/Admin'));
 const POLL_MS = 30_000;
 const STATS_POLL_MS = 5 * MINUTE_MS;
 
-/** Wraps a poll so it only runs while the tab is visible. */
 const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
 
 export interface InitialData {
@@ -126,7 +125,6 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
     });
   });
 
-  // The last good data stays on screen through failed polls.
   const data = status.data;
   useStatusTab(data, minute);
   // The last poll failed, so the status shown may be out of date. (A tab back from the background
@@ -163,7 +161,6 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                     </Match>
                   </Switch>
                 </div>
-                {/* Keyed on the outage so a new one starts with fresh state. */}
                 <Show when={s().status === 'OFF' && s().outage?.id} keyed>
                   {(id) => (
                     <ConfirmOutage

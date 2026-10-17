@@ -35,7 +35,6 @@ interface TrendsProps {
 
 interface Delta {
   text: string;
-  /** Whether the change is good news, bad news or flat. */
   tone: 'worse' | 'better' | 'same';
   direction: 'up' | 'down' | 'flat';
 }
@@ -257,7 +256,6 @@ export const Trends: Component<TrendsProps> = (props) => {
   const since = () => Date.parse(props.stats.trackingSince);
   const started = () => props.now >= since();
   const s = () => props.stats.last30;
-  // No comparison until a full previous 30 days exists.
   const prev = () => (props.now - since() >= COMPARE_AFTER_MS ? props.stats.previous30 : null);
   const firstDay = () => trackingDay(props.stats.trackingSince);
   const place = (index: number): WeekPlace => {

@@ -1,12 +1,12 @@
 import { and, asc, desc, eq, gte, isNull, or } from 'drizzle-orm';
 import { DAY_MS, MINUTE_MS, outageDurationMs, type StatsResponse, TRACKING_SINCE } from '../../shared/api';
+import { CSV_PATH, FEED_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { outages } from '../db/schema';
 import { outagesWithCounts } from '../lib/grid';
 import { json } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { mergeOutages, weeklyStats, windowStats } from '../lib/stats';
-import { CSV_PATH, FEED_PATH, STATS_PATH } from './paths';
 
 async function getStats({ db }: RouteContext): Promise<Response> {
   const now = Date.now();

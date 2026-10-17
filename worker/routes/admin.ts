@@ -1,13 +1,13 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { type AdminOutagesResponse, MINUTE_MS, type TimerAction } from '../../shared/api';
+import { OUTAGE_VIEWS } from '../../shared/paths';
 import { outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
 import { getOpenOutage, openOutage, outagesWithCounts, summarise } from '../lib/grid';
 import { errors, json, parseBody, refuseCrossSite } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkSession } from './auth';
-import { OUTAGE_VIEWS } from './paths';
 
 /** Clock skew allowed on admin times; anything later is a typo, not an outage. */
 const MAX_FUTURE_MS = 5 * MINUTE_MS;
@@ -49,7 +49,6 @@ async function listOutages({ db }: RouteContext): Promise<Response> {
   return json(body);
 }
 
-/** Punch clock: punch out when the power goes off, punch in when it comes back. */
 async function timer({ request, db }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, timerSchema);
   if ('response' in parsed) return parsed.response;

@@ -37,7 +37,7 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-/** 30 days from now, but never past the absolute maximum after sign-in. */
+/** SESSION_TTL_SECONDS from now, capped at SESSION_MAX_AGE_MS after sign-in. */
 const sessionExpiry = (now: number, createdAt: number) =>
   Math.min(now + SESSION_TTL_SECONDS * 1000, createdAt + SESSION_MAX_AGE_MS);
 

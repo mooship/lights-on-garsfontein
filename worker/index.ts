@@ -1,3 +1,4 @@
+import { OUTAGE_VIEWS } from '../shared/paths';
 import { createDb } from './db/client';
 import { detectOutage, purgeExpiredSessions, purgeOldFingerprints, purgeOldStillOffReports } from './lib/grid';
 import { errors } from './lib/http';
@@ -6,15 +7,14 @@ import { adminRoutes } from './routes/admin';
 import { authRoutes } from './routes/auth';
 import { contactRoutes } from './routes/contact';
 import { historyRoutes } from './routes/history';
-import { OUTAGE_VIEWS } from './routes/paths';
 import { seoRoutes } from './routes/seo';
 import { statusRoutes } from './routes/status';
 
-/** The hourly housekeeping cron in wrangler.toml. */
+/** Must match the hourly cron in wrangler.toml. */
 const HOURLY_CRON = '0 * * * *';
 
 /**
- * Every Worker endpoint, keyed by "METHOD /path". Adding one means: its handler in a file under
+ * Every Worker endpoint. Adding one means: its handler in a file under
  * routes/, its route map spread here, the path in wrangler's `assets.run_worker_first` if it is
  * outside /api/, and the path in vite.config.ts's dev `server.proxy`.
  */
@@ -76,7 +76,6 @@ export default {
         purgeOldStillOffReports(db, now),
       ]);
     } else {
-      // Purges only this datacentre's copies; elsewhere their edge TTLs bound the delay.
       const { opened } = await detectOutage(db, now);
       if (opened) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);
     }

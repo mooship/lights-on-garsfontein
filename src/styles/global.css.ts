@@ -175,7 +175,6 @@ globalStyle('.gg-icon-button', {
 
 globalStyle('.gg-masthead-actions', { flex: 'none', display: 'flex', gap: '0.5rem' });
 
-// The language switch is a 44px-high pill with the next language's name.
 globalStyle('.gg-lang-button', { width: 'auto', padding: '0 0.875rem', fontSize: '0.875rem', fontWeight: 600 });
 
 globalStyle('.gg-footer', {
@@ -195,9 +194,6 @@ globalStyle('.gg-footer nav a', {
   minHeight: '2.75rem',
 });
 
-// The status card's lower rows. The shell in index.html renders them too, so they keep global
-// names: the scope line and its "Why?", the "Still off where you are?" link button with its
-// note, and the safety line.
 globalStyle('.gg-scope', { fontSize: '0.9375rem', lineHeight: 1.45, color: vars.color.muted });
 
 globalStyle('.gg-why', { marginTop: '0.125rem' });
@@ -260,7 +256,6 @@ globalStyle('.gg-notice', {
 
 globalStyle('.gg-status-note', { color: vars.color.muted, fontSize: '0.9375rem' });
 
-// Skeleton placeholders. Global names because the static HTML in index.html uses them too.
 globalKeyframes('gg-shimmer', { to: { transform: 'translateX(100%)' } });
 
 globalStyle('.gg-skel', {

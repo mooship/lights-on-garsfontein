@@ -2,8 +2,7 @@
 // Public copy never says how an outage was recorded (no "sensor" or "met die hand").
 
 export const af = {
-  // The language switch's label: switching to the next locale in site.locales, in that language.
-  // `next` is shown on the switch: the next language's name, in that language.
+  // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
   lang: { switchTo: 'Switch to English', next: 'English' },
   theme: { label: 'Wissel tema', toDark: 'Skakel oor na donker modus', toLight: 'Skakel oor na ligte modus' },
   // `m` is the compact minute for the tab title ("1u 5m").

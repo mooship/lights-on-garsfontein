@@ -1,4 +1,5 @@
-// The edge-cached routes (`edgeCache` in lib/router.ts). Each is a view of the outages.
+// Paths shared by the Worker (edge-cached routes, `edgeCache` in worker/lib/router.ts) and the
+// service worker. Each is a view of the outages.
 
 export const STATUS_PATH = '/api/status';
 export const STATS_PATH = '/api/stats';

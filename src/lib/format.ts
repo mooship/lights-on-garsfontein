@@ -1,7 +1,7 @@
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { site } from '../../site.config';
 import { intlLocale, t } from './i18n';
-import { zoned } from './zone';
+import { pad2, zoned } from './zone';
 
 export { outageDurationMs } from '../../shared/api';
 
@@ -90,8 +90,6 @@ export function formatCompactDuration(ms: number): string {
   return `${minutes}${u.m}`;
 }
 
-const pad2 = (n: number) => String(n).padStart(2, '0');
-
 /** "01:02:03" stopwatch format. */
 export function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -102,8 +100,6 @@ export function formatClock(ms: number): string {
 // whatever time zone the browser is in.
 const OFFSET_MS = site.utcOffsetMinutes * MINUTE_MS;
 
-/** Converts an ISO string to the value a datetime-local input expects, in the configured zone. */
 export const toLocalInput = (iso: string) => new Date(Date.parse(iso) + OFFSET_MS).toISOString().slice(0, 16);
 
-/** Reads a datetime-local value in the configured zone and returns it as an ISO string. */
 export const fromLocalInput = (value: string) => new Date(zoned(value)).toISOString();

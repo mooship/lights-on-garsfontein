@@ -8,7 +8,7 @@ import { errorText } from '../styles/ui.css';
 import { widget as widgetClass } from './ConfirmOutage.css';
 
 interface StillOffProps {
-  /** Reports in the last hour, from the status poll. */
+  /** Reports in the last STILL_OFF_WINDOW_MS, from the status poll. */
   reports: number;
   siteKey: string;
 }

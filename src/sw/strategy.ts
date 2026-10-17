@@ -1,6 +1,10 @@
 // Shared by the service worker (sw.ts) and the app, which reads FROM_CACHE_HEADER. No DOM or
 // worker globals, so test/sw.test.ts can run it.
 
+import { STATUS_PATH } from '../../shared/paths';
+
+export { STATUS_PATH };
+
 /**
  * - page: network first, then this build's copy.
  * - asset: cache first; hashed file names never change content.
@@ -11,8 +15,6 @@ export type Strategy = 'page' | 'asset' | 'status' | 'network';
 
 /** On a status the worker served from its cache because the network failed: not current. */
 export const FROM_CACHE_HEADER = 'X-From-Cache';
-
-export const STATUS_PATH = '/api/status';
 
 /** One cache per build, so the worker that activates can delete the others. */
 export const cacheName = (buildId: string) => `shell-${buildId}`;

@@ -17,7 +17,7 @@ function toBase64Url(bytes: Uint8Array): string {
   return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/** Constant-time byte comparison. Runs in Workers and Node (the hash script imports this module). */
+/** Hand-rolled: scripts/hash-password.ts runs this module in Node, which lacks Workers' `timingSafeEqual`. */
 function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.byteLength !== b.byteLength) return false;
   let diff = 0;
