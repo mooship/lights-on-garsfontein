@@ -71,7 +71,15 @@ Optional secrets: `ADMIN_API_TOKEN` (scripts and agents) and `HEARTBEAT_TOKEN` (
 npx wrangler d1 execute DB --remote --command "DELETE FROM sessions"
 ```
 
-**Continuous deployment.** CI runs on every pull request and every push to `main`. To deploy automatically from `main`, create a Cloudflare API token limited to *Workers Scripts: Edit* and *D1: Edit* on this account, add it with your account ID as the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and set the repository variable `DEPLOY_ENABLED` to `true`.
+**Continuous deployment.** Cloudflare Workers Builds deploys every push to `main` with `npm run deploy:ci`, which applies pending D1 migrations first and only then deploys the new code. If a migration fails, the deploy stops and the previous version stays live. Pull requests are tested by GitHub Actions and are not deployed.
+
+**Writing migrations.** The database changes a few seconds before the code does, so every migration must work with both the old and the new code:
+
+- Add before you use: add a column or table in one release, start using it in the next.
+- Remove after you stop using: stop reading a column in one release, drop it in a later one.
+- Give new columns a default (or make them nullable) so the old code can still insert rows.
+- Never rename in place. Add the new name, copy the data, switch the code over, then drop the old name.
+- Check what drizzle-kit generates. On SQLite it sometimes rebuilds a whole table, and on D1 that can cascade-delete related rows (see `drizzle/0003_boolean_flags.sql`).
 
 ## Recording outages
 
