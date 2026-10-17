@@ -8,6 +8,9 @@ updates:
       time: "06:00"
       timezone: Africa/Johannesburg
     open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       npm:
         applies-to: version-updates
