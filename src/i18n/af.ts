@@ -2,11 +2,13 @@
 // Public copy never says how an outage was recorded (no "sensor" or "met die hand").
 
 export const af = {
-  lang: { label: 'EN', switchTo: 'Switch to English', target: 'en' as 'af' | 'en' },
-  theme: { toDark: 'Skakel oor na donker modus', toLight: 'Skakel oor na ligte modus' },
-  units: { d: 'd', h: 'u', min: 'min', s: 's' },
+  lang: { switchTo: 'Switch to English' },
+  theme: { label: 'Wissel tema', toDark: 'Skakel oor na donker modus', toLight: 'Skakel oor na ligte modus' },
+  // `m` is the compact minute for the tab title ("1u 5m").
+  units: { d: 'd', h: 'u', min: 'min', m: 'm', s: 's' },
   day: { today: 'vandag', yesterday: 'gister', on: (day: string) => `op ${day}` },
   tab: { ON: 'AAN', OFF: 'AF' },
+  banner: { region: 'Kennisgewing', dismiss: 'Maak toe' },
   masthead: {
     eyebrow: 'Garsfontein Uitb. 16 · Wyk 45 · Pretoria',
     notice: 'Onafhanklike diens. Nie verbonde aan die Stad Tshwane of Eskom nie.',
@@ -47,7 +49,7 @@ export const af = {
       no_active_outage: 'Daar is geen onderbreking aan die gang om te bevestig nie.',
       outage_changed: 'Daardie onderbreking is verby. Die status word binnekort bygewerk.',
       turnstile_failed: 'Die sekuriteitskontrole kon nie voltooi word nie. Probeer asseblief weer.',
-    } as Record<string, string>,
+    },
     unknown: 'Iets het skeefgeloop. Probeer asseblief weer.',
   },
   history: {
@@ -96,7 +98,6 @@ export const af = {
     back: 'Openbare bladsy',
     unreachable: 'Kan nie die bediener bereik nie.',
     retry: 'Probeer weer',
-    sessionExpired: 'Jou sessie het verval. Teken asseblief weer in.',
     errors: {
       unauthorized: 'Verkeerde gebruikersnaam of wagwoord.',
       rate_limited: 'Te veel pogings. Wag asseblief ’n minuut en probeer weer.',
@@ -107,7 +108,8 @@ export const af = {
       invalid_json: 'Die versoek kon nie gelees word nie. Herlaai die bladsy en probeer weer.',
       bad_request: 'Kyk na die tye en probeer weer. Tye kan nie in die toekoms wees nie.',
       not_found: 'Daardie onderbreking bestaan nie meer nie. Herlaai die bladsy.',
-    } as Record<string, string>,
+      session_expired: 'Jou sessie het verval. Teken asseblief weer in.',
+    },
     requestFailed: (code: string) => `Die versoek het misluk (${code}).`,
     network: 'Netwerkfout.',
     signInTitle: 'Teken in as administrateur',

@@ -1,11 +1,12 @@
-import type { Messages } from './af';
+import type { Messages } from './af.ts';
 
 export const en = {
-  lang: { label: 'AF', switchTo: 'Skakel oor na Afrikaans', target: 'af' },
-  theme: { toDark: 'Switch to dark theme', toLight: 'Switch to light theme' },
-  units: { d: 'd', h: 'h', min: 'min', s: 's' },
+  lang: { switchTo: 'Skakel oor na Afrikaans' },
+  theme: { label: 'Switch theme', toDark: 'Switch to dark theme', toLight: 'Switch to light theme' },
+  units: { d: 'd', h: 'h', min: 'min', m: 'm', s: 's' },
   day: { today: 'today', yesterday: 'yesterday', on: (day: string) => `on ${day}` },
   tab: { ON: 'ON', OFF: 'OFF' },
+  banner: { region: 'Notice', dismiss: 'Dismiss' },
   masthead: {
     eyebrow: 'Garsfontein Ext. 16 · Ward 45 · Pretoria',
     notice: 'Independent service. Not affiliated with the City of Tshwane or Eskom.',
@@ -94,7 +95,6 @@ export const en = {
     back: 'Public page',
     unreachable: 'Unable to reach the server.',
     retry: 'Try again',
-    sessionExpired: 'Your session has expired. Please sign in again.',
     errors: {
       unauthorized: 'Incorrect username or password.',
       rate_limited: 'Too many attempts. Please wait a minute and try again.',
@@ -105,6 +105,7 @@ export const en = {
       invalid_json: 'The request could not be read. Reload the page and try again.',
       bad_request: 'Check the times and try again. Times cannot be in the future.',
       not_found: 'That outage no longer exists. Reload the page.',
+      session_expired: 'Your session has expired. Please sign in again.',
     },
     requestFailed: (code: string) => `Request failed (${code}).`,
     network: 'Network error.',

@@ -1,4 +1,4 @@
-import { DAY_MS, HOUR_MS } from '../../shared/api';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { intlLocale, t } from './i18n';
 
 export { outageDurationMs } from '../../shared/api';
@@ -52,17 +52,34 @@ export function formatRelativeDay(iso: string, now: number): string {
   return t().day.on(formatDay(iso));
 }
 
+/** Whole days, the hours and minutes left over, and the total seconds (negative counts as 0). */
+function splitDuration(ms: number) {
+  const clamped = Math.max(0, ms);
+  return {
+    days: Math.floor(clamped / DAY_MS),
+    hours: Math.floor((clamped % DAY_MS) / HOUR_MS),
+    minutes: Math.floor((clamped % HOUR_MS) / MINUTE_MS),
+    seconds: Math.floor(clamped / 1000),
+  };
+}
+
 /** "3 d 4 u", "2 u 14 min", "5 min", "40 s" ("h" in English) */
 export function formatDuration(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const days = Math.floor(totalSeconds / 86_400);
-  const hours = Math.floor((totalSeconds % 86_400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const { days, hours, minutes, seconds } = splitDuration(ms);
   const u = t().units;
   if (days > 0) return `${days} ${u.d} ${hours} ${u.h}`;
   if (hours > 0) return `${hours} ${u.h} ${minutes} ${u.min}`;
   if (minutes > 0) return `${minutes} ${u.min}`;
-  return `${totalSeconds} ${u.s}`;
+  return `${seconds} ${u.s}`;
+}
+
+/** Tab-friendly duration: "3d 4u", "1u 5m", "5m" ("h" in English). */
+export function formatCompactDuration(ms: number): string {
+  const { days, hours, minutes } = splitDuration(ms);
+  const u = t().units;
+  if (days > 0) return `${days}${u.d} ${hours}${u.h}`;
+  if (hours > 0) return `${hours}${u.h} ${minutes}${u.m}`;
+  return `${minutes}${u.m}`;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0');

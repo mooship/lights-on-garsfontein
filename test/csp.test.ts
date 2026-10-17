@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import index from '../index.html?raw';
+import privacy from '../privacy.html?raw';
 import headers from '../public/_headers?raw';
-import privacy from '../public/privacy.html?raw';
 
 async function inlineScriptHashes(html: string): Promise<string[]> {
   // Inline scripts only (no attributes); JSON-LD and module scripts are not covered by the hash.

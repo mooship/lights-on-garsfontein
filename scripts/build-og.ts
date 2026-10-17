@@ -4,23 +4,28 @@
 // Usage: npm run og   (needs `npx playwright install chromium` once)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
+import { af } from '../src/i18n/af.ts';
+import { en } from '../src/i18n/en.ts';
+import { FONT_FILES } from '../src/styles/fonts.ts';
 
-// Fontsource's Latin weight-axis files, the same ones the site bundles.
-const font = (pkg: string, file: string) =>
-  `data:font/woff2;base64,${readFileSync(new URL(import.meta.resolve(`@fontsource-variable/${pkg}/files/${file}`))).toString('base64')}`;
+// The same font files the site bundles, inlined so the page needs no server.
+const fontUrl = (file: string) =>
+  `data:font/woff2;base64,${readFileSync(new URL(import.meta.resolve(file))).toString('base64')}`;
+const DISPLAY_FONT = fontUrl(FONT_FILES.display);
+const BODY_FONT = fontUrl(FONT_FILES.body);
 
 const CARDS = {
   on: {
-    label: 'Die krag is aan',
-    english: 'Power is on',
+    label: af.status.ON,
+    english: en.status.ON,
     color: '#2D5A27',
     soft: '#E6EEE3',
     glyph:
       'M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z',
   },
   off: {
-    label: 'Die krag is af',
-    english: 'Power is off',
+    label: af.status.OFF,
+    english: en.status.OFF,
     color: '#B33A2B',
     soft: '#F7E5E1',
     glyph:
@@ -30,8 +35,8 @@ const CARDS = {
 
 const html = (card: (typeof CARDS)[keyof typeof CARDS]) => `<!doctype html>
 <html lang="af"><head><style>
-@font-face { font-family: Fraunces; src: url(${font('fraunces', 'fraunces-latin-wght-normal.woff2')}); font-weight: 100 900; }
-@font-face { font-family: Jakarta; src: url(${font('plus-jakarta-sans', 'plus-jakarta-sans-latin-wght-normal.woff2')}); font-weight: 200 800; }
+@font-face { font-family: Fraunces; src: url(${DISPLAY_FONT}); font-weight: 100 900; }
+@font-face { font-family: Jakarta; src: url(${BODY_FONT}); font-weight: 200 800; }
 * { margin: 0; box-sizing: border-box; }
 body { width: 1200px; height: 630px; background: #F6F4EF; color: #1F2120; font-family: Jakarta, sans-serif;
   padding: 72px 80px; display: flex; flex-direction: column; justify-content: space-between; }
@@ -45,11 +50,11 @@ h1 { font-family: Fraunces, serif; font-size: 88px; font-weight: 700; margin-top
 .english { font-size: 30px; font-weight: 600; color: #5C5850; margin-top: 8px; }
 .foot { font-size: 26px; color: #5C5850; }
 </style></head><body>
-<div><p class="eyebrow">Garsfontein Uitb. 16 · Wyk 45 · Pretoria</p><h1>Lights On?</h1></div>
+<div><p class="eyebrow">${af.masthead.eyebrow}</p><h1>Lights On?</h1></div>
 <div class="status"><div class="icon"><svg width="64" height="64" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="${card.glyph}"/></svg></div>
   <div><p class="label">${card.label}</p><p class="english" lang="en">${card.english}</p></div></div>
-<p class="foot">Onafhanklike diens · Nie verbonde aan die Stad Tshwane of Eskom nie</p>
+<p class="foot">${af.masthead.notice}</p>
 </body></html>`;
 
 const outDir = new URL('../public/og/', import.meta.url);

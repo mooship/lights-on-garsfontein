@@ -1,29 +1,7 @@
-import frauncesUrl from '@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2?url';
-import jakartaUrl from '@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2?url';
-import { createGlobalTheme, createThemeContract, globalFontFace } from '@vanilla-extract/css';
+import { createGlobalTheme, createThemeContract } from '@vanilla-extract/css';
 
-// Fontsource's Latin subset, weight axis only. Its own CSS is not imported: it uses
-// font-display: swap and loads every subset.
-const latinRange =
-  'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
-
-// font-display: optional keeps CLS at zero: a font is used only if it is ready before
-// first paint, otherwise the system fallback stays for that visit.
-globalFontFace('Fraunces', {
-  src: `url('${frauncesUrl}') format('woff2')`,
-  fontWeight: '100 900',
-  fontStyle: 'normal',
-  fontDisplay: 'optional',
-  unicodeRange: latinRange,
-});
-
-globalFontFace('Plus Jakarta Sans', {
-  src: `url('${jakartaUrl}') format('woff2')`,
-  fontWeight: '200 800',
-  fontStyle: 'normal',
-  fontDisplay: 'optional',
-  unicodeRange: latinRange,
-});
+// The @font-face rules and font stacks are in base.css, which index.html links so the static
+// shell has them before any JavaScript runs.
 
 export const vars = createThemeContract({
   color: {
@@ -47,10 +25,7 @@ export const vars = createThemeContract({
   radius: { card: null, pill: null, control: null },
 });
 
-const fonts = {
-  display: "Fraunces, Georgia, 'Times New Roman', serif",
-  body: "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-};
+const fonts = { display: 'var(--gg-font-display)', body: 'var(--gg-font-body)' };
 
 /** Page backgrounds, also used for the phone status bar (lib/theme.ts). */
 export const PAGE_BG = { light: '#F6F4EF', dark: '#121312' } as const;

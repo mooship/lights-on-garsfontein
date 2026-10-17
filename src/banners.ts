@@ -16,7 +16,6 @@ export interface Banner {
   until: string;
   text: Copy;
   link?: { href: string; label: Copy };
-  tone?: 'info' | 'notice';
 }
 
 export const BANNERS: readonly Banner[] = [
@@ -34,6 +33,10 @@ export const BANNERS: readonly Banner[] = [
     },
   },
 ];
+
+/** Whether any banner is showing at `now` (ms) or still to come. */
+export const bannersPending = (now: number, banners: readonly Banner[] = BANNERS) =>
+  banners.some((b) => now < Date.parse(b.until));
 
 /** The banners showing at `now` (ms), in their listed order. */
 export function activeBanners(now: number, banners: readonly Banner[] = BANNERS): Banner[] {

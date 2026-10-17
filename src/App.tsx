@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
 import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
 import * as css from './App.css';
+import { bannersPending } from './banners';
 import { SiteBanner } from './components/Banner';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { LanguageToggle } from './components/LanguageToggle';
@@ -204,6 +205,8 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
 
 /** `initial` is the public page's prefetched data; without it, the admin page renders. */
 export const App: Component<{ initial?: InitialData }> = (props) => {
+  // Checked once: with every banner expired, the banner and its minute timer never mount.
+  const showBanner = !!props.initial && bannersPending(Date.now());
   onMount(() => {
     syncThemeColor();
     onCleanup(watchSystemTheme());
@@ -232,7 +235,7 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
         </Show>
       </main>
       <Footer signIn={!!props.initial} />
-      <Show when={props.initial}>
+      <Show when={showBanner}>
         <SiteBanner />
       </Show>
     </div>

@@ -9,20 +9,8 @@
           var s = localStorage.getItem('theme');
           var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
           document.documentElement.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
-          if (localStorage.getItem('locale') !== 'en') return;
-          // English: swap the shell's data-en* strings as the parser adds them, before the first paint.
-          document.documentElement.lang = 'en';
-          var o = new MutationObserver(function() {
-            var els = document.querySelectorAll('[data-en],[data-en-label]');
-            for (var i = 0; i < els.length; i++) {
-              var e = els[i], v = e.getAttribute('data-en'), l = e.getAttribute('data-en-label');
-              if (v !== null && e.textContent !== v) e.textContent = v;
-              if (l !== null) e.setAttribute('aria-label', l);
-              if (e.hasAttribute('data-en-lang')) e.lang = e.getAttribute('data-en-lang');
-            }
-          });
-          o.observe(document.documentElement, { childList: true, subtree: true });
-          document.addEventListener('DOMContentLoaded', function() { o.disconnect(); });
+          // The shell below is in both languages; base.css shows the one matching lang.
+          if (localStorage.getItem('locale') === 'en') document.documentElement.lang = 'en';
         } catch (e) {}
       })();
     </script>
@@ -38,6 +26,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/src/styles/base.css" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Lights On, Garsfontein?" />
@@ -90,35 +79,24 @@
   </head>
   <body>
     <div id="root">
-      <!-- Static loading state. Mirrors src/components/Skeletons.tsx box for box (zero layout shift).
-           Afrikaans by default; the boot script swaps in the data-en* strings for English (src/i18n/en.ts). -->
+      <!-- Static loading state. Mirrors the app's masthead and src/components/Skeletons.tsx box for box
+           (zero layout shift). The data-i18n* elements are filled from src/i18n in both languages at
+           build time (staticI18n in vite.config.ts). -->
       <div class="gg-shell">
         <header class="gg-masthead">
           <div>
-            <p class="gg-eyebrow" data-en="Garsfontein Ext. 16 · Ward 45 · Pretoria">Garsfontein Uitb. 16 · Wyk 45 · Pretoria</p>
+            <p class="gg-eyebrow" data-i18n="masthead.eyebrow"></p>
             <h1 class="gg-title">Lights On?</h1>
           </div>
           <div class="gg-masthead-actions">
-            <button
-              type="button"
-              class="gg-icon-button gg-lang-button"
-              lang="en"
-              aria-label="Switch to English"
-              data-en="AF"
-              data-en-label="Skakel oor na Afrikaans"
-              data-en-lang="af"
-              disabled
-            >EN</button>
-            <button type="button" class="gg-icon-button" aria-label="Wissel tema" data-en-label="Switch theme" disabled></button>
+            <button type="button" class="gg-icon-button gg-lang-button" data-i18n-switch data-i18n-label="lang.switchTo" disabled></button>
+            <button type="button" class="gg-icon-button" data-i18n-label="theme.label" disabled></button>
           </div>
         </header>
-        <p
-          class="gg-notice"
-          data-en="Independent service. Not affiliated with the City of Tshwane or Eskom."
-        >Onafhanklike diens. Nie verbonde aan die Stad Tshwane of Eskom nie.</p>
+        <p class="gg-notice" data-i18n="masthead.notice"></p>
         <main class="gg-main">
           <section class="gg-card gg-status-card">
-            <p class="gg-sr-only" data-en="Loading the current status…">Laai tans die huidige status…</p>
+            <p class="gg-sr-only" data-i18n="status.loading"></p>
             <div class="gg-skel-row" aria-hidden="true">
               <span class="gg-skel gg-skel-badge"></span>
               <span class="gg-skel-stack">
@@ -133,7 +111,7 @@
           </section>
           <section class="gg-card">
             <div class="gg-trends-body">
-              <h2 class="gg-card-title" data-en="Statistics">Statistiek</h2>
+              <h2 class="gg-card-title" data-i18n="trends.title"></h2>
               <div class="gg-skel-stack" aria-hidden="true">
                 <span class="gg-skel gg-skel-text gg-w-45"></span>
                 <div class="gg-skel-grid">
@@ -146,11 +124,11 @@
               </div>
             </div>
             <details class="gg-trends-details">
-              <summary data-en="Show weekly figures">Wys die weeklikse syfers</summary>
+              <summary data-i18n="trends.tableLabel"></summary>
             </details>
           </section>
           <section class="gg-card">
-            <h2 class="gg-card-title" data-en="Recent outages">Onlangse onderbrekings</h2>
+            <h2 class="gg-card-title" data-i18n="history.title"></h2>
             <div class="gg-skel-list" aria-hidden="true">
               <span class="gg-skel gg-skel-item"></span>
               <span class="gg-skel gg-skel-item"></span>

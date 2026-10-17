@@ -5,6 +5,7 @@ import Plus from 'lucide-solid/icons/plus';
 import { type Component, createResource, createSignal, For, Match, onMount, Show, Switch } from 'solid-js';
 import type { AdminOutage, AdminOutagesResponse, TimerAction } from '../../shared/api';
 import { PunchClock } from '../components/PunchClock';
+import type { Messages } from '../i18n/af';
 import { ApiError, api } from '../lib/api';
 import { formatDay, formatDuration, formatTime, fromLocalInput, outageDurationMs, toLocalInput } from '../lib/format';
 import { t } from '../lib/i18n';
@@ -13,28 +14,37 @@ import { getTurnstileToken } from '../lib/turnstile';
 import { button, errorText, input, label, plainList } from '../styles/ui.css';
 import * as css from './Admin.css';
 
-/** Error line under a form or row; role="alert" so screen readers announce it. */
-const FormError: Component<{ message: string }> = (props) => (
-  <Show when={props.message}>
+type ErrorCode = keyof Messages['admin']['errors'];
+
+const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401;
+
+/** The message for an ApiError or an error code; anything else is a network failure. */
+function describeError(error: unknown): string {
+  const code = error instanceof ApiError ? error.code : typeof error === 'string' ? error : null;
+  if (code === null) return t().admin.network;
+  return (t().admin.errors as Record<string, string | undefined>)[code] ?? t().admin.requestFailed(code);
+}
+
+/**
+ * Error line under a form or row; role="alert" so screen readers announce it. Forms keep the error
+ * itself and it is described here, so the message follows a language switch.
+ */
+const FormError: Component<{ error: unknown }> = (props) => (
+  <Show when={props.error !== undefined}>
     <p class={errorText} role="alert">
-      {props.message}
+      {describeError(props.error)}
     </p>
   </Show>
 );
 
-const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401;
-
-const describeError = (error: unknown) =>
-  error instanceof ApiError ? (t().admin.errors[error.code] ?? t().admin.requestFailed(error.code)) : t().admin.network;
-
 /** Reports a failed dashboard action: a 401 ends the session, anything else shows through `show`. */
-type OnError = (error: unknown, show: (message: string) => void) => void;
+type OnError = (error: unknown, show: (error: unknown) => void) => void;
 
-const LoginForm: Component<{ notice: string; focus: boolean; onLoggedIn: () => void }> = (props) => {
+const LoginForm: Component<{ notice?: ErrorCode; focus: boolean; onLoggedIn: () => void }> = (props) => {
   let widget!: HTMLDivElement;
   let heading!: HTMLHeadingElement;
   // Starts with the reason the last session ended, if any.
-  const [error, setError] = createSignal(props.notice);
+  const [error, setError] = createSignal<unknown>(props.notice);
   const [busy, setBusy] = createSignal(false);
   onMount(() => props.focus && heading.focus());
 
@@ -44,7 +54,7 @@ const LoginForm: Component<{ notice: string; focus: boolean; onLoggedIn: () => v
     const username = String(form.get('username') ?? '');
     const password = String(form.get('password') ?? '');
     setBusy(true);
-    setError('');
+    setError(undefined);
     try {
       // The public status response carries the Turnstile site key.
       const { turnstileSiteKey } = await api.status();
@@ -52,7 +62,7 @@ const LoginForm: Component<{ notice: string; focus: boolean; onLoggedIn: () => v
       await api.login(username, password, token);
       props.onLoggedIn();
     } catch (e) {
-      setError(describeError(e));
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -83,7 +93,7 @@ const LoginForm: Component<{ notice: string; focus: boolean; onLoggedIn: () => v
           <input class={input} type="password" id="password" name="password" autocomplete="current-password" required />
         </label>
         <div ref={widget} />
-        <FormError message={error()} />
+        <FormError error={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
           {busy() ? t().admin.checking : t().admin.signIn}
         </button>
@@ -98,12 +108,12 @@ const OutageRow: Component<{
   onChange: () => Promise<void>;
   onError: OnError;
 }> = (props) => {
-  const [error, setError] = createSignal('');
+  const [error, setError] = createSignal<unknown>();
   const [busy, setBusy] = createSignal(false);
   const titleId = () => `outage-${props.outage.id}-title`;
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
-    setError('');
+    setError(undefined);
     try {
       await action();
       await props.onChange();
@@ -172,14 +182,14 @@ const OutageRow: Component<{
           {t().admin.delete}
         </button>
       </div>
-      <FormError message={error()} />
+      <FormError error={error()} />
     </li>
   );
 };
 
 const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError }> = (props) => {
-  const [error, setError] = createSignal('');
-  const [saved, setSaved] = createSignal('');
+  const [error, setError] = createSignal<unknown>();
+  const [saved, setSaved] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
 
   async function submit(event: SubmitEvent) {
@@ -188,17 +198,17 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
     const data = new FormData(form);
     const start = fromLocalInput(String(data.get('start') ?? ''));
     const end = data.get('end') ? fromLocalInput(String(data.get('end'))) : null;
-    setError('');
-    setSaved('');
+    setError(undefined);
+    setSaved(false);
     if (end && Date.parse(end) <= Date.parse(start)) {
-      setError(t().admin.errors.end_before_start ?? '');
+      setError('end_before_start' satisfies ErrorCode);
       return;
     }
     setBusy(true);
     try {
       await api.createOutage(start, end, data.get('planned') === 'on');
       form.reset();
-      setSaved(t().admin.logged);
+      setSaved(true);
       await props.onLogged();
     } catch (e) {
       props.onError(e, setError);
@@ -230,12 +240,12 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
         <label class={css.checkbox}>
           <input type="checkbox" name="planned" /> {t().admin.plannedHint}
         </label>
-        <FormError message={error()} />
+        <FormError error={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
           <Plus size={18} aria-hidden="true" /> {busy() ? t().admin.saving : t().admin.log}
         </button>
         <p class={css.saved} role="status">
-          {saved()}
+          {saved() ? t().admin.logged : ''}
         </p>
       </form>
     </section>
@@ -245,7 +255,7 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
 const Dashboard: Component<{
   initial: AdminOutagesResponse;
   focus: boolean;
-  onLoggedOut: (notice?: string) => void;
+  onLoggedOut: (notice?: ErrorCode) => void;
 }> = (props) => {
   let heading!: HTMLHeadingElement;
   onMount(() => props.focus && heading.focus());
@@ -263,14 +273,13 @@ const Dashboard: Component<{
     }
   };
   const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal('');
+  const [error, setError] = createSignal<unknown>();
   const open = () => outages().outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
-  const onError: OnError = (e, show) =>
-    isUnauthorized(e) ? props.onLoggedOut(t().admin.sessionExpired) : show(describeError(e));
+  const onError: OnError = (e, show) => (isUnauthorized(e) ? props.onLoggedOut('session_expired') : show(e));
 
   const punch = async (action: TimerAction) => {
     setBusy(true);
-    setError('');
+    setError(undefined);
     try {
       await api.punch(action);
       await refetch();
@@ -304,7 +313,7 @@ const Dashboard: Component<{
           onPunchOut={() => punch('punch_out')}
           onPunchIn={() => punch('punch_in')}
         />
-        <FormError message={error()} />
+        <FormError error={error()} />
       </section>
 
       <LogOutageForm onLogged={refetch} onError={onError} />
@@ -333,11 +342,11 @@ const Admin: Component = () => {
       throw e;
     }
   });
-  const [notice, setNotice] = createSignal('');
+  const [notice, setNotice] = createSignal<ErrorCode>();
   // Focus moves to the new view's heading after signing in or out, not on first load.
   const [moved, setMoved] = createSignal(false);
-  const switchView = (message = '') => {
-    setNotice(message);
+  const switchView = (reason?: ErrorCode) => {
+    setNotice(reason);
     setMoved(true);
     refetch();
   };

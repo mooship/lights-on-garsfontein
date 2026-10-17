@@ -1,3 +1,6 @@
+/* The privacy page (privacy.html). base.css brings the same fonts as the app. */
+@import "./base.css";
+
 :root {
   color-scheme: light;
   --bg: #f6f4ef;
@@ -12,19 +15,6 @@
   --muted: #a8a69e;
   --accent: #4caf50;
 }
-/* The build points these /fonts/ urls at the hashed Fontsource files in /assets/ (vite.config.ts). */
-@font-face {
-  font-family: Fraunces;
-  src: url("/fonts/fraunces-latin-wght-normal.woff2") format("woff2");
-  font-weight: 100 900;
-  font-display: optional;
-}
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  src: url("/fonts/plus-jakarta-sans-latin-wght-normal.woff2") format("woff2");
-  font-weight: 200 800;
-  font-display: optional;
-}
 * {
   box-sizing: border-box;
 }
@@ -32,7 +22,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  font-family: var(--gg-font-body);
   line-height: 1.6;
 }
 main {
@@ -43,7 +33,7 @@ main {
 }
 h1,
 h2 {
-  font-family: Fraunces, Georgia, serif;
+  font-family: var(--gg-font-display);
   line-height: 1.2;
 }
 h1 {

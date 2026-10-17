@@ -1,5 +1,51 @@
-import { type Cookie, expect, type Page, test } from '@playwright/test';
+import { test as base, type Cookie, expect, type Page } from '@playwright/test';
+import { DAY_MS } from '../shared/api';
 import { activeBanners, BANNERS, type Banner } from '../src/banners';
+import type { Locale } from '../src/lib/i18n';
+
+/** Stores the app's language before every load of `page` (the app's own default is Afrikaans). */
+const withLocale = (page: Page, locale: Locale) => page.addInitScript((l) => localStorage.setItem('locale', l), locale);
+
+// Most tests read the English copy; a block opts into Afrikaans with test.use({ appLocale: 'af' }).
+// Pages from browser.newContext() don't get it: pass them to withLocale.
+const test = base.extend<{ appLocale: Locale }>({
+  appLocale: ['en', { option: true }],
+  page: async ({ page, appLocale }, use) => {
+    await withLocale(page, appLocale);
+    await use(page);
+  },
+});
+
+type ShiftWindow = Window & { __readCls: () => number };
+
+/** Sums the page's layout shifts from the start of its load; call it before `goto`. */
+const trackLayoutShift = (page: Page) =>
+  page.addInitScript(() => {
+    let cls = 0;
+    const add = (entries: PerformanceEntryList) => {
+      for (const entry of entries as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
+        if (!entry.hadRecentInput) cls += entry.value;
+      }
+    };
+    const observer = new PerformanceObserver((list) => add(list.getEntries()));
+    observer.observe({ type: 'layout-shift', buffered: true });
+    // takeRecords picks up shifts the observer has not been called back with yet.
+    (window as unknown as ShiftWindow).__readCls = () => {
+      add(observer.takeRecords());
+      return cls;
+    };
+  });
+
+/** The layout shift so far, once the status and statistics have rendered and the fonts have painted. */
+async function readLayoutShift(page: Page): Promise<number> {
+  await expect(page.getByRole('status')).toBeVisible();
+  await expect(page.locator('.gg-trends-details table')).toBeAttached(); // the skeleton has no table
+  return page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return (window as unknown as ShiftWindow).__readCls();
+  });
+}
 
 // Tests share one local database and run in order.
 test.describe.configure({ mode: 'serial' });
@@ -9,11 +55,6 @@ const ADMIN_PASSWORD = 'test-password';
 
 // Public copy never says how an outage was recorded, in either language.
 const RECORDING_METHOD = /by hand|sensor|met die hand|handmatig|voeler/i;
-
-/** Starts the page in English (the default is Afrikaans) so most tests read the English copy. */
-const inEnglish = (page: Page) => page.addInitScript(() => localStorage.setItem('locale', 'en'));
-
-test.beforeEach(({ page }) => inEnglish(page));
 
 // Log in through the UI once and reuse the cookie: the login endpoint allows 5 attempts a minute.
 let sessionCookies: Cookie[] = [];
@@ -42,10 +83,10 @@ test.describe('theme boot', () => {
     await context.close();
   });
 
-  test('a saved preference beats the system theme and the toggle persists it', async ({ browser }) => {
+  test('a saved preference beats the system theme and the toggle persists it', async ({ browser, appLocale }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });
     const page = await context.newPage();
-    await inEnglish(page);
+    await withLocale(page, appLocale);
     await page.addInitScript(() => {
       if (!sessionStorage.getItem('seeded')) {
         localStorage.setItem('theme', 'light');
@@ -106,7 +147,7 @@ test.describe('language', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'af');
     await expect(page.getByRole('heading', { name: 'Statistiek' })).toBeVisible();
 
-    await inEnglish(page);
+    await withLocale(page, 'en');
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
@@ -126,23 +167,16 @@ test.describe('public page', () => {
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
   });
 
-  for (const locale of ['af', 'en']) {
-    test(`has zero cumulative layout shift while loading (${locale})`, async ({ page }) => {
-      // Runs after the English default from beforeEach, so it wins.
-      await page.addInitScript((l) => localStorage.setItem('locale', l), locale);
-      await page.addInitScript(() => {
-        (window as unknown as { __cls: number }).__cls = 0;
-        new PerformanceObserver((list) => {
-          for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
-            if (!entry.hadRecentInput) (window as unknown as { __cls: number }).__cls += entry.value;
-          }
-        }).observe({ type: 'layout-shift', buffered: true });
+  for (const locale of ['af', 'en'] as const) {
+    test.describe(locale, () => {
+      test.use({ appLocale: locale });
+
+      test(`has zero cumulative layout shift while loading (${locale})`, async ({ page }) => {
+        await trackLayoutShift(page);
+        await page.goto('/');
+        await expect(page.locator('html')).toHaveAttribute('lang', locale);
+        expect(await readLayoutShift(page)).toBe(0);
       });
-      await page.goto('/');
-      await expect(page.locator('html')).toHaveAttribute('lang', locale);
-      await expect(page.getByRole('status')).toBeVisible();
-      await page.waitForTimeout(1000);
-      expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
     });
   }
 
@@ -285,7 +319,7 @@ test.describe('site banner', () => {
       until: VOTE_UNTIL,
       text: { af: '', en: '' },
     };
-    expect(activeBanners(DURING.getTime() + 7 * 864e5, [...BANNERS, later]).map((b) => b.id)).toEqual([VOTE, 'later']);
+    expect(activeBanners(DURING.getTime() + 7 * DAY_MS, [...BANNERS, later]).map((b) => b.id)).toEqual([VOTE, 'later']);
   });
 
   test('shows the election notice before its end date, in English', async ({ page }) => {
@@ -298,14 +332,17 @@ test.describe('site banner', () => {
     await expect(notice(page).getByRole('button', { name: 'Dismiss' })).toBeVisible();
   });
 
-  test('is in Afrikaans by default', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('locale', 'af')); // overrides the English beforeEach
-    await page.clock.setFixedTime(DURING);
-    await page.goto('/');
-    const region = page.getByRole('region', { name: 'Kennisgewing' });
-    await expect(region).toContainText('Die plaaslike regeringsverkiesing vind op Woensdag 4 November 2026 plaas.');
-    await expect(region.getByRole('link', { name: 'Kiesersinligting by die OVK' })).toBeVisible();
-    await expect(region.getByRole('button', { name: 'Maak toe' })).toBeVisible();
+  test.describe('in Afrikaans', () => {
+    test.use({ appLocale: 'af' });
+
+    test('is in Afrikaans by default', async ({ page }) => {
+      await page.clock.setFixedTime(DURING);
+      await page.goto('/');
+      const region = page.getByRole('region', { name: 'Kennisgewing' });
+      await expect(region).toContainText('Die plaaslike regeringsverkiesing vind op Woensdag 4 November 2026 plaas.');
+      await expect(region.getByRole('link', { name: 'Kiesersinligting by die OVK' })).toBeVisible();
+      await expect(region.getByRole('button', { name: 'Maak toe' })).toBeVisible();
+    });
   });
 
   test('is gone once its end date passes', async ({ page }) => {
@@ -338,18 +375,10 @@ test.describe('site banner', () => {
 
   test('causes no layout shift and never covers the footer', async ({ page }) => {
     await page.clock.setFixedTime(DURING);
-    await page.addInitScript(() => {
-      (window as unknown as { __cls: number }).__cls = 0;
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
-          if (!entry.hadRecentInput) (window as unknown as { __cls: number }).__cls += entry.value;
-        }
-      }).observe({ type: 'layout-shift', buffered: true });
-    });
+    await trackLayoutShift(page);
     await page.goto('/');
     await expect(notice(page)).toBeVisible();
-    await page.waitForTimeout(1000);
-    expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
+    expect(await readLayoutShift(page)).toBe(0);
 
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     const footer = await page.locator('.gg-footer').boundingBox();

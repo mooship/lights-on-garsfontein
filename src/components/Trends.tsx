@@ -71,9 +71,19 @@ function niceMax(value: number): number {
   return NICE_MAXIMA.find((n) => n >= value) ?? Math.ceil(value / 24) * 24;
 }
 
-const readout = (w: WeekStats, current: boolean) => {
+/** The readout for a week in parts, so the visible line can emphasise the hours. */
+function readoutParts(w: WeekStats, current: boolean) {
   const m = t().trends;
-  return `${m.weekOf(formatCalendarDay(w.weekStart))}: ${formatHours(w.hoursOff)} ${m.off} · ${m.outageCount(w.outages)}${current ? m.soFar : ''}`;
+  return {
+    week: m.weekOf(formatCalendarDay(w.weekStart)),
+    hours: formatHours(w.hoursOff),
+    rest: `${m.off} · ${m.outageCount(w.outages)}${current ? m.soFar : ''}`,
+  };
+}
+
+const readout = (w: WeekStats, current: boolean) => {
+  const p = readoutParts(w, current);
+  return `${p.week}: ${p.hours} ${p.rest}`;
 };
 
 const CHART_HEIGHT = 144;
@@ -128,14 +138,14 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
       <h3 class={css.chartTitle}>{t().trends.chartTitle}</h3>
       <p class={css.readout}>
         <Show when={activeWeek()}>
-          {(w) => (
-            <>
-              {t().trends.weekOf(formatCalendarDay(w().weekStart))}:{' '}
-              <span class={css.readoutValue}>{formatHours(w().hoursOff)}</span> {t().trends.off} ·{' '}
-              {t().trends.outageCount(w().outages)}
-              {activeIndex() === props.weeks.length - 1 ? t().trends.soFar : ''}
-            </>
-          )}
+          {(w) => {
+            const p = () => readoutParts(w(), activeIndex() === props.weeks.length - 1);
+            return (
+              <>
+                {p().week}: <span class={css.readoutValue}>{p().hours}</span> {p().rest}
+              </>
+            );
+          }}
         </Show>
       </p>
       <p class="gg-sr-only" aria-live="polite">

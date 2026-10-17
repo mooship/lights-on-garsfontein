@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 import { PAGE_BG } from '../styles/theme.css';
+import { readStored, writeStored } from './storage';
 
 type Theme = keyof typeof PAGE_BG;
 
@@ -27,23 +28,14 @@ function applyTheme(next: Theme): void {
 
 export function setTheme(next: Theme): void {
   applyTheme(next);
-  try {
-    localStorage.setItem(STORAGE_KEY, next);
-  } catch {
-    // Storage can be unavailable (private mode); the toggle still works for this visit.
-  }
+  writeStored(STORAGE_KEY, next);
 }
 
 /** Follow OS changes while the visitor has not picked a theme themselves. */
 export function watchSystemTheme(): () => void {
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   const onChange = (event: MediaQueryListEvent) => {
-    let stored: string | null = null;
-    try {
-      stored = localStorage.getItem(STORAGE_KEY);
-    } catch {}
-    if (stored) return;
-    applyTheme(event.matches ? 'dark' : 'light');
+    if (!readStored(STORAGE_KEY)) applyTheme(event.matches ? 'dark' : 'light');
   };
   media.addEventListener('change', onChange);
   return () => media.removeEventListener('change', onChange);

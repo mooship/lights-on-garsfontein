@@ -2,6 +2,7 @@ import Users from 'lucide-solid/icons/users';
 import { type Component, createSignal, Show } from 'solid-js';
 import { ApiError, api } from '../lib/api';
 import { t } from '../lib/i18n';
+import { isFlagged, setFlag } from '../lib/storage';
 import { getTurnstileToken } from '../lib/turnstile';
 import { button, errorText, muted } from '../styles/ui.css';
 import * as css from './ConfirmOutage.css';
@@ -16,22 +17,15 @@ interface ConfirmOutageProps {
 
 const storageKey = (id: number) => `confirmed:${id}`;
 
-function remembered(id: number): boolean {
-  try {
-    return localStorage.getItem(storageKey(id)) === '1';
-  } catch {
-    return false;
-  }
-}
-
 export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
   let widget!: HTMLDivElement;
   const [busy, setBusy] = createSignal(false);
-  const [confirmed, setConfirmed] = createSignal(remembered(props.outageId));
+  const [confirmed, setConfirmed] = createSignal(isFlagged(storageKey(props.outageId)));
   const [count, setCount] = createSignal<number | null>(null);
   // The error code, so the message follows a language switch.
   const [errorCode, setErrorCode] = createSignal('');
-  const message = () => errorCode() && (t().confirm.errors[errorCode()] ?? t().confirm.unknown);
+  const message = () =>
+    errorCode() && ((t().confirm.errors as Record<string, string | undefined>)[errorCode()] ?? t().confirm.unknown);
   const total = () => count() ?? props.confirmations;
   const disabled = () => busy() || confirmed();
 
@@ -44,9 +38,7 @@ export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
       const res = await api.confirm(token, props.outageId);
       setCount(res.confirmations);
       setConfirmed(true);
-      try {
-        localStorage.setItem(storageKey(props.outageId), '1');
-      } catch {}
+      setFlag(storageKey(props.outageId));
     } catch (error) {
       const code = error instanceof ApiError ? error.code : 'unknown';
       if (code === 'already_confirmed') setConfirmed(true);

@@ -2,8 +2,8 @@ import { type Component, For } from 'solid-js';
 import { t } from '../lib/i18n';
 
 // Loading placeholders. index.html renders the same markup statically before any
-// JavaScript runs, so keep the two in step (text in both languages too): identical boxes
-// mean zero layout shift.
+// JavaScript runs, so keep the boxes in step: identical boxes mean zero layout shift. Its text
+// comes from the same dictionaries at build time (staticI18n in vite.config.ts).
 
 export const StatusSkeleton: Component = () => (
   <>
