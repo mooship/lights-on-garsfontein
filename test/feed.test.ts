@@ -22,7 +22,12 @@ function assertWellFormed(xml: string): void {
   expect(stack).toEqual([]);
   expect(roots).toBe(1);
   // Nothing outside the tags but text: no stray `<` or `>`.
-  expect(body.replace(/<[^>]*>/g, '')).not.toMatch(/[<>]/);
+  let text = body;
+  for (let previous = ''; previous !== text; ) {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, '');
+  }
+  expect(text).not.toMatch(/[<>]/);
 }
 
 const entries = (xml: string) => [...xml.matchAll(/<entry>[\s\S]*?<\/entry>/g)].map(([e]) => e);

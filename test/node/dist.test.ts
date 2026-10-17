@@ -12,6 +12,15 @@ const DIST = resolve(import.meta.dirname, '../../dist');
 const read = (file: string) => readFileSync(resolve(DIST, file), 'utf8');
 const exists = (file: string) => existsSync(resolve(DIST, file));
 
+/** Removes `pattern` until nothing changes, so one removal cannot leave a new match behind. */
+function stripRepeatedly(text: string, pattern: RegExp): string {
+  for (let previous = ''; previous !== text; ) {
+    previous = text;
+    text = text.replace(pattern, '');
+  }
+  return text;
+}
+
 /** dist/index.html for the default locale, dist/<code>/index.html for the others. */
 const LOCALE_PAGES = site.locales.map((locale) => ({ locale, file: `${localePath(locale).slice(1)}index.html` }));
 const HTML = [...LOCALE_PAGES.map((p) => p.file), 'privacy.html'];
@@ -48,7 +57,7 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     // The build's copy of public/_headers, so a build older than the source cannot fail this.
     const headers = read('_headers');
     for (const file of HTML) {
-      const scripts = [...read(file).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1] ?? '');
+      const scripts = [...read(file).matchAll(/<script>([\s\S]*?)<\/script\s*>/gi)].map((m) => m[1] ?? '');
       expect(scripts.length, file).toBeGreaterThan(0);
       for (const script of scripts) {
         const hash = createHash('sha256').update(script).digest('base64');
@@ -68,7 +77,7 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
   it('leaves no placeholder unfilled', () => {
     for (const file of [...HTML, 'site.webmanifest', 'llms.txt']) {
       // index.html's own comment names the placeholders.
-      const text = read(file).replace(/<!--[\s\S]*?-->/g, '');
+      const text = stripRepeatedly(read(file), /<!--[\s\S]*?-->/g);
       expect(text, file).not.toMatch(/%(?:site|since|page)\./);
     }
   });
