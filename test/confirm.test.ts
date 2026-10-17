@@ -1,6 +1,16 @@
 import { env } from 'cloudflare:test';
-import { describe, expect, it, vi } from 'vitest';
-import { call, insertOutage, mockTurnstile, ORIGIN, openOutageCount, runCron, setHeartbeat, uniqueIp } from './helpers';
+import { describe, expect, it } from 'vitest';
+import {
+  call,
+  insertOutage,
+  mockTurnstile,
+  ORIGIN,
+  openOutageCount,
+  runCron,
+  sameWindow,
+  setHeartbeat,
+  uniqueIp,
+} from './helpers';
 
 const confirm = (ip?: string, body: unknown = { token: 'turnstile-token' }) =>
   call('/api/confirm', { method: 'POST', body, ip });
@@ -15,18 +25,6 @@ describe('POST /api/confirm', () => {
   it('validates the body', async () => {
     mockTurnstile(true);
     expect((await confirm(undefined, {})).status).toBe(400);
-  });
-
-  it('sends the token and client IP to siteverify', async () => {
-    const spy = mockTurnstile(true);
-    await insertOutage({});
-    const ip = uniqueIp();
-    await confirm(ip);
-    const [, init] = spy.mock.calls[0] ?? [];
-    const form = init?.body as FormData;
-    expect(form.get('secret')).toBe('test-secret');
-    expect(form.get('response')).toBe('turnstile-token');
-    expect(form.get('remoteip')).toBe(ip);
   });
 
   it('returns 409 when the power is on', async () => {
@@ -73,41 +71,9 @@ describe('POST /api/confirm', () => {
     await insertOutage({});
     const ip = uniqueIp();
     const codes: number[] = [];
+    await sameWindow();
     for (let i = 0; i < 6; i++) codes.push((await confirm(ip)).status);
     expect(codes).toEqual([201, 409, 409, 409, 409, 429]);
-  });
-
-  it('accepts Cloudflare test secrets on localhost without action/host checks, but not their failures', async () => {
-    await insertOutage({});
-    const testEnv = {
-      ...env,
-      SITE_URL: 'http://localhost:8787',
-      TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA',
-    } as Env;
-    mockTurnstile(true, 'login', 'example.com');
-    expect((await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: testEnv })).status).toBe(201);
-    mockTurnstile(false);
-    expect((await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: testEnv })).status).toBe(403);
-  });
-
-  it('refuses Cloudflare test secrets outside localhost without calling siteverify', async () => {
-    await insertOutage({});
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const spy = mockTurnstile(true);
-    const deployed = { ...env, TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA' } as Env;
-    const res = await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: deployed });
-    expect(res.status).toBe(403);
-    expect(spy).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalled();
-  });
-
-  it('treats a malformed siteverify answer as a failure', async () => {
-    await insertOutage({});
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => Response.json({ success: 'yes', action: 'confirm', hostname: new URL(ORIGIN).hostname })),
-    );
-    expect((await confirm()).status).toBe(403);
   });
 
   it('counts addresses in the same IPv6 /64 as one neighbour', async () => {

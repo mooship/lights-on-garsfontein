@@ -6,8 +6,9 @@ import { adminRoutes } from './routes/admin';
 import { authRoutes } from './routes/auth';
 import { contactRoutes } from './routes/contact';
 import { historyRoutes } from './routes/history';
+import { OUTAGE_VIEWS } from './routes/paths';
 import { seoRoutes } from './routes/seo';
-import { STATUS_PATH, statusRoutes } from './routes/status';
+import { statusRoutes } from './routes/status';
 
 /** The hourly housekeeping cron in wrangler.toml. */
 const HOURLY_CRON = '0 * * * *';
@@ -75,9 +76,9 @@ export default {
         purgeOldStillOffReports(db, now),
       ]);
     } else {
-      // Purges only this datacentre's copy; elsewhere the status edge TTL bounds the delay.
+      // Purges only this datacentre's copies; elsewhere their edge TTLs bound the delay.
       const { opened } = await detectOutage(db, now);
-      if (opened) await purgeEdgeCache(env.SITE_URL, STATUS_PATH);
+      if (opened) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);
     }
   },
 } satisfies ExportedHandler<Env>;

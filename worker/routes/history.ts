@@ -6,6 +6,7 @@ import { outagesWithCounts } from '../lib/grid';
 import { json } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { mergeOutages, weeklyStats, windowStats } from '../lib/stats';
+import { CSV_PATH, FEED_PATH, STATS_PATH } from './paths';
 
 async function getStats({ db }: RouteContext): Promise<Response> {
   const now = Date.now();
@@ -155,7 +156,7 @@ ${entries
 }
 
 export const historyRoutes: Routes = {
-  'GET /feed.xml': { handler: getFeed, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
-  'GET /api/stats': { handler: getStats, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
-  'GET /api/outages.csv': { handler: getOutagesCsv, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
+  [`GET ${FEED_PATH}`]: { handler: getFeed, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
+  [`GET ${STATS_PATH}`]: { handler: getStats, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
+  [`GET ${CSV_PATH}`]: { handler: getOutagesCsv, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
 };

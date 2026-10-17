@@ -20,6 +20,7 @@ import {
 import { errors, json, parseBody } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
+import { CSV_PATH, OUTAGE_VIEWS, STATUS_PATH } from './paths';
 
 const confirmSchema = z.object({
   token: z.string().min(1).max(2048),
@@ -27,8 +28,6 @@ const confirmSchema = z.object({
 }) satisfies z.ZodType<ConfirmRequest>;
 
 const stillOffSchema = z.object({ token: z.string().min(1).max(2048) }) satisfies z.ZodType<StillOffRequest>;
-
-export const STATUS_PATH = '/api/status';
 
 /**
  * Edge TTL for the status, which every open tab polls. Writes purge it (in the datacentre that
@@ -68,8 +67,8 @@ async function postConfirm(ctx: RouteContext): Promise<Response> {
   if (refused) return refused;
 
   const { outage, opened } = await detectOutage(db, new Date());
-  // The route purges after a successful confirm; this covers the refusals below.
-  if (opened) await purgeEdgeCache(new URL(request.url).origin, STATUS_PATH);
+  // The route purges what a confirmation changes; an outage opened here changes every view, refused or not.
+  if (opened) await purgeEdgeCache(new URL(request.url).origin, OUTAGE_VIEWS);
   if (!outage) return errors.conflict('no_active_outage');
   // The visitor saw an outage that has since ended and another began: do not count them for it.
   if (parsed.data.outageId !== undefined && parsed.data.outageId !== outage.id) {
@@ -108,7 +107,7 @@ async function postStillOff(ctx: RouteContext): Promise<Response> {
 
   // Same check as the status: an open outage, or a stale heartbeat (which this opens).
   const { outage, opened } = await detectOutage(db, new Date());
-  if (opened) await purgeEdgeCache(new URL(request.url).origin, STATUS_PATH);
+  if (opened) await purgeEdgeCache(new URL(request.url).origin, OUTAGE_VIEWS);
   if (outage) return errors.conflict('outage_in_progress');
 
   const now = new Date();
@@ -135,7 +134,8 @@ export const statusRoutes: Routes = {
     handler: postConfirm,
     sameOrigin: true,
     limiter: 'CONFIRM_LIMITER',
-    purges: [STATUS_PATH],
+    // The confirmation counts are in the status and the CSV.
+    purges: [STATUS_PATH, CSV_PATH],
   },
   'POST /api/still-off': {
     handler: postStillOff,
@@ -147,6 +147,7 @@ export const statusRoutes: Routes = {
   'POST /api/heartbeat': {
     handler: postHeartbeat,
     authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),
-    purges: [STATUS_PATH],
+    // Any heartbeat may close an outage or record one it missed.
+    purges: OUTAGE_VIEWS,
   },
 };

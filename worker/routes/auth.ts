@@ -42,7 +42,8 @@ const sessionExpiry = (now: number, createdAt: number) =>
   Math.min(now + SESSION_TTL_SECONDS * 1000, createdAt + SESSION_MAX_AGE_MS);
 
 /** Changes whenever ADMIN_PASSWORD_HASH does, so a new password signs every session out. */
-const passwordFingerprint = async (env: Env) => (await sha256Hex(`session:${env.ADMIN_PASSWORD_HASH}`)).slice(0, 16);
+export const passwordFingerprint = async (env: Env) =>
+  (await sha256Hex(`session:${env.ADMIN_PASSWORD_HASH}`)).slice(0, 16);
 
 /**
  * True when the request carries a valid, unexpired session cookie. Sessions slide: once a

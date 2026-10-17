@@ -8,6 +8,7 @@ import {
   insertStillOff,
   mockTurnstile,
   ORIGIN,
+  sameWindow,
   setHeartbeat,
   uniqueIp,
 } from './helpers';
@@ -122,6 +123,7 @@ describe('POST /api/still-off', () => {
     mockTurnstile(true, 'still_off');
     const ip = uniqueIp();
     const codes: number[] = [];
+    await sameWindow();
     for (let i = 0; i < 6; i++) codes.push((await report(ip)).status);
     expect(codes).toEqual([201, 409, 409, 409, 409, 429]);
   });

@@ -50,3 +50,19 @@ You will:
 
 **Output Format**: Always save the complete test plan as a markdown file with clear headings, numbered steps, and
 professional formatting suitable for sharing with development and QA teams.
+
+## Project conventions
+
+Where these differ from the instructions above, these win.
+
+- Read `AGENTS.md` first, if it exists.
+- The tests live in `e2e/app.spec.ts`. They import `test`, `expect`, `withLocale`, `trackLayoutShift` and
+  `readLayoutShift` from `e2e/fixtures.ts`, never `test` from `@playwright/test`, and use the helpers in the spec
+  (`login`, `withTime`, `expectShellIn`). Pages are in English unless a block sets `test.use({ appLocale: 'af' })`.
+- The tests run one at a time against one shared local D1 database. The `resetOutages` fixture deletes every outage
+  before each test; "still off" reports and rate-limit counts are not reset, so no test may rely on them being empty.
+- Cover both locales (`site.locales` in `site.config.ts`). Take copy from the dictionaries (`af` and `en` in
+  `src/i18n/`), `HEAD`, `BANNERS` and `site.config.ts` rather than writing the strings out, unless the test is
+  about the wording itself.
+- Single quotes and Biome formatting: run `npm run lint:fix` on what you write.
+- Save plans in `specs/`.

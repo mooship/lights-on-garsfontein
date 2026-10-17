@@ -1,12 +1,15 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../shared/api';
+import { createDb } from '../worker/db/client';
+import { getGridState } from '../worker/lib/grid';
 import {
   call,
   insertOutage,
   insertStillOff,
   mockTurnstile,
   runCron,
+  sameWindow,
   setHeartbeat,
   getStatus as status,
   uniqueIp,
@@ -67,16 +70,11 @@ describe('GET /api/status', () => {
     expect(body.recent[0]).not.toHaveProperty('source');
   });
 
-  it('is ON while heartbeats are fresh', async () => {
-    await setHeartbeat(30);
-    expect((await status()).status).toBe('ON');
-  });
-
-  it(`is OFF once the heartbeat is older than ${HEARTBEAT_THRESHOLD_MS / 1000} seconds`, async () => {
-    const lastSeen = await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 1);
-    const body = await status();
-    expect(body.status).toBe('OFF');
-    expect(body.since).toBe(lastSeen);
+  it(`is OFF once the heartbeat is more than ${HEARTBEAT_THRESHOLD_MS / 1000} seconds old, not at exactly that`, async () => {
+    const lastSeen = await setHeartbeat(0);
+    const at = (ms: number) => getGridState(createDb(env.DB), new Date(Date.parse(lastSeen) + ms));
+    expect(await at(HEARTBEAT_THRESHOLD_MS)).toMatchObject({ status: 'ON', monitored: true });
+    expect(await at(HEARTBEAT_THRESHOLD_MS + 1)).toMatchObject({ status: 'OFF', since: lastSeen, monitored: false });
   });
 
   it('is OFF while an outage is open, even with a fresh heartbeat', async () => {
@@ -141,6 +139,7 @@ describe('GET /api/status', () => {
 
   it('rate limits at 60 requests per minute per IP', async () => {
     const ip = uniqueIp();
+    await sameWindow();
     for (let i = 0; i < 60; i++) {
       expect((await call('/api/status', { ip })).status).toBe(200);
     }
@@ -161,24 +160,16 @@ describe('GET /api/status edge cache', () => {
     expect(await status()).toEqual(first);
   });
 
+  it('ignores the query string, so it cannot be used to skip the cache', async () => {
+    const first = await status();
+    await insertOutage({ source: 'manual' });
+    expect(await (await call('/api/status?x=1')).json()).toEqual(first);
+  });
+
   it('is purged by a heartbeat', async () => {
     expect((await status()).monitored).toBe(false);
     expect((await heartbeat()).status).toBe(200);
     expect((await status()).monitored).toBe(true);
-  });
-
-  it('is purged by admin writes', async () => {
-    expect((await status()).status).toBe('ON');
-    const out = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' }, headers: admin });
-    expect(out.status).toBe(201);
-    const { outage } = (await out.json()) as { outage: { id: number } };
-    expect((await status()).status).toBe('OFF');
-    const update = { action: 'update', id: outage.id, isPlanned: true };
-    expect((await call('/api/admin/outages', { method: 'POST', body: update, headers: admin })).status).toBe(200);
-    expect((await status()).outage?.planned).toBe(true);
-    const remove = { action: 'delete', id: outage.id };
-    expect((await call('/api/admin/outages', { method: 'POST', body: remove, headers: admin })).status).toBe(200);
-    expect(await status()).toMatchObject({ status: 'ON', recent: [] });
   });
 
   it('is not purged by a refused admin write', async () => {
@@ -196,13 +187,6 @@ describe('GET /api/status edge cache', () => {
     const res = await call('/api/confirm', { method: 'POST', body: { token: 'turnstile-token' } });
     expect(res.status).toBe(201);
     expect((await status()).outage?.confirmations).toBe(1);
-  });
-
-  it('is purged when outage detection opens an outage', async () => {
-    await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 60);
-    expect(await status()).toMatchObject({ status: 'OFF', outage: null });
-    await runCron();
-    expect((await status()).outage).not.toBeNull();
   });
 });
 

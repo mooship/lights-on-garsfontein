@@ -7,7 +7,7 @@ import { getOpenOutage, openOutage, outagesWithCounts, summarise } from '../lib/
 import { errors, json, parseBody, refuseCrossSite } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkSession } from './auth';
-import { STATUS_PATH } from './status';
+import { OUTAGE_VIEWS } from './paths';
 
 /** Clock skew allowed on admin times; anything later is a typo, not an outage. */
 const MAX_FUTURE_MS = 5 * MINUTE_MS;
@@ -135,6 +135,6 @@ async function authorizeAdmin(ctx: RouteContext): Promise<Response | null> {
 
 export const adminRoutes: Routes = {
   'GET /api/admin/outages': { handler: listOutages, authorize: authorizeAdmin },
-  'POST /api/admin/outages': { handler: mutateOutage, authorize: authorizeAdmin, purges: [STATUS_PATH] },
-  'POST /api/admin/timer': { handler: timer, authorize: authorizeAdmin, purges: [STATUS_PATH] },
+  'POST /api/admin/outages': { handler: mutateOutage, authorize: authorizeAdmin, purges: OUTAGE_VIEWS },
+  'POST /api/admin/timer': { handler: timer, authorize: authorizeAdmin, purges: OUTAGE_VIEWS },
 };

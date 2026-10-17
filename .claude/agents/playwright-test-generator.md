@@ -57,3 +57,20 @@ application behavior.
    });
    ```
    </example-generation>
+
+## Project conventions
+
+Where these differ from the instructions above, these win.
+
+- Read `AGENTS.md` first, if it exists.
+- The tests live in `e2e/app.spec.ts`. They import `test`, `expect`, `withLocale`, `trackLayoutShift` and
+  `readLayoutShift` from `e2e/fixtures.ts`, never `test` from `@playwright/test`, and use the helpers in the spec
+  (`login`, `withTime`, `expectShellIn`). Pages are in English unless a block sets `test.use({ appLocale: 'af' })`.
+- The tests run one at a time against one shared local D1 database. The `resetOutages` fixture deletes every outage
+  before each test; "still off" reports and rate-limit counts are not reset, so no test may rely on them being empty.
+- Cover both locales (`site.locales` in `site.config.ts`). Take copy from the dictionaries (`af` and `en` in
+  `src/i18n/`), `HEAD`, `BANNERS` and `site.config.ts` rather than writing the strings out, unless the test is
+  about the wording itself.
+- Single quotes and Biome formatting: run `npm run lint:fix` on what you write.
+- `generator_write_test` writes a file of its own: put it in `e2e/`, importing from `./fixtures`, and say in your
+  reply which describe in `e2e/app.spec.ts` it belongs in, so it can be moved there.

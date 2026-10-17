@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { call, mockTurnstile, ORIGIN, uniqueIp } from './helpers';
+import { call, mockTurnstile, ORIGIN, sameWindow, uniqueIp } from './helpers';
 
 const EMAIL = 'contact@example.invalid';
 const configured = { ...env, CONTACT_EMAIL: EMAIL } as Env;
@@ -80,6 +80,7 @@ describe('POST /api/contact', () => {
     mockTurnstile(true, 'contact');
     const ip = uniqueIp();
     const codes: number[] = [];
+    await sameWindow();
     for (let i = 0; i < 6; i++) codes.push((await reveal({ ip })).status);
     expect(codes).toEqual([200, 200, 200, 200, 200, 429]);
   });

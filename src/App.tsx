@@ -16,7 +16,14 @@ import { StillOff } from './components/StillOff';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api, type Status } from './lib/api';
-import { formatDate, formatDuration, formatRelativeDay, formatTime, outageDurationMs } from './lib/format';
+import {
+  formatDate,
+  formatDuration,
+  formatRelativeDay,
+  formatTime,
+  offlineLabel,
+  outageDurationMs,
+} from './lib/format';
 import { t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll } from './lib/poll';
@@ -80,12 +87,6 @@ const Footer: Component<{ isPublic: boolean }> = (props) => (
     <p>{t().footer.operator}</p>
   </footer>
 );
-
-/** "No connection · status as at 20:11", with the day when the copy is not from today. */
-function offlineLabel(iso: string, now: number): string {
-  const day = formatRelativeDay(iso, now);
-  return t().status.offline(formatTime(iso), day === t().day.today ? undefined : day);
-}
 
 /** One line of context under the badge: when it went off, or when the last outage was. */
 function statusDetail(s: StatusResponse, now: number): string {

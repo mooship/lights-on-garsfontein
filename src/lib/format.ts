@@ -54,6 +54,12 @@ export function formatRelativeDay(iso: string, now: number): string {
   return t().day.on(formatDay(iso));
 }
 
+/** "No connection · status as at 20:11", with the day when the copy is not from today. */
+export function offlineLabel(iso: string, now: number): string {
+  const day = formatRelativeDay(iso, now);
+  return t().status.offline(formatTime(iso), day === t().day.today ? undefined : day);
+}
+
 /** Whole days, the hours and minutes left over, and the total seconds (negative counts as 0). */
 function splitDuration(ms: number) {
   const clamped = Math.max(0, ms);
