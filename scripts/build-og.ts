@@ -41,7 +41,7 @@ h1 { font-family: Fraunces, serif; font-size: 88px; font-weight: 700; margin-top
 .label { font-family: Fraunces, serif; font-size: 72px; font-weight: 650; color: ${card.color}; }
 .foot { font-size: 26px; color: #5C5850; }
 </style></head><body>
-<div><p class="eyebrow">Ward 45 · Garsfontein, Pretoria</p><h1>Garsfontein Grid</h1></div>
+<div><p class="eyebrow">Garsfontein Ext. 16 · Ward 45 · Pretoria</p><h1>Lights On?</h1></div>
 <div class="status"><div class="icon"><svg width="64" height="64" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="${card.glyph}"/></svg></div>
   <p class="label">${card.label}</p></div>

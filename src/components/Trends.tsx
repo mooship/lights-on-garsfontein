@@ -287,7 +287,7 @@ export const Trends: Component<TrendsProps> = (props) => {
             </For>
           </tbody>
         </table>
-        <a class={css.download} href="/api/outages.csv" download="garsfontein-grid-outages.csv">
+        <a class={css.download} href="/api/outages.csv" download="lights-on-garsfontein-outages.csv">
           <Download size={14} aria-hidden="true" /> Download the full record (CSV)
         </a>
       </details>

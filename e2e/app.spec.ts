@@ -138,7 +138,7 @@ test.describe('admin', () => {
 
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText('Power is off');
-    await expect(page).toHaveTitle(/^OFF \d+m · Garsfontein Grid$/);
+    await expect(page).toHaveTitle(/^OFF \d+m · Lights On\?$/);
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-off.svg');
 
     await login(page);
@@ -146,7 +146,7 @@ test.describe('admin', () => {
     await expect(page.getByTestId('punch-clock')).toHaveText('00:00:00');
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText('Power is on');
-    await expect(page).toHaveTitle('ON · Garsfontein Grid');
+    await expect(page).toHaveTitle('ON · Lights On?');
   });
 
   test('logs a past outage', async ({ page }) => {

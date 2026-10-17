@@ -1,4 +1,5 @@
 #:schema node_modules/wrangler/config-schema.json
+# Worker and D1 names keep the original slug: renaming the Worker would create a new one.
 name = "garsfontein-grid"
 main = "worker/index.ts"
 compatibility_date = "2026-10-01"

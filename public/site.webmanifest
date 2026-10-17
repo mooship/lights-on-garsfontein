@@ -1,8 +1,8 @@
 {
-  "name": "Garsfontein Grid",
+  "name": "Lights On, Garsfontein?",
   "id": "/",
-  "short_name": "Garsfontein Grid",
-  "description": "Live power status and outage history for Ward 45, Garsfontein, Pretoria.",
+  "short_name": "Lights On?",
+  "description": "Live power status and outage history for Garsfontein, Pretoria, measured in Extension 16 (Ward 45).",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

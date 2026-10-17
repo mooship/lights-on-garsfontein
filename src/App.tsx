@@ -35,8 +35,8 @@ const Masthead: Component<{ notice: boolean }> = (props) => (
   <>
     <header class="gg-masthead">
       <div>
-        <p class="gg-eyebrow">Ward 45 · Garsfontein, Pretoria</p>
-        <h1 class="gg-title">Garsfontein Grid</h1>
+        <p class="gg-eyebrow">Garsfontein Ext. 16 · Ward 45 · Pretoria</p>
+        <h1 class="gg-title">Lights On?</h1>
       </div>
       <ThemeToggle />
     </header>
@@ -57,7 +57,7 @@ const Footer: Component<{ signIn: boolean }> = (props) => (
         </a>
       </Show>
     </nav>
-    <p>Garsfontein, Pretoria · Ward 45 (DA) · Region 6, City of Tshwane · Garsfontein substation</p>
+    <p>Measured in Garsfontein Ext. 16, Pretoria · Ward 45 (DA) · Region 6, City of Tshwane · Garsfontein substation</p>
   </footer>
 );
 

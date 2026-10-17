@@ -26,7 +26,7 @@ export function useStatusTab(status: Accessor<StatusResponse | undefined>, minut
     const s = status();
     if (!s) return;
     const duration = s.status === 'OFF' && s.since ? ` ${compactDuration(minute() - Date.parse(s.since))}` : '';
-    document.title = `${s.status}${duration} · Garsfontein Grid`;
+    document.title = `${s.status}${duration} · Lights On?`;
     if (icon) icon.href = s.status === 'ON' ? '/favicon-on.svg' : '/favicon-off.svg';
   });
 

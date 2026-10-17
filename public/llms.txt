@@ -1,11 +1,11 @@
-# Garsfontein Grid
+# Lights On, Garsfontein?
 
-> An open record of power cuts for homes supplied by the Garsfontein substation in Pretoria, South Africa (Ward 45), kept since 17 October 2026 (Africa/Johannesburg). There is no data from before that date. Run by a local resident; not affiliated with the City of Tshwane or Eskom.
+> An open record of power cuts for homes supplied by the Garsfontein substation in Pretoria, South Africa, kept since 17 October 2026 (Africa/Johannesburg). There is no data from before that date. Run by a local resident; not affiliated with the City of Tshwane or Eskom.
 
-Garsfontein, Pretoria: Ward 45 (DA), Region 6 of the City of Tshwane. Supplied by the Garsfontein substation (fed from Highlands, fed from Njala).
+Garsfontein, Pretoria: measured in Garsfontein Extension 16, which is in Ward 45 (DA), Region 6 of the City of Tshwane. Supplied by the Garsfontein substation (fed from Highlands, fed from Njala).
 
 Site: https://garsfontein.timothybrits.co.za/
-Source code (GPL-3.0-only): https://github.com/mooship/garsfontein-grid
+Source code (GPL-3.0-only): https://github.com/mooship/lights-on-garsfontein
 
 ## Endpoints
 

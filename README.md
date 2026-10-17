@@ -1,14 +1,14 @@
-# Garsfontein Grid
+# Lights On, Garsfontein?
 
-A running record of power outages in Garsfontein, Pretoria. It shows whether the power is on right now and keeps a history of every outage, so it is easy to see how often the power goes off and whether that is changing.
+A running record of power outages in Garsfontein, Pretoria, measured by a sensor in **Garsfontein Extension 16** (Ward 45). It shows whether the power is on right now and keeps a history of every outage, so it is easy to see how often the power goes off and whether that is changing.
 
 Live at **https://garsfontein.timothybrits.co.za**. Records start on **17 October 2026**.
 
-> Run by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.
+> Run by a Garsfontein Ext. 16 resident. Not affiliated with the City of Tshwane or Eskom.
 
 ## Area covered
 
-Garsfontein is in Ward 45, Region 6 of the City of Tshwane. Homes are supplied by the **Garsfontein substation**, which is fed from **Highlands**, which is fed from **Njala**. Much of that equipment has little modern protection, so a single fault usually cuts the whole Garsfontein substation area at once. One household's record is therefore a fair guide for the neighbourhood.
+The sensor is in a home in **Garsfontein Extension 16**, part of Ward 45 in Region 6 of the City of Tshwane. Readings are exact for Ext. 16. Homes are supplied by the **Garsfontein substation**, which is fed from **Highlands**, which is fed from **Njala**. Much of that equipment has little modern protection, so a single fault usually cuts the whole Garsfontein substation area at once. One household's record is therefore a fair guide for the rest of Garsfontein too, but an outage limited to another extension will not show up.
 
 ## Features
 
@@ -68,11 +68,7 @@ npm run deploy                                 # build, apply migrations, deploy
 
 Optional secrets: `ADMIN_API_TOKEN` (scripts and agents) and `HEARTBEAT_TOKEN` (a sensor).
 
-**Changing the admin password.** Set a new hash as above, then sign out every existing session:
-
-```sh
-npx wrangler d1 execute DB --remote --command "DELETE FROM sessions"
-```
+**Changing the admin password.** Set a new hash as above. Each session stores a short fingerprint of `ADMIN_PASSWORD_HASH`, so every existing session is refused (and deleted) on its next use; there is nothing to clear by hand. Sessions slide for 30 days after the last visit but never last more than 90 days after sign-in.
 
 **Continuous deployment.** Cloudflare Workers Builds deploys every push to `main` with `npm run deploy:ci`, which applies pending D1 migrations first and only then deploys the new code. If a migration fails, the deploy stops and the previous version stays live. Pull requests are tested by GitHub Actions and are not deployed.
 
