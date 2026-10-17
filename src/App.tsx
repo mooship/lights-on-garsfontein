@@ -67,11 +67,7 @@ const AreaCard: Component = () => (
       This is one Garsfontein household’s record of power cuts, kept since {formatDate(TRACKING_SINCE)} and shared with
       the neighbourhood.
     </p>
-    <p>
-      Garsfontein is currently in Ward 45, in Region 6 of the City of Tshwane, Pretoria; as of October 2026 its ward
-      councillor is from the DA. Ward boundaries are being redrawn for the next local elections, and part of Ward 45
-      moves to Ward 46.
-    </p>
+    <p>Garsfontein is in Ward 45, in Region 6 of the City of Tshwane, Pretoria. The ward has a DA councillor.</p>
     <p>
       Homes here get their electricity from the Garsfontein substation, which is fed from the Highlands substation,
       which in turn is fed from Njala. The older substations along that chain have little modern protection, so a fault
