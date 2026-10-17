@@ -9,6 +9,8 @@ export interface RouteContext {
   ip: string;
   /** Key for per-connection rate limits (IPv6 grouped by /64). */
   limitKey: string;
+  /** Extra headers added to whatever response the route returns, e.g. a refreshed session cookie. */
+  headers: Headers;
 }
 
 /**
@@ -32,12 +34,21 @@ export type Routes = Record<string, Route>;
 
 export async function dispatch(route: Route, request: Request, env: Env, url: URL): Promise<Response> {
   const ip = clientIp(request);
-  const ctx: RouteContext = { request, env, url, db: createDb(env.DB), ip, limitKey: rateLimitKey(ip) };
+  const ctx: RouteContext = {
+    request,
+    env,
+    url,
+    db: createDb(env.DB),
+    ip,
+    limitKey: rateLimitKey(ip),
+    headers: new Headers(),
+  };
   let response: Response | null = null;
   if (route.sameOrigin && isCrossOrigin(request)) response = errors.forbidden();
   else if (route.limiter && (await isRateLimited(env[route.limiter], ctx.limitKey))) response = errors.rateLimited();
   else if (route.authorize) response = await route.authorize(ctx);
   response ??= await route.handler(ctx);
   if (route.cors) response.headers.set('Access-Control-Allow-Origin', '*');
+  for (const [name, value] of ctx.headers) response.headers.append(name, value);
   return response;
 }

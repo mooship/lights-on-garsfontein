@@ -96,6 +96,10 @@ test.describe('public page', () => {
 });
 
 test.describe('admin', () => {
+  test('is kept out of search results', async ({ request }) => {
+    expect((await request.get('/admin')).headers()['x-robots-tag']).toBe('noindex, nofollow');
+  });
+
   test('rejects a wrong password', async ({ page }) => {
     await page.goto('/admin');
     await page.getByLabel('Username').fill(ADMIN_USERNAME);

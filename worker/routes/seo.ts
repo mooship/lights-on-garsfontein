@@ -22,7 +22,6 @@ function robots({ env }: RouteContext): Response {
   const body = `User-agent: *
 Allow: /
 Disallow: /api/admin/
-Disallow: /admin
 
 Sitemap: ${env.SITE_URL}/sitemap.xml
 `;

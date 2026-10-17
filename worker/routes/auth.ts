@@ -1,6 +1,6 @@
 import { and, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Db } from '../db/client';
+import { DAY_MS } from '../../shared/api';
 import { sessions } from '../db/schema';
 import { randomToken, safeEqual, sha256Hex, verifyPassword } from '../lib/crypto';
 import { errors, isRateLimited, json, parseBody } from '../lib/http';
@@ -10,7 +10,9 @@ import { checkTurnstile } from '../lib/turnstile';
 // __Host- prefix: the browser only accepts it from this exact host (no sibling-subdomain cookie tossing).
 const SESSION_COOKIE = '__Host-admin_session';
 const SESSION_TOKEN = /^[\w-]{43}$/;
-const SESSION_TTL_SECONDS = 12 * 60 * 60;
+// Stay signed in for 30 days after the last visit; renewing at most daily keeps writes rare.
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const RENEW_AFTER_MS = DAY_MS;
 const ADMIN_USER_ID = 'admin';
 
 const loginSchema = z.object({
@@ -33,16 +35,30 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-/** Returns the session's user id when the request carries a valid, unexpired session cookie. */
-export async function getSessionUser(request: Request, db: Db): Promise<string | null> {
+const sessionExpiry = (now: number) => new Date(now + SESSION_TTL_SECONDS * 1000).toISOString();
+
+/**
+ * True when the request carries a valid, unexpired session cookie. Sessions slide: once a
+ * day of the 30 has been used, the expiry and the cookie are pushed back out to 30 days.
+ */
+export async function checkSession({ request, db, headers }: RouteContext): Promise<boolean> {
   const token = readCookie(request, SESSION_COOKIE);
   // Skip the database for anything that cannot be one of our tokens.
-  if (!token || !SESSION_TOKEN.test(token)) return null;
+  if (!token || !SESSION_TOKEN.test(token)) return false;
   const id = await sha256Hex(token);
+  const now = Date.now();
   const session = await db.query.sessions.findFirst({
-    where: and(eq(sessions.id, id), gt(sessions.expiresAt, new Date().toISOString())),
+    where: and(eq(sessions.id, id), gt(sessions.expiresAt, new Date(now).toISOString())),
   });
-  return session?.userId ?? null;
+  if (!session) return false;
+  if (Date.parse(session.expiresAt) < now + SESSION_TTL_SECONDS * 1000 - RENEW_AFTER_MS) {
+    await db
+      .update(sessions)
+      .set({ expiresAt: sessionExpiry(now) })
+      .where(eq(sessions.id, id));
+    headers.append('Set-Cookie', sessionCookie(token, SESSION_TTL_SECONDS));
+  }
+  return true;
 }
 
 async function login(ctx: RouteContext): Promise<Response> {
@@ -68,7 +84,7 @@ async function login(ctx: RouteContext): Promise<Response> {
   await db.insert(sessions).values({
     id: await sha256Hex(token),
     userId: ADMIN_USER_ID,
-    expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+    expiresAt: sessionExpiry(Date.now()),
   });
   return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SECONDS) });
 }

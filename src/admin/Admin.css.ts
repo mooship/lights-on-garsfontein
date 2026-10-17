@@ -5,6 +5,16 @@ export const stack = style({ display: 'flex', flexDirection: 'column', gap: '0.8
 
 export const header = style({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' });
 
+export const backLink = style({
+  alignSelf: 'flex-start',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.375rem',
+  minHeight: '2.75rem',
+  fontWeight: 600,
+  textDecoration: 'none',
+});
+
 // Side by side when there is room, stacked on phones (iOS date-time inputs need ~15rem).
 export const formRow = style({
   display: 'grid',

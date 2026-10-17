@@ -63,11 +63,16 @@ const Masthead: Component<{ notice: boolean }> = (props) => (
   </>
 );
 
-const Footer: Component = () => (
+const Footer: Component<{ signIn: boolean }> = (props) => (
   <footer class="gg-footer">
     <nav aria-label="Site">
       <a href="/privacy.html">Privacy</a>
       <a href="/api/outages.csv">Download the data (CSV)</a>
+      <Show when={props.signIn}>
+        <a href="/admin" rel="nofollow">
+          Sign in
+        </a>
+      </Show>
     </nav>
     <p>Garsfontein, Pretoria · Ward 45 (DA) · Region 6, City of Tshwane · Garsfontein substation</p>
   </footer>
@@ -181,7 +186,7 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
           {(initial) => <PublicView initial={initial()} />}
         </Show>
       </main>
-      <Footer />
+      <Footer signIn={!!props.initial} />
     </div>
   );
 };

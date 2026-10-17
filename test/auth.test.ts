@@ -85,6 +85,21 @@ describe('admin auth', () => {
     expect((await call('/api/admin/outages', { cookie })).status).toBe(200);
   });
 
+  it('keeps you signed in for 30 days and renews the session on use', async () => {
+    const cookie = await login();
+    const fresh = await call('/api/admin/outages', { cookie });
+    expect(fresh.headers.get('Set-Cookie')).toBeNull(); // brand-new session: nothing to renew
+
+    await env.DB.prepare('UPDATE sessions SET expires_at = ?')
+      .bind(new Date(Date.now() + 3 * 86_400_000).toISOString())
+      .run();
+    const renewed = await call('/api/admin/outages', { cookie });
+    expect(renewed.status).toBe(200);
+    expect(renewed.headers.get('Set-Cookie')).toContain(`Max-Age=${30 * 24 * 60 * 60}`);
+    const row = await env.DB.prepare('SELECT expires_at FROM sessions').first<{ expires_at: string }>();
+    expect(Date.parse(row?.expires_at ?? '') - Date.now()).toBeGreaterThan(29 * 86_400_000);
+  });
+
   it('rejects expired sessions', async () => {
     const cookie = await login();
     await env.DB.prepare('UPDATE sessions SET expires_at = ?')

@@ -7,7 +7,7 @@ import { safeEqual } from '../lib/crypto';
 import { getOpenOutage, outagesWithCounts, summarise } from '../lib/grid';
 import { bearerToken, errors, isCrossOrigin, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
-import { getSessionUser } from './auth';
+import { checkSession } from './auth';
 
 const isoDate = z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
 
@@ -122,12 +122,12 @@ async function checkApiToken(request: Request, env: Env): Promise<boolean | null
 
 /** Admin auth: a valid API token, or a session cookie on a same-origin request. */
 async function authorizeAdmin(ctx: RouteContext): Promise<Response | null> {
-  const { request, env, db } = ctx;
+  const { request, env } = ctx;
   const token = await checkApiToken(request, env);
   if (token === false) return refuseBadToken(ctx);
   if (token === null) {
     if (request.method !== 'GET' && isCrossOrigin(request)) return errors.forbidden();
-    if (!(await getSessionUser(request, db))) return errors.unauthorized();
+    if (!(await checkSession(ctx))) return errors.unauthorized();
   }
   return null;
 }

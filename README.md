@@ -160,7 +160,7 @@ Times are UTC (ISO 8601). Public endpoints allow any origin and are limited to 6
 | `GET /api/outages.csv` | Public | Every outage, false positives removed |
 | `POST /api/confirm` | Public, Turnstile | "My power's off too": once per connection per outage, 5 requests a minute |
 | `POST /api/heartbeat` | Sensor token | Sensor check-in |
-| `POST /api/admin/login`, `/logout` | Username, password, Turnstile | Sets an `HttpOnly`, `Secure`, `SameSite=Strict` session cookie for 12 hours |
+| `POST /api/admin/login`, `/logout` | Username, password, Turnstile | Sets an `HttpOnly`, `Secure`, `SameSite=Strict` session cookie; you stay signed in for 30 days after your last visit |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Session or API token | Manage outages and the punch clock |
 
 A plain-text summary for language models is served at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt).

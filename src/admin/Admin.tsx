@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
 import { type Component, createMemo, createResource, createSignal, For, Show } from 'solid-js';
@@ -290,11 +291,16 @@ const Admin: Component = () => {
   });
 
   return (
-    <Show when={session() !== undefined} fallback={<p class="gg-status-note">Loading…</p>}>
-      <Show when={session()} fallback={<LoginForm onLoggedIn={refetch} />}>
-        {(data) => <Dashboard initial={data()} onLoggedOut={refetch} />}
+    <>
+      <a class={css.backLink} href="/">
+        <ArrowLeft size={16} aria-hidden="true" /> Public page
+      </a>
+      <Show when={session() !== undefined} fallback={<p class="gg-status-note">Loading…</p>}>
+        <Show when={session()} fallback={<LoginForm onLoggedIn={refetch} />}>
+          {(data) => <Dashboard initial={data()} onLoggedOut={refetch} />}
+        </Show>
       </Show>
-    </Show>
+    </>
   );
 };
 

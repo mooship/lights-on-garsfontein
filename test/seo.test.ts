@@ -8,6 +8,8 @@ describe('SEO routes', () => {
     expect(res.headers.get('Content-Type')).toContain('text/plain');
     const body = await res.text();
     expect(body).toContain('Disallow: /api/admin/');
+    // /admin stays crawlable so its noindex header (public/_headers) can be seen.
+    expect(body).not.toMatch(/^Disallow: \/admin$/m);
     expect(body).toContain('Sitemap: https://garsfontein.example/sitemap.xml');
   });
 

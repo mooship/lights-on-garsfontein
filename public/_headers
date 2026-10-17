@@ -7,6 +7,10 @@
   X-Content-Type-Options: nosniff
   Cross-Origin-Opener-Policy: same-origin
 
+# Crawlable so search engines can see the noindex (robots.txt would hide it from them).
+/admin
+  X-Robots-Tag: noindex, nofollow
+
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
