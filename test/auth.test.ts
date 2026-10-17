@@ -4,7 +4,11 @@ import { sha256Hex } from '../worker/lib/crypto';
 import { call, login, mockTurnstile, uniqueIp } from './helpers';
 
 const attempt = (password: string, extra: Parameters<typeof call>[1] = {}) =>
-  call('/api/admin/login', { method: 'POST', body: { password, token: 'turnstile-token' }, ...extra });
+  call('/api/admin/login', {
+    method: 'POST',
+    body: { username: 'admin', password, token: 'turnstile-token' },
+    ...extra,
+  });
 
 describe('admin auth', () => {
   it('refuses all logins while no password hash is configured', async () => {
@@ -27,6 +31,25 @@ describe('admin auth', () => {
     expect((await attempt('test-password')).status).toBe(403);
     mockTurnstile(true, 'login', 'evil.example');
     expect((await attempt('test-password')).status).toBe(403);
+  });
+
+  it('rejects a wrong username with the same answer as a wrong password', async () => {
+    mockTurnstile(true, 'login');
+    const res = await call('/api/admin/login', {
+      method: 'POST',
+      body: { username: 'someone', password: 'test-password', token: 'turnstile-token' },
+    });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized' });
+  });
+
+  it('accepts the username in any case', async () => {
+    mockTurnstile(true, 'login');
+    const res = await call('/api/admin/login', {
+      method: 'POST',
+      body: { username: ' Admin ', password: 'test-password', token: 'turnstile-token' },
+    });
+    expect(res.status).toBe(200);
   });
 
   it('rejects a wrong password', async () => {

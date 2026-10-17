@@ -33,7 +33,7 @@ Requires Node 24.
 
 ```sh
 npm install
-cp .dev.vars.example .dev.vars   # local test keys; the admin password is "test-password"
+cp .dev.vars.example .dev.vars   # local test keys; sign in as "admin" / "test-password"
 npm run db:migrate:local
 npm run preview                  # build, then serve on http://localhost:8787
 ```
@@ -56,6 +56,7 @@ The Worker, database, rate limits and custom domain are defined in `wrangler.tom
 
 ```sh
 npx wrangler login
+npx wrangler secret put ADMIN_USERNAME                     # your sign-in name (case-insensitive)
 npm run --silent hash-password | npx wrangler secret put ADMIN_PASSWORD_HASH
 npx wrangler secret put TURNSTILE_SECRET_KEY   # from the Turnstile widget
 npx wrangler secret put IP_SALT                # a long random string; never change it
@@ -159,7 +160,7 @@ Times are UTC (ISO 8601). Public endpoints allow any origin and are limited to 6
 | `GET /api/outages.csv` | Public | Every outage, false positives removed |
 | `POST /api/confirm` | Public, Turnstile | "My power's off too": once per connection per outage, 5 requests a minute |
 | `POST /api/heartbeat` | Sensor token | Sensor check-in |
-| `POST /api/admin/login`, `/logout` | Password, Turnstile | Sets an `HttpOnly`, `Secure`, `SameSite=Strict` session cookie for 12 hours |
+| `POST /api/admin/login`, `/logout` | Username, password, Turnstile | Sets an `HttpOnly`, `Secure`, `SameSite=Strict` session cookie for 12 hours |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Session or API token | Manage outages and the punch clock |
 
 A plain-text summary for language models is served at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt).

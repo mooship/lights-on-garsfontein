@@ -3,7 +3,8 @@ import { type Cookie, expect, type Page, test } from '@playwright/test';
 // Tests share one local database and run in order.
 test.describe.configure({ mode: 'serial' });
 
-const ADMIN_PASSWORD = 'test-password'; // matches .dev.vars.example
+const ADMIN_USERNAME = 'admin'; // matches .dev.vars.example
+const ADMIN_PASSWORD = 'test-password';
 
 // Log in through the UI once and reuse the cookie: the login endpoint allows 5 attempts a minute.
 let sessionCookies: Cookie[] = [];
@@ -15,6 +16,7 @@ async function login(page: Page) {
   const password = page.getByLabel('Password');
   await expect(dashboard.or(password)).toBeVisible();
   if (await dashboard.isVisible()) return; // session cookie still valid
+  await page.getByLabel('Username').fill(ADMIN_USERNAME);
   await password.fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(dashboard).toBeVisible();
@@ -96,9 +98,10 @@ test.describe('public page', () => {
 test.describe('admin', () => {
   test('rejects a wrong password', async ({ page }) => {
     await page.goto('/admin');
+    await page.getByLabel('Username').fill(ADMIN_USERNAME);
     await page.getByLabel('Password').fill('not-the-password');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('alert')).toHaveText('Wrong password.');
+    await expect(page.getByRole('alert')).toHaveText('Wrong username or password.');
   });
 
   test('sets an HttpOnly, Strict session cookie', async ({ page, context }) => {

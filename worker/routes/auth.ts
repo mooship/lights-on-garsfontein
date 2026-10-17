@@ -2,7 +2,7 @@ import { and, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client';
 import { sessions } from '../db/schema';
-import { randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
+import { randomToken, safeEqual, sha256Hex, verifyPassword } from '../lib/crypto';
 import { errors, isRateLimited, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
@@ -13,7 +13,11 @@ const SESSION_TOKEN = /^[\w-]{43}$/;
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const ADMIN_USER_ID = 'admin';
 
-const loginSchema = z.object({ password: z.string().min(1).max(256), token: z.string().min(1).max(2048) });
+const loginSchema = z.object({
+  username: z.string().min(1).max(128),
+  password: z.string().min(1).max(256),
+  token: z.string().min(1).max(2048),
+});
 
 function sessionCookie(value: string, maxAge: number): string {
   return `${SESSION_COOKIE}=${value}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
@@ -51,9 +55,14 @@ async function login(ctx: RouteContext): Promise<Response> {
   // Turnstile keeps bots off the sign-in form; scripts use ADMIN_API_TOKEN instead.
   const refused = await checkTurnstile(ctx, parsed.data.token, 'login');
   if (refused) return refused;
-  if (!env.ADMIN_PASSWORD_HASH || !(await verifyPassword(parsed.data.password, env.ADMIN_PASSWORD_HASH))) {
-    return errors.unauthorized();
-  }
+  // Check both before answering, and give the same answer either way, so neither the
+  // response nor its timing reveals whether the username was right.
+  const { username, password } = parsed.data;
+  const [userOk, passwordOk] = await Promise.all([
+    env.ADMIN_USERNAME ? safeEqual(username.trim().toLowerCase(), env.ADMIN_USERNAME.toLowerCase()) : false,
+    env.ADMIN_PASSWORD_HASH ? verifyPassword(password, env.ADMIN_PASSWORD_HASH) : false,
+  ]);
+  if (!userOk || !passwordOk) return errors.unauthorized();
 
   const token = randomToken();
   await db.insert(sessions).values({

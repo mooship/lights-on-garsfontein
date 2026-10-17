@@ -47,7 +47,8 @@ function firstThen<T>(initial: Promise<T>, fetcher: () => Promise<T>): () => Pro
   };
 }
 
-const Masthead: Component = () => (
+/** The disclaimer is for the public page; the admin view doesn't need it. */
+const Masthead: Component<{ notice: boolean }> = (props) => (
   <>
     <header class="gg-masthead">
       <div>
@@ -56,7 +57,9 @@ const Masthead: Component = () => (
       </div>
       <ThemeToggle />
     </header>
-    <p class="gg-notice">Run by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.</p>
+    <Show when={props.notice}>
+      <p class="gg-notice">Run by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.</p>
+    </Show>
   </>
 );
 
@@ -184,7 +187,7 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
 
   return (
     <div class="gg-shell">
-      <Masthead />
+      <Masthead notice={!!props.initial} />
       <main class="gg-main">
         <Show
           when={props.initial}

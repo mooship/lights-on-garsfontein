@@ -23,7 +23,7 @@ const FormError: Component<{ message: string }> = (props) => (
 const describeError = (error: unknown) =>
   error instanceof ApiError
     ? ({
-        unauthorized: 'Wrong password.',
+        unauthorized: 'Wrong username or password.',
         rate_limited: 'Too many attempts. Wait a minute and try again.',
         turnstile_failed: 'The bot check failed. Please try again.',
         outage_already_open: 'An outage is already open.',
@@ -38,14 +38,16 @@ const LoginForm: Component<{ onLoggedIn: () => void }> = (props) => {
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
-    const password = new FormData(event.currentTarget as HTMLFormElement).get('password');
+    const form = new FormData(event.currentTarget as HTMLFormElement);
+    const username = String(form.get('username') ?? '');
+    const password = String(form.get('password') ?? '');
     setBusy(true);
     setError('');
     try {
       // The public status response carries the Turnstile site key.
       const { turnstileSiteKey } = await api.status();
       const token = await getTurnstileToken(widget, turnstileSiteKey, 'login');
-      await api.login(String(password ?? ''), token);
+      await api.login(username, password, token);
       props.onLoggedIn();
     } catch (e) {
       setError(describeError(e));
@@ -57,10 +59,24 @@ const LoginForm: Component<{ onLoggedIn: () => void }> = (props) => {
   return (
     <section class="gg-card">
       <h2 class="gg-card-title">Admin sign in</h2>
-      <form class={css.stack} onSubmit={submit}>
+      {/* Named form, ids and autocomplete hints so password managers recognise and fill it. */}
+      <form class={css.stack} onSubmit={submit} id="admin-sign-in" name="admin-sign-in">
+        <label class={label}>
+          Username
+          <input
+            class={input}
+            type="text"
+            id="username"
+            name="username"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck={false}
+            required
+          />
+        </label>
         <label class={label}>
           Password
-          <input class={input} type="password" name="password" autocomplete="current-password" required />
+          <input class={input} type="password" id="password" name="password" autocomplete="current-password" required />
         </label>
         <div ref={widget} />
         <FormError message={error()} />

@@ -1,4 +1,4 @@
-import { style, styleVariants } from '@vanilla-extract/css';
+import { globalStyle, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from './theme.css';
 
 const buttonBase = style({
@@ -31,7 +31,13 @@ export const button = styleVariants({
 export const smallButton = style({ minHeight: '2.25rem', padding: '0 0.75rem', fontSize: '0.875rem' });
 
 export const input = style({
+  display: 'block',
   width: '100%',
+  minWidth: 0,
+  // iOS gives date and time inputs a fixed intrinsic width and its own pill styling.
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  textAlign: 'left',
   minHeight: '2.875rem',
   padding: '0 0.875rem',
   borderRadius: vars.radius.control,
@@ -50,3 +56,6 @@ export const label = style({
 export const muted = style({ color: vars.color.muted });
 
 export const errorText = style({ color: vars.color.off, fontSize: '0.875rem', fontWeight: 600 });
+
+// iOS centres the picked date and time inside the field; align it like other inputs.
+globalStyle(`${input}::-webkit-date-and-time-value`, { textAlign: 'left' });

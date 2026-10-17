@@ -94,7 +94,10 @@ export async function insertOutage(values: {
 
 export async function login(password = 'test-password'): Promise<string> {
   mockTurnstile(true, 'login');
-  const res = await call('/api/admin/login', { method: 'POST', body: { password, token: 'turnstile-token' } });
+  const res = await call('/api/admin/login', {
+    method: 'POST',
+    body: { username: 'admin', password, token: 'turnstile-token' },
+  });
   if (res.status !== 200) throw new Error(`login failed: ${res.status}`);
   const cookie = res.headers.get('Set-Cookie') ?? '';
   return cookie.split(';')[0] ?? '';

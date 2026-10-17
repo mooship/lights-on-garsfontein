@@ -5,7 +5,12 @@ export const stack = style({ display: 'flex', flexDirection: 'column', gap: '0.8
 
 export const header = style({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' });
 
-export const formRow = style({ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' });
+// Side by side when there is room, stacked on phones (iOS date-time inputs need ~15rem).
+export const formRow = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 15rem), 1fr))',
+  gap: '0.75rem',
+});
 
 export const table = style({ listStyle: 'none', margin: 0, padding: 0 });
 

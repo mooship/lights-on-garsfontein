@@ -26,7 +26,8 @@ export const api = {
   status: () => request<StatusResponse>('/api/status'),
   stats: () => request<StatsResponse>('/api/stats'),
   confirm: (token: string) => post<ConfirmResponse>('/api/confirm', { token }),
-  login: (password: string, token: string) => post<{ ok: true }>('/api/admin/login', { password, token }),
+  login: (username: string, password: string, token: string) =>
+    post<{ ok: true }>('/api/admin/login', { username, password, token }),
   logout: () => post<{ ok: true }>('/api/admin/logout'),
   outages: () => request<AdminOutagesResponse>('/api/admin/outages'),
   punch: (action: 'punch_out' | 'punch_in') => post('/api/admin/timer', { action }),
