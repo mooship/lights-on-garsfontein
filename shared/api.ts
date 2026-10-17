@@ -70,4 +70,4 @@ export interface StatsResponse {
 export const HEARTBEAT_THRESHOLD_MS = 180_000;
 
 /** The public start of outage tracking. Statistics never count time before it. */
-export const TRACKING_SINCE = '2026-10-18T00:00:00+02:00';
+export const TRACKING_SINCE = '2026-10-17T00:00:00+02:00';

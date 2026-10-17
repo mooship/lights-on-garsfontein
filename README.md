@@ -4,7 +4,7 @@
 
 > **A volunteer project.** Not affiliated with the City of Tshwane, Eskom or any government body.
 
-Live at **https://garsfontein.timothybrits.co.za** · Outage tracking began on **18 October 2026**.
+Live at **https://garsfontein.timothybrits.co.za** · Outage tracking began on **17 October 2026**.
 
 ## What it does
 
@@ -72,7 +72,7 @@ Until the first sensor heartbeat arrives, the site runs in **manual mode**:
 - Use **Log a past outage** to add outages after the fact, and **False positive** or **Delete** to correct mistakes.
 - The page tells visitors the status is reported by hand.
 
-Outages from before 18 October 2026 can be added and will appear in the history and CSV. The statistics only count time from the tracking start, so untracked days never make the numbers look better than they were. To change the start date, edit `TRACKING_SINCE` in `shared/api.ts`.
+Outages from before 17 October 2026 can be added and will appear in the history and CSV. The statistics only count time from the tracking start, so untracked days never make the numbers look better than they were. To change the start date, edit `TRACKING_SINCE` in `shared/api.ts`.
 
 ## Adding a sensor
 

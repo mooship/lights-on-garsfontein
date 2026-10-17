@@ -77,7 +77,7 @@ describe('weekly stats', () => {
     const since = t(TRACKING_SINCE);
     const intervals = [{ start: t('2026-10-25T22:00:00+02:00'), end: t('2026-10-26T03:00:00+02:00') }];
     const weeks = weeklyStats(intervals, t('2026-10-28T12:00:00+02:00'), since);
-    // Tracking began on Sunday 18 Oct, so the first week is the one starting Monday 12 Oct.
+    // Tracking began on Saturday 17 Oct, so the first week is the one starting Monday 12 Oct.
     expect(weeks).toEqual([
       { weekStart: '2026-10-12', hoursOff: 0, outages: 0 },
       { weekStart: '2026-10-19', hoursOff: 2, outages: 1 },
@@ -102,7 +102,7 @@ describe('GET /api/stats', () => {
     const res = await call('/api/stats');
     expect(res.status).toBe(200);
     const body = (await res.json()) as StatsResponse;
-    expect(body.trackingSince).toBe('2026-10-17T22:00:00.000Z');
+    expect(body.trackingSince).toBe('2026-10-16T22:00:00.000Z');
     expect(body).toHaveProperty('last30.hoursOff');
     expect(Array.isArray(body.weeks)).toBe(true);
   });
