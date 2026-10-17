@@ -2,7 +2,7 @@ import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
 import { type StatsResponse, TRACKING_SINCE } from '../../shared/api';
 import { createDb } from '../db/client';
 import { outages } from '../db/schema';
-import { confirmationCounts } from '../lib/grid';
+import { outagesWithCounts } from '../lib/grid';
 import { clientIp, errors, isRateLimited, json, PUBLIC_CORS } from '../lib/http';
 import { DAY_MS, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
 
@@ -41,27 +41,22 @@ function csvField(value: string | number | null): string {
 /** Open data: every outage (false positives excluded) as CSV. */
 async function getOutagesCsv(request: Request, env: Env): Promise<Response> {
   if (await isRateLimited(env.STATUS_LIMITER, clientIp(request))) return errors.rateLimited();
-  const db = createDb(env.DB);
-  const rows = await db.query.outages.findMany({
-    where: eq(outages.isFalsePositive, 0),
-    orderBy: asc(outages.startTime),
-  });
-  const counts = await confirmationCounts(
-    db,
-    rows.map((r) => r.id),
+  const rows = await outagesWithCounts(createDb(env.DB), eq(outages.isFalsePositive, 0)).orderBy(
+    asc(outages.startTime),
   );
   const lines = [
-    'id,start_time_utc,end_time_utc,duration_minutes,source,confirmations',
+    'id,start_time_utc,end_time_utc,duration_minutes,confirmations',
     ...rows.map((r) => {
       const minutes = r.endTime ? Math.round((Date.parse(r.endTime) - Date.parse(r.startTime)) / 60_000) : null;
-      return [r.id, r.startTime, r.endTime, minutes, r.source, counts.get(r.id) ?? 0].map(csvField).join(',');
+      return [r.id, r.startTime, r.endTime, minutes, r.confirmations].map(csvField).join(',');
     }),
   ];
   return new Response(`${lines.join('\n')}\n`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': 'attachment; filename="garsfontein-grid-outages.csv"',
-      'Cache-Control': 'no-store',
+      // About 80 bytes per outage, so even decades of data stay a few MB; a short cache keeps repeat downloads cheap.
+      'Cache-Control': 'public, max-age=300',
       ...PUBLIC_CORS,
     },
   });

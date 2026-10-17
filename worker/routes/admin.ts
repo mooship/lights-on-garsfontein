@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AdminOutagesResponse } from '../../shared/api';
 import { createDb } from '../db/client';
 import { outages } from '../db/schema';
-import { confirmationCounts, getOpenOutage } from '../lib/grid';
+import { getOpenOutage, outagesWithCounts } from '../lib/grid';
 import { errors, isCrossOrigin, json, parseBody } from '../lib/http';
 import { getSessionUser } from './auth';
 
@@ -27,21 +27,9 @@ const outageSchema = z.discriminatedUnion('action', [
 ]);
 
 async function listOutages(env: Env): Promise<Response> {
-  const db = createDb(env.DB);
-  const rows = await db.query.outages.findMany({ orderBy: desc(outages.startTime), limit: 50 });
-  const counts = await confirmationCounts(
-    db,
-    rows.map((r) => r.id),
-  );
+  const rows = await outagesWithCounts(createDb(env.DB)).orderBy(desc(outages.startTime)).limit(50);
   const body: AdminOutagesResponse = {
-    outages: rows.map((r) => ({
-      id: r.id,
-      startTime: r.startTime,
-      endTime: r.endTime,
-      source: r.source,
-      isFalsePositive: r.isFalsePositive === 1,
-      confirmations: counts.get(r.id) ?? 0,
-    })),
+    outages: rows.map((r) => ({ ...r, isFalsePositive: r.isFalsePositive === 1 })),
   };
   return json(body);
 }

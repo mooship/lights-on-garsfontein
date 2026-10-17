@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { type StatsResponse, TRACKING_SINCE } from '../shared/api';
 import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
@@ -115,6 +116,19 @@ describe('GET /api/stats', () => {
 });
 
 describe('GET /api/outages.csv', () => {
+  it('handles more outages than D1 allows bound parameters (100)', async () => {
+    const insert = env.DB.prepare('INSERT INTO outages (start_time, end_time, source) VALUES (?, ?, ?)');
+    await env.DB.batch(
+      Array.from({ length: 120 }, (_, i) => {
+        const start = new Date(Date.UTC(2026, 9, 18) + i * 3_600_000);
+        return insert.bind(start.toISOString(), new Date(start.getTime() + 600_000).toISOString(), 'manual');
+      }),
+    );
+    const res = await call('/api/outages.csv');
+    expect(res.status).toBe(200);
+    expect((await res.text()).trim().split('\n')).toHaveLength(121);
+  });
+
   it('exports outages as CSV without false positives', async () => {
     await insertOutage({ startTime: '2026-10-20T10:00:00.000Z', endTime: '2026-10-20T11:30:00.000Z' });
     await insertOutage({ startTime: '2026-10-21T10:00:00.000Z', endTime: null, source: 'manual' });
@@ -122,10 +136,10 @@ describe('GET /api/outages.csv', () => {
     const res = await call('/api/outages.csv');
     expect(res.headers.get('Content-Type')).toContain('text/csv');
     const lines = (await res.text()).trim().split('\n');
-    expect(lines[0]).toBe('id,start_time_utc,end_time_utc,duration_minutes,source,confirmations');
+    expect(lines[0]).toBe('id,start_time_utc,end_time_utc,duration_minutes,confirmations');
     expect(lines.slice(1).map((l) => l.split(',').slice(1).join(','))).toEqual([
-      '2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,sensor,0',
-      '2026-10-21T10:00:00.000Z,,,manual,0',
+      '2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,0',
+      '2026-10-21T10:00:00.000Z,,,0',
     ]);
   });
 });

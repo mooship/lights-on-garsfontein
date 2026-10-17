@@ -2,14 +2,14 @@ import clsx from 'clsx';
 import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
 import type { Component } from 'solid-js';
-import type { OutageSummary } from '../../shared/api';
+import type { AdminOutage } from '../../shared/api';
 import { formatClock, formatDay, formatTime } from '../lib/format';
 import { button } from '../styles/ui.css';
 import * as css from './PunchClock.css';
 
 export interface PunchClockProps {
   /** The currently open outage, if any. */
-  outage: OutageSummary | null;
+  outage: AdminOutage | null;
   now: number;
   busy?: boolean;
   onPunchOut: () => void;

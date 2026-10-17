@@ -1,28 +1,27 @@
 // Response shapes shared by the Worker and the SolidJS client.
 
+// Public responses deliberately never say how an outage was recorded (sensor or by hand);
+// only the admin API exposes `source`.
+
 export type PowerStatus = 'ON' | 'OFF';
-/** 'manual' until the first sensor heartbeat arrives; the admin's punch clock drives the status. */
-export type StatusMode = 'manual' | 'sensor';
 export type OutageSource = 'sensor' | 'manual';
 
 export interface OutageSummary {
   id: number;
   startTime: string;
   endTime: string | null;
-  source: OutageSource;
   confirmations: number;
 }
 
 export interface AdminOutage extends OutageSummary {
+  source: OutageSource;
   isFalsePositive: boolean;
 }
 
 export interface StatusResponse {
   status: PowerStatus;
-  mode: StatusMode;
   /** When the current state began, if known. */
   since: string | null;
-  lastSeen: string | null;
   outage: OutageSummary | null;
   recent: OutageSummary[];
   turnstileSiteKey: string;

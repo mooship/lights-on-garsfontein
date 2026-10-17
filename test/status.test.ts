@@ -12,24 +12,26 @@ async function status(): Promise<StatusResponse> {
 describe('GET /api/status', () => {
   it('is ON in manual mode before any sensor heartbeat arrives', async () => {
     const body = await status();
-    expect(body).toMatchObject({ status: 'ON', mode: 'manual', lastSeen: null, turnstileSiteKey: 'test-site-key' });
+    expect(body).toMatchObject({ status: 'ON', since: null, turnstileSiteKey: 'test-site-key' });
+    expect(body).not.toHaveProperty('mode');
+    expect(body).not.toHaveProperty('lastSeen');
   });
 
   it('is OFF in manual mode while the admin has an outage open', async () => {
     await insertOutage({ source: 'manual' });
-    expect(await status()).toMatchObject({ status: 'OFF', mode: 'manual' });
+    expect(await status()).toMatchObject({ status: 'OFF' });
   });
 
-  it('switches to sensor mode on the first heartbeat', async () => {
-    await call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
-    expect(await status()).toMatchObject({ status: 'ON', mode: 'sensor' });
+  it('never reveals how an outage was recorded', async () => {
+    await insertOutage({ source: 'manual' });
+    const body = await status();
+    expect(body.outage).not.toHaveProperty('source');
+    expect(body.recent[0]).not.toHaveProperty('source');
   });
 
   it('is ON while heartbeats are fresh', async () => {
-    const lastSeen = await setHeartbeat(30);
-    const body = await status();
-    expect(body.status).toBe('ON');
-    expect(body.lastSeen).toBe(lastSeen);
+    await setHeartbeat(30);
+    expect((await status()).status).toBe('ON');
   });
 
   it('is OFF once the heartbeat is older than 180 seconds', async () => {

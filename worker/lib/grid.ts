@@ -1,5 +1,5 @@
-import { and, count, desc, eq, inArray, isNull, lt } from 'drizzle-orm';
-import { HEARTBEAT_THRESHOLD_MS, type OutageSummary, type PowerStatus, type StatusMode } from '../../shared/api';
+import { and, count, desc, eq, isNull, lt, type SQL } from 'drizzle-orm';
+import { HEARTBEAT_THRESHOLD_MS, type OutageSummary, type PowerStatus } from '../../shared/api';
 import type { Db } from '../db/client';
 import { heartbeats, type Outage, outageConfirmations, outages, sessions } from '../db/schema';
 
@@ -21,42 +21,49 @@ export function isStale(lastSeen: string, now: Date): boolean {
   return now.getTime() - Date.parse(lastSeen) > HEARTBEAT_THRESHOLD_MS;
 }
 
-export async function confirmationCounts(db: Db, ids: number[]): Promise<Map<number, number>> {
-  if (ids.length === 0) return new Map();
-  const rows = await db
-    .select({ outageId: outageConfirmations.outageId, total: count() })
-    .from(outageConfirmations)
-    .where(inArray(outageConfirmations.outageId, ids))
-    .groupBy(outageConfirmations.outageId);
-  return new Map(rows.map((r) => [r.outageId, r.total]));
+/**
+ * Outages with their confirmation counts in one JOIN. (Passing outage ids as parameters
+ * would break past 100 outages: D1 allows at most 100 bound parameters per query.)
+ */
+export function outagesWithCounts(db: Db, where?: SQL) {
+  return db
+    .select({
+      id: outages.id,
+      startTime: outages.startTime,
+      endTime: outages.endTime,
+      source: outages.source,
+      isFalsePositive: outages.isFalsePositive,
+      confirmations: count(outageConfirmations.id),
+    })
+    .from(outages)
+    .leftJoin(outageConfirmations, eq(outageConfirmations.outageId, outages.id))
+    .where(where)
+    .groupBy(outages.id);
 }
 
-function summarise(outage: Outage, counts: Map<number, number>): OutageSummary {
-  return {
-    id: outage.id,
-    startTime: outage.startTime,
-    endTime: outage.endTime,
-    source: outage.source,
-    confirmations: counts.get(outage.id) ?? 0,
-  };
+export async function countConfirmations(db: Db, outageId: number): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(outageConfirmations)
+    .where(eq(outageConfirmations.outageId, outageId));
+  return row?.total ?? 0;
+}
+
+function summarise(outage: Pick<Outage, 'id' | 'startTime' | 'endTime'>, confirmations: number): OutageSummary {
+  const { id, startTime, endTime } = outage;
+  return { id, startTime, endTime, confirmations };
 }
 
 export async function getGridState(db: Db, now: Date) {
   const [heartbeat, open, recentRows] = await Promise.all([
     getHeartbeat(db),
     getOpenOutage(db),
-    db.query.outages.findMany({
-      where: eq(outages.isFalsePositive, 0),
-      orderBy: desc(outages.startTime),
-      limit: RECENT_LIMIT,
-    }),
+    outagesWithCounts(db, eq(outages.isFalsePositive, 0)).orderBy(desc(outages.startTime)).limit(RECENT_LIMIT),
   ]);
-  const ids = [...new Set([...recentRows.map((o) => o.id), ...(open ? [open.id] : [])])];
-  const counts = await confirmationCounts(db, ids);
+  const openConfirmations = open ? await countConfirmations(db, open.id) : 0;
   const lastSeen = heartbeat?.lastSeen ?? null;
 
-  // Without a sensor the admin's punch clock is the source of truth: no open outage means ON.
-  const mode: StatusMode = lastSeen ? 'sensor' : 'manual';
+  // Until a sensor reports, the admin's punch clock is the source of truth: no open outage means ON.
   let status: PowerStatus;
   let since: string | null;
   if (open) {
@@ -73,11 +80,9 @@ export async function getGridState(db: Db, now: Date) {
 
   return {
     status,
-    mode,
     since,
-    lastSeen,
-    outage: open ? summarise(open, counts) : null,
-    recent: recentRows.map((o) => summarise(o, counts)),
+    outage: open ? summarise(open, openConfirmations) : null,
+    recent: recentRows.map((o) => summarise(o, o.confirmations)),
   };
 }
 

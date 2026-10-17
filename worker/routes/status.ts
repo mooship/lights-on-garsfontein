@@ -3,7 +3,7 @@ import type { ConfirmResponse, StatusResponse } from '../../shared/api';
 import { createDb } from '../db/client';
 import { outageConfirmations } from '../db/schema';
 import { safeEqual, sha256Hex } from '../lib/crypto';
-import { confirmationCounts, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
+import { countConfirmations, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
 import { clientIp, errors, isCrossOrigin, isRateLimited, json, PUBLIC_CORS, parseBody } from '../lib/http';
 import { verifyTurnstile } from '../lib/turnstile';
 
@@ -44,8 +44,7 @@ async function postConfirm(request: Request, env: Env): Promise<Response> {
     .returning({ id: outageConfirmations.id });
   if (inserted.length === 0) return errors.conflict('already_confirmed');
 
-  const counts = await confirmationCounts(db, [outage.id]);
-  const body: ConfirmResponse = { confirmations: counts.get(outage.id) ?? 0 };
+  const body: ConfirmResponse = { confirmations: await countConfirmations(db, outage.id) };
   return json(body, 201);
 }
 
