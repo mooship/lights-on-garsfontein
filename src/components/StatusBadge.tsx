@@ -6,7 +6,7 @@ import type { PowerStatus } from '../../shared/api';
 import { formatDuration } from '../lib/format';
 import * as css from './StatusBadge.css';
 
-export interface StatusBadgeProps {
+interface StatusBadgeProps {
   status: PowerStatus;
   since: string | null;
   /** Current time in ms, injected so the duration ticks. */
@@ -22,7 +22,7 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
   const duration = () => (props.since ? formatDuration(props.now - Date.parse(props.since)) : null);
 
   return (
-    <div class={css.root} role="status" aria-live="polite" data-status={props.status}>
+    <div class={css.root} data-status={props.status}>
       <div class={css.icon[props.status]} aria-hidden="true">
         <Show when={props.status === 'ON'} fallback={<ZapOff size={30} stroke-width={2.25} />}>
           <Zap size={30} stroke-width={2.25} />
@@ -30,7 +30,10 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
         <span class={css.ring} />
       </div>
       <div>
-        <h2 class={clsx(css.headline, css.tone[props.status])}>{HEADLINES[props.status]}</h2>
+        {/* Only the headline is live, so the ticking duration is never re-announced. */}
+        <p class={clsx(css.headline, css.tone[props.status])} role="status">
+          {HEADLINES[props.status]}
+        </p>
         <p class={css.detail}>
           <Show when={duration()} fallback={' '}>
             {(d) => <>for {d()}</>}

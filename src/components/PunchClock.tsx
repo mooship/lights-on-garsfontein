@@ -7,7 +7,7 @@ import { formatClock, formatDay, formatTime, outageDurationMs } from '../lib/for
 import { button } from '../styles/ui.css';
 import * as css from './PunchClock.css';
 
-export interface PunchClockProps {
+interface PunchClockProps {
   /** The currently open outage, if any. */
   outage: AdminOutage | null;
   now: number;
@@ -23,12 +23,8 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
   return (
     <div class={css.root}>
       <div>
-        <div
-          class={clsx(css.clock, props.outage ? css.running : css.idle)}
-          role="timer"
-          aria-label={props.outage ? 'Outage duration' : 'No outage running'}
-          data-testid="punch-clock"
-        >
+        <span class="gg-sr-only">Outage duration</span>
+        <div class={clsx(css.clock, props.outage ? css.running : css.idle)} role="timer" data-testid="punch-clock">
           {formatClock(elapsed())}
         </div>
         <p class={css.meta}>

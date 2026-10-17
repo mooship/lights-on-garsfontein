@@ -28,6 +28,7 @@ export const vars = createThemeContract({
     text: null,
     muted: null,
     border: null,
+    inputBorder: null,
     on: null,
     onSoft: null,
     onContrast: null,
@@ -46,16 +47,21 @@ const fonts = {
   display: "Fraunces, Georgia, 'Times New Roman', serif",
   body: "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
 };
+
+/** Page backgrounds, also used for the phone status bar (lib/theme.ts). */
+export const PAGE_BG = { light: '#F6F4EF', dark: '#121312' } as const;
+
 const radius = { card: '1.25rem', pill: '999px', control: '0.75rem' };
 
 // Light is the default so the page is themed even before the boot script runs.
 createGlobalTheme(':root', vars, {
   color: {
-    bg: '#F6F4EF',
+    bg: PAGE_BG.light,
     card: '#FFFFFF',
     text: '#1F2120',
     muted: '#5C5850',
     border: '#E4DFD4',
+    inputBorder: '#857E71',
     on: '#2D5A27',
     onSoft: '#E6EEE3',
     onContrast: '#FFFFFF',
@@ -72,11 +78,12 @@ createGlobalTheme(':root', vars, {
 
 createGlobalTheme(':root.dark', vars, {
   color: {
-    bg: '#121312',
+    bg: PAGE_BG.dark,
     card: '#1C1E1C',
     text: '#F0EFEA',
     muted: '#A8A69E',
     border: '#2E312E',
+    inputBorder: '#737872',
     on: '#4CAF50',
     onSoft: '#1F2E1F',
     onContrast: '#121312',

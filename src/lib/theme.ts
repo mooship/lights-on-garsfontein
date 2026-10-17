@@ -1,25 +1,20 @@
 import { createSignal } from 'solid-js';
+import { PAGE_BG } from '../styles/theme.css';
 
-type Theme = 'light' | 'dark';
+type Theme = keyof typeof PAGE_BG;
 
 const STORAGE_KEY = 'theme';
 
-function currentTheme(): Theme {
-  if (typeof document === 'undefined') return 'light';
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-}
+const currentTheme = (): Theme => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 
 const [theme, setThemeSignal] = createSignal<Theme>(currentTheme());
 
 export { theme };
 
-// Matches the page background in each theme (see styles/theme.css.ts).
-const THEME_COLORS: Record<Theme, string> = { light: '#F6F4EF', dark: '#121312' };
-
 /** Colours the phone's status bar to match the active theme, even when it differs from the OS setting. */
 export function syncThemeColor(active: Theme = currentTheme()): void {
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
-    meta.content = THEME_COLORS[active];
+    meta.content = PAGE_BG[active];
   }
 }
 

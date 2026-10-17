@@ -1,4 +1,10 @@
-import type { AdminOutagesResponse, ConfirmResponse, StatsResponse, StatusResponse } from '../../shared/api';
+import type {
+  AdminOutagesResponse,
+  ConfirmResponse,
+  StatsResponse,
+  StatusResponse,
+  TimerAction,
+} from '../../shared/api';
 
 export class ApiError extends Error {
   constructor(
@@ -25,12 +31,12 @@ const post = <T>(path: string, body?: unknown) =>
 export const api = {
   status: () => request<StatusResponse>('/api/status'),
   stats: () => request<StatsResponse>('/api/stats'),
-  confirm: (token: string) => post<ConfirmResponse>('/api/confirm', { token }),
+  confirm: (token: string, outageId: number) => post<ConfirmResponse>('/api/confirm', { token, outageId }),
   login: (username: string, password: string, token: string) =>
     post<{ ok: true }>('/api/admin/login', { username, password, token }),
   logout: () => post<{ ok: true }>('/api/admin/logout'),
   outages: () => request<AdminOutagesResponse>('/api/admin/outages'),
-  punch: (action: 'punch_out' | 'punch_in') => post('/api/admin/timer', { action }),
+  punch: (action: TimerAction) => post('/api/admin/timer', { action }),
   createOutage: (startTime: string, endTime: string | null, isPlanned: boolean) =>
     post('/api/admin/outages', { action: 'create', startTime, endTime, isPlanned }),
   updateOutage: (id: number, changes: { endTime?: string | null; isFalsePositive?: boolean; isPlanned?: boolean }) =>

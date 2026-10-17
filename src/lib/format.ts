@@ -1,4 +1,4 @@
-import { DAY_MS } from '../../shared/api';
+import { DAY_MS, HOUR_MS } from '../../shared/api';
 
 export { outageDurationMs } from '../../shared/api';
 
@@ -60,8 +60,12 @@ export function formatClock(ms: number): string {
   return `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
 }
 
-/** Converts an ISO string to the value a datetime-local input expects (browser time zone). */
-export function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
+// South Africa is UTC+2 all year (no daylight saving), so the admin's datetime-local inputs are
+// read and written as SAST whatever time zone the browser is in.
+const SAST_OFFSET_MS = 2 * HOUR_MS;
+
+/** Converts an ISO string to the value a datetime-local input expects, in SAST. */
+export const toLocalInput = (iso: string) => new Date(Date.parse(iso) + SAST_OFFSET_MS).toISOString().slice(0, 16);
+
+/** Reads a datetime-local value as SAST and returns it as an ISO string. */
+export const fromLocalInput = (value: string) => new Date(`${value}+02:00`).toISOString();

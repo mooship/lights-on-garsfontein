@@ -1,26 +1,17 @@
-import {
-  type Component,
-  createMemo,
-  createResource,
-  lazy,
-  Match,
-  onCleanup,
-  onMount,
-  Show,
-  Suspense,
-  Switch,
-} from 'solid-js';
+import clsx from 'clsx';
+import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
 import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
 import * as css from './App.css';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { OutageHistory } from './components/OutageHistory';
-import { HistorySkeleton, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
+import { HistorySkeleton, StatusSkeleton, TRENDS_TITLE, TrendsCardSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api } from './lib/api';
 import { formatDate, formatDuration, formatRelativeDay, formatTime, outageDurationMs } from './lib/format';
-import { useNow } from './lib/now';
+import { useMinute, useNow } from './lib/now';
+import { createPoll } from './lib/poll';
 import { useStatusTab } from './lib/tab';
 import { syncThemeColor, watchSystemTheme } from './lib/theme';
 
@@ -37,15 +28,7 @@ export interface InitialData {
   stats: Promise<StatsResponse>;
 }
 
-/** Uses the request started in index.tsx first, then fetches fresh data on refetch. */
-function firstThen<T>(initial: Promise<T>, fetcher: () => Promise<T>): () => Promise<T> {
-  let first = true;
-  return () => {
-    if (!first) return fetcher();
-    first = false;
-    return initial;
-  };
-}
+const clockTime = (ms: number) => formatTime(new Date(ms).toISOString());
 
 /** The disclaimer is for the public page; the admin view doesn't need it. */
 const Masthead: Component<{ notice: boolean }> = (props) => (
@@ -66,7 +49,7 @@ const Masthead: Component<{ notice: boolean }> = (props) => (
 const Footer: Component<{ signIn: boolean }> = (props) => (
   <footer class="gg-footer">
     <nav aria-label="Site">
-      <a href="/privacy.html">Privacy</a>
+      <a href="/privacy">Privacy</a>
       <a href="/api/outages.csv">Download the data (CSV)</a>
       <Show when={props.signIn}>
         <a href="/admin" rel="nofollow">
@@ -98,15 +81,14 @@ function statusDetail(s: StatusResponse, now: number): string {
 
 const PublicView: Component<{ initial: InitialData }> = (props) => {
   const now = useNow(1000);
-  // Text that only changes by the minute (or day) re-renders once a minute, not every second.
-  const minute = createMemo(() => Math.floor(now() / MINUTE_MS) * MINUTE_MS);
-  const [status, { refetch }] = createResource(firstThen(props.initial.status, api.status));
-  const [stats, { refetch: refetchStats }] = createResource(firstThen(props.initial.stats, api.stats));
+  const minute = useMinute(now);
+  const status = createPoll(props.initial.status, api.status);
+  const stats = createPoll(props.initial.stats, api.stats);
 
   onMount(() => {
-    const timer = setInterval(whenVisible(refetch), POLL_MS);
-    const statsTimer = setInterval(whenVisible(refetchStats), STATS_POLL_MS);
-    const onVisible = whenVisible(refetch);
+    const timer = setInterval(whenVisible(status.refetch), POLL_MS);
+    const statsTimer = setInterval(whenVisible(stats.refetch), STATS_POLL_MS);
+    const onVisible = whenVisible(status.refetch);
     document.addEventListener('visibilitychange', onVisible);
     onCleanup(() => {
       clearInterval(timer);
@@ -115,9 +97,12 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
     });
   });
 
-  // `latest` keeps showing the previous data while a poll is in flight.
-  const data = () => status.latest;
+  // The last good data stays on screen through failed polls.
+  const data = status.data;
   useStatusTab(data, minute);
+  // The last poll failed, so the status shown may be out of date. (A tab back from the background
+  // is not stale: it refetches at once, and "Updated HH:MM" shows the age meanwhile.)
+  const stale = () => status.error() !== undefined;
 
   return (
     <>
@@ -130,15 +115,34 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             {(s) => (
               <>
                 <StatusBadge status={s().status} since={s().since} now={now()} />
-                <p class="gg-status-detail">{statusDetail(s(), minute())}</p>
-                <Show when={s().status === 'OFF' && s().outage}>
-                  {(outage) => <ConfirmOutage outage={outage()} siteKey={s().turnstileSiteKey} />}
+                <div class="gg-status-detail">
+                  <p>{statusDetail(s(), minute())}</p>
+                  <Show
+                    when={stale()}
+                    fallback={<p class="gg-status-updated">Updated {clockTime(status.updatedAt())}</p>}
+                  >
+                    <p class={clsx('gg-status-updated', css.warning)} role="alert">
+                      Can’t reach the server. Showing status from {clockTime(status.updatedAt())}.
+                    </p>
+                  </Show>
+                </div>
+                {/* Keyed on the outage so a new one starts with fresh state. */}
+                <Show when={s().status === 'OFF' && s().outage?.id} keyed>
+                  {(id) => (
+                    <ConfirmOutage
+                      outageId={id}
+                      confirmations={s().outage?.confirmations ?? 0}
+                      siteKey={s().turnstileSiteKey}
+                    />
+                  )}
                 </Show>
               </>
             )}
           </Match>
-          <Match when={status.error}>
-            <p class={css.error}>Couldn’t reach the server. Trying again shortly…</p>
+          <Match when={status.error() !== undefined}>
+            <p class={css.error} role="alert">
+              Couldn’t reach the server. Trying again shortly…
+            </p>
           </Match>
           <Match when={true}>
             <StatusSkeleton />
@@ -147,16 +151,45 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
       </section>
 
       <section class="gg-card" aria-labelledby="trends-heading">
-        <Show when={stats.latest} fallback={<TrendsCardSkeleton />}>
-          {(s) => <Trends stats={s()} now={minute()} />}
-        </Show>
+        <Switch>
+          <Match when={stats.data()}>
+            {(s) => (
+              <>
+                <Trends stats={s()} now={minute()} />
+                <Show when={stats.error() !== undefined}>
+                  <p class={css.trendsWarning} role="alert">
+                    Couldn’t refresh the numbers. Showing them from {clockTime(stats.updatedAt())}.
+                  </p>
+                </Show>
+              </>
+            )}
+          </Match>
+          <Match when={stats.error() !== undefined}>
+            <h2 id="trends-heading" class="gg-card-title">
+              {TRENDS_TITLE}
+            </h2>
+            <p class={css.warning}>Couldn’t load the numbers. Trying again shortly…</p>
+          </Match>
+          <Match when={true}>
+            <TrendsCardSkeleton />
+          </Match>
+        </Switch>
       </section>
 
       <section class="gg-card" aria-labelledby="history-heading">
         <h2 id="history-heading" class="gg-card-title">
           Recent outages
         </h2>
-        <Show when={data()} fallback={<HistorySkeleton />}>
+        <Show
+          when={data()}
+          fallback={
+            status.error() !== undefined ? (
+              <p class="gg-status-note">Couldn’t load the outage history.</p>
+            ) : (
+              <HistorySkeleton />
+            )
+          }
+        >
           {(s) => <OutageHistory outages={s().recent} now={now()} />}
         </Show>
       </section>
@@ -178,7 +211,13 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
         <Show
           when={props.initial}
           fallback={
-            <Suspense fallback={<p class="gg-status-note">Loading…</p>}>
+            <Suspense
+              fallback={
+                <p class="gg-status-note" role="status">
+                  Loading…
+                </p>
+              }
+            >
               <Admin />
             </Suspense>
           }

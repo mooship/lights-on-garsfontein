@@ -93,24 +93,31 @@ globalStyle('.gg-status-card', {
   overflow: 'hidden',
 });
 
+// Room for one line of detail and the "Updated" line (padding + 0.9375rem × 1.5 + gap + 0.8125rem × 1.5).
 globalStyle('.gg-status-detail', {
   paddingTop: '1rem',
   borderTop: `1px solid ${vars.color.border}`,
   color: vars.color.muted,
   fontSize: '0.9375rem',
   fontVariantNumeric: 'tabular-nums',
-  minHeight: '2.5rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.25rem',
+  minHeight: '3.875rem',
 });
 
-// The trends body is fixed; only the user-opened weekly table below it may grow the card.
-globalStyle('.gg-trends-body', { height: '32.75rem', overflow: 'hidden' });
+globalStyle('.gg-status-updated', { fontSize: '0.8125rem' });
+
+// The trends body reserves its loaded height; only text that wraps on a narrow or zoomed
+// screen, or the user-opened weekly table below it, may grow the card.
+globalStyle('.gg-trends-body', { minHeight: '32.75rem' });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
 
 globalStyle('.gg-trends-details > summary', {
   cursor: 'pointer',
   fontWeight: 600,
-  height: '2.25rem',
+  minHeight: '2.75rem',
   display: 'flex',
   alignItems: 'center',
 });
@@ -145,12 +152,12 @@ globalStyle('.gg-footer', {
   paddingTop: '0.5rem',
 });
 
-globalStyle('.gg-footer nav', { display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1rem' });
+globalStyle('.gg-footer nav', { display: 'flex', flexWrap: 'wrap', gap: '0 1rem' });
 
 globalStyle('.gg-footer a', {
-  display: 'inline-block',
-  padding: '0.375rem 0',
-  minHeight: '2.25rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: '2.75rem',
 });
 
 globalStyle('.gg-sr-only', {

@@ -5,11 +5,12 @@ import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
 import { HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
 import { formatCalendarDay, formatDate, formatDuration, formatHours } from '../lib/format';
-import { AXIS_WIDTH } from './chart';
 import { TRENDS_TABLE_LABEL, TRENDS_TITLE } from './Skeletons';
 import * as css from './Trends.css';
 
-export interface TrendsProps {
+const { AXIS_WIDTH } = css;
+
+interface TrendsProps {
   stats: StatsResponse;
   now: number;
 }
@@ -70,6 +71,9 @@ function niceMax(value: number): number {
   return NICE_MAXIMA.find((n) => n >= value) ?? Math.ceil(value / 24) * 24;
 }
 
+const readout = (w: WeekStats, current: boolean) =>
+  `Week of ${formatCalendarDay(w.weekStart)}: ${formatHours(w.hoursOff)} off · ${w.outages} ${w.outages === 1 ? 'outage' : 'outages'}${current ? ' (so far)' : ''}`;
+
 const CHART_HEIGHT = 144;
 const TOP_PAD = 6;
 
@@ -95,12 +99,19 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
   // Clamped so a refresh with fewer weeks never points past the end.
   const activeIndex = createMemo(() => Math.min(active(), props.weeks.length - 1));
   const activeWeek = () => props.weeks[activeIndex()];
+  // Announced only on keyboard moves; pointer moves would flood a screen reader.
+  const [announcement, setAnnouncement] = createSignal('');
 
   const onKey: JSX.EventHandler<SVGSVGElement, KeyboardEvent> = (event) => {
-    if (event.key === 'ArrowLeft') setActive((i) => Math.max(0, i - 1));
-    else if (event.key === 'ArrowRight') setActive((i) => Math.min(props.weeks.length - 1, i + 1));
+    const last = props.weeks.length - 1;
+    if (event.key === 'ArrowLeft') setActive((i) => Math.max(0, Math.min(last, i) - 1));
+    else if (event.key === 'ArrowRight') setActive((i) => Math.min(last, i + 1));
+    else if (event.key === 'Home') setActive(0);
+    else if (event.key === 'End') setActive(last);
     else return;
     event.preventDefault();
+    const w = activeWeek();
+    if (w) setAnnouncement(readout(w, activeIndex() === last));
   };
 
   // The whole column slot is the hit target, not just the painted bar.
@@ -113,7 +124,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
   return (
     <div class={css.chartBlock}>
       <h3 class={css.chartTitle}>Hours without power, week by week</h3>
-      <p class={css.readout} aria-live="polite">
+      <p class={css.readout}>
         <Show when={activeWeek()}>
           {(w) => (
             <>
@@ -124,6 +135,9 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
             </>
           )}
         </Show>
+      </p>
+      <p class="gg-sr-only" aria-live="polite">
+        {announcement()}
       </p>
       <svg
         ref={svg}
@@ -152,7 +166,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
             const top = () => y(week.hoursOff);
             const height = () => CHART_HEIGHT - top();
             return (
-              <g class={css.barGroup} data-active={active() === index() ? '' : undefined}>
+              <g class={css.barGroup} data-active={activeIndex() === index() ? '' : undefined}>
                 <Show when={week.hoursOff > 0}>
                   <rect
                     data-bar
@@ -173,7 +187,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
                     height={Math.min(4, height())}
                   />
                 </Show>
-                <Show when={active() === index()}>
+                <Show when={activeIndex() === index()}>
                   <rect
                     class={css.activeMarker}
                     x={barX()}

@@ -18,6 +18,7 @@ export const StatusSkeleton: Component = () => (
     </div>
     <div class="gg-status-detail" aria-hidden="true">
       <span class="gg-skel gg-skel-text gg-w-80" />
+      <span class="gg-skel gg-skel-text gg-w-30" />
     </div>
   </>
 );

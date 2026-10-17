@@ -1,11 +1,13 @@
 import { globalStyle, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
-import { AXIS_WIDTH } from './chart';
+
+/** Width of the weekly chart's y-axis labels, shared by the SVG and the x-label row. */
+export const AXIS_WIDTH = 32;
 
 export const subtitle = style({
   marginTop: '-0.5rem',
   marginBottom: '1rem',
-  height: '1.25rem',
+  minHeight: '1.25rem',
   fontSize: '0.875rem',
   color: vars.color.muted,
 });
@@ -17,7 +19,7 @@ export const tiles = style({
 });
 
 export const tile = style({
-  height: '5.75rem',
+  minHeight: '5.75rem',
   padding: '0.75rem',
   borderRadius: vars.radius.control,
   background: vars.color.bg,
@@ -38,9 +40,6 @@ export const tileDelta = style({
   fontWeight: 600,
   color: vars.color.muted,
   lineHeight: 1.2,
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
 });
 
 const deltaIconBase = style({ flex: 'none' });
@@ -53,10 +52,10 @@ export const deltaIcon = styleVariants({
 
 export const chartBlock = style({ marginTop: '1.25rem' });
 
-export const chartTitle = style({ fontWeight: 600, fontSize: '0.9375rem', height: '1.375rem' });
+export const chartTitle = style({ fontWeight: 600, fontSize: '0.9375rem', minHeight: '1.375rem' });
 
 export const readout = style({
-  height: '1.375rem',
+  minHeight: '1.375rem',
   fontSize: '0.875rem',
   color: vars.color.muted,
   fontVariantNumeric: 'tabular-nums',
@@ -79,15 +78,15 @@ export const bar = style({ fill: vars.color.chartOff });
 
 export const barGroup = style({});
 
-// The active (hovered, tapped or arrow-key selected) week lifts slightly.
-globalStyle(`${barGroup}[data-active] ${bar}`, { opacity: 0.8 });
+// The active (hovered, tapped or arrow-key selected) week stands out; the others recede.
+globalStyle(`${barGroup}:not([data-active]) ${bar}`, { opacity: 0.55 });
 
 export const activeMarker = style({ fill: vars.color.text });
 
 export const xLabels = style({
   display: 'flex',
   justifyContent: 'space-between',
-  height: '1.25rem',
+  minHeight: '1.25rem',
   paddingTop: '0.25rem',
   paddingLeft: `${AXIS_WIDTH}px`,
   fontSize: '0.75rem',
@@ -116,6 +115,12 @@ export const td = style({
   selectors: { '&:not(:first-child)': { textAlign: 'right' } },
 });
 
-export const download = style({ display: 'inline-block', marginTop: '0.75rem', minHeight: '2.25rem' });
+export const download = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.25rem',
+  marginTop: '0.75rem',
+  minHeight: '2.75rem',
+});
 
 export const chartEmpty = style({ marginTop: '1.25rem', color: vars.color.muted, fontSize: '0.9375rem' });

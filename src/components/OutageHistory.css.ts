@@ -1,10 +1,8 @@
 import { style } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
-export const list = style({ listStyle: 'none', margin: 0, padding: 0 });
-
 export const row = style({
-  height: '3.5rem',
+  minHeight: '3.5rem',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',

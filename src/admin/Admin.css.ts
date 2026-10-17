@@ -22,8 +22,6 @@ export const formRow = style({
   gap: '0.75rem',
 });
 
-export const table = style({ listStyle: 'none', margin: 0, padding: 0 });
-
 export const item = style({
   padding: '0.75rem 0',
   borderTop: `1px solid ${vars.color.border}`,
@@ -39,6 +37,13 @@ export const itemMeta = style({ fontSize: '0.875rem', color: vars.color.muted })
 export const flagged = style({ opacity: 0.55, textDecoration: 'line-through' });
 
 export const actions = style({ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' });
+
+// The live region stays in the DOM so it announces reliably; while empty it gives back the stack gap.
+export const saved = style({
+  fontSize: '0.875rem',
+  color: vars.color.muted,
+  selectors: { '&:empty': { marginTop: '-0.875rem' } },
+});
 
 export const checkbox = style({
   display: 'flex',

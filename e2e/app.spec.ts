@@ -87,9 +87,26 @@ test.describe('public page', () => {
     expect(errors).toEqual([]);
   });
 
+  test('says so when the server fails on first load', async ({ page }) => {
+    await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
+    await page.goto('/');
+    await expect(page.getByRole('alert')).toHaveText('Couldn’t reach the server. Trying again shortly…');
+    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
+  });
+
+  test('keeps the last status and warns when a later poll fails', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('status')).toContainText('Power is on');
+    await expect(page.getByText(/^Updated \d\d:\d\d$/)).toBeVisible();
+    await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // polls now
+    await expect(page.getByRole('alert')).toHaveText(/^Can’t reach the server\. Showing status from \d\d:\d\d\.$/);
+    await expect(page.getByRole('status')).toContainText('Power is on');
+  });
+
   test('serves the SEO manifests', async ({ request }) => {
     expect(await (await request.get('/robots.txt')).text()).toContain('Disallow: /api/admin/');
-    expect(await (await request.get('/sitemap.xml')).text()).toContain('/privacy.html</loc>');
+    expect(await (await request.get('/sitemap.xml')).text()).toContain('/privacy</loc>');
     const og = await request.get('/og.png');
     expect(og.headers()['content-type']).toBe('image/png');
   });
