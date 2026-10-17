@@ -3,13 +3,15 @@ import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch
 import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
 import * as css from './App.css';
 import { ConfirmOutage } from './components/ConfirmOutage';
+import { LanguageToggle } from './components/LanguageToggle';
 import { OutageHistory } from './components/OutageHistory';
-import { HistorySkeleton, StatusSkeleton, TRENDS_TITLE, TrendsCardSkeleton } from './components/Skeletons';
+import { HistorySkeleton, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api } from './lib/api';
 import { formatDate, formatDuration, formatRelativeDay, formatTime, outageDurationMs } from './lib/format';
+import { t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll } from './lib/poll';
 import { useStatusTab } from './lib/tab';
@@ -35,48 +37,53 @@ const Masthead: Component<{ notice: boolean }> = (props) => (
   <>
     <header class="gg-masthead">
       <div>
-        <p class="gg-eyebrow">Garsfontein Ext. 16 · Ward 45 · Pretoria</p>
+        <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
         <h1 class="gg-title">Lights On?</h1>
       </div>
-      <ThemeToggle />
+      <div class="gg-masthead-actions">
+        <LanguageToggle />
+        <ThemeToggle />
+      </div>
     </header>
     <Show when={props.notice}>
-      <p class="gg-notice">Run by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.</p>
+      <p class="gg-notice">{t().masthead.notice}</p>
     </Show>
   </>
 );
 
 const Footer: Component<{ signIn: boolean }> = (props) => (
   <footer class="gg-footer">
-    <nav aria-label="Site">
-      <a href="/privacy">Privacy</a>
-      <a href="/api/outages.csv">Download the data (CSV)</a>
+    <nav aria-label={t().footer.nav}>
+      <a href="/privacy">{t().footer.privacy}</a>
+      <a href="/api/outages.csv">{t().footer.csv}</a>
       <Show when={props.signIn}>
         <a href="/admin" rel="nofollow">
-          Sign in
+          {t().footer.signIn}
         </a>
       </Show>
     </nav>
-    <p>Measured in Garsfontein Ext. 16, Pretoria · Ward 45 (DA) · Region 6, City of Tshwane · Garsfontein substation</p>
+    <p>{t().footer.measured}</p>
   </footer>
 );
 
 /** One line of context under the badge: when it went off, or when the last outage was. */
 function statusDetail(s: StatusResponse, now: number): string {
-  const on = (iso: string) => {
-    const day = formatRelativeDay(iso, now);
-    return day === 'today' || day === 'yesterday' ? day : `on ${day}`;
-  };
+  const m = t().status;
   if (s.status === 'OFF') {
     const start = s.since;
     if (!start) return '';
-    const when = `${formatTime(start)} ${on(start)}`;
-    return s.outage?.planned ? `Planned work on the grid since ${when}.` : `Went off at ${when}.`;
+    const day = formatRelativeDay(start, now);
+    return s.outage?.planned ? m.planned(formatTime(start), day) : m.wentOff(formatTime(start), day);
   }
   const last = s.recent.find((o) => o.endTime);
-  if (!last?.endTime) return `No outages since tracking began on ${formatDate(TRACKING_SINCE)}.`;
+  if (!last?.endTime) return m.noOutages(formatDate(TRACKING_SINCE));
   const lasted = formatDuration(outageDurationMs(last, now));
-  return `Last outage: ${formatTime(last.startTime)} to ${formatTime(last.endTime)} ${on(last.startTime)} (${lasted}).`;
+  return m.lastOutage(
+    formatTime(last.startTime),
+    formatTime(last.endTime),
+    formatRelativeDay(last.startTime, now),
+    lasted,
+  );
 }
 
 const PublicView: Component<{ initial: InitialData }> = (props) => {
@@ -108,7 +115,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
     <>
       <section class="gg-card gg-status-card" aria-labelledby="status-heading">
         <h2 id="status-heading" class="gg-sr-only">
-          Current status
+          {t().status.heading}
         </h2>
         <Switch>
           <Match when={data()}>
@@ -119,10 +126,10 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                   <p>{statusDetail(s(), minute())}</p>
                   <Show
                     when={stale()}
-                    fallback={<p class="gg-status-updated">Updated {clockTime(status.updatedAt())}</p>}
+                    fallback={<p class="gg-status-updated">{t().status.updated(clockTime(status.updatedAt()))}</p>}
                   >
                     <p class={clsx('gg-status-updated', css.warning)} role="alert">
-                      Can’t reach the server. Showing status from {clockTime(status.updatedAt())}.
+                      {t().status.stale(clockTime(status.updatedAt()))}
                     </p>
                   </Show>
                 </div>
@@ -141,7 +148,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
           </Match>
           <Match when={status.error() !== undefined}>
             <p class={css.error} role="alert">
-              Couldn’t reach the server. Trying again shortly…
+              {t().status.unreachable}
             </p>
           </Match>
           <Match when={true}>
@@ -158,7 +165,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <Trends stats={s()} now={minute()} />
                 <Show when={stats.error() !== undefined}>
                   <p class={css.trendsWarning} role="alert">
-                    Couldn’t refresh the numbers. Showing them from {clockTime(stats.updatedAt())}.
+                    {t().trends.refreshFailed(clockTime(stats.updatedAt()))}
                   </p>
                 </Show>
               </>
@@ -166,9 +173,9 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
           </Match>
           <Match when={stats.error() !== undefined}>
             <h2 id="trends-heading" class="gg-card-title">
-              {TRENDS_TITLE}
+              {t().trends.title}
             </h2>
-            <p class={css.warning}>Couldn’t load the numbers. Trying again shortly…</p>
+            <p class={css.warning}>{t().trends.loadFailed}</p>
           </Match>
           <Match when={true}>
             <TrendsCardSkeleton />
@@ -178,16 +185,12 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
 
       <section class="gg-card" aria-labelledby="history-heading">
         <h2 id="history-heading" class="gg-card-title">
-          Recent outages
+          {t().history.title}
         </h2>
         <Show
           when={data()}
           fallback={
-            status.error() !== undefined ? (
-              <p class="gg-status-note">Couldn’t load the outage history.</p>
-            ) : (
-              <HistorySkeleton />
-            )
+            status.error() !== undefined ? <p class="gg-status-note">{t().history.failed}</p> : <HistorySkeleton />
           }
         >
           {(s) => <OutageHistory outages={s().recent} now={now()} />}
@@ -214,7 +217,7 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
             <Suspense
               fallback={
                 <p class="gg-status-note" role="status">
-                  Loading…
+                  {t().loading}
                 </p>
               }
             >

@@ -4,6 +4,7 @@ import ZapOff from 'lucide-solid/icons/zap-off';
 import type { Component } from 'solid-js';
 import type { AdminOutage } from '../../shared/api';
 import { formatClock, formatDay, formatTime, outageDurationMs } from '../lib/format';
+import { t } from '../lib/i18n';
 import { button } from '../styles/ui.css';
 import * as css from './PunchClock.css';
 
@@ -23,14 +24,18 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
   return (
     <div class={css.root}>
       <div>
-        <span class="gg-sr-only">Outage duration</span>
+        <span class="gg-sr-only">{t().admin.duration}</span>
         <div class={clsx(css.clock, props.outage ? css.running : css.idle)} role="timer" data-testid="punch-clock">
           {formatClock(elapsed())}
         </div>
         <p class={css.meta}>
           {props.outage
-            ? `Off since ${formatDay(props.outage.startTime)}, ${formatTime(props.outage.startTime)} (${props.outage.source})`
-            : 'No outage running.'}
+            ? t().admin.offSince(
+                formatDay(props.outage.startTime),
+                formatTime(props.outage.startTime),
+                t().admin.source[props.outage.source],
+              )
+            : t().admin.idle}
         </p>
       </div>
       <div class={css.actions}>
@@ -41,7 +46,7 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
           onClick={props.onPunchOut}
         >
           <ZapOff size={18} aria-hidden="true" />
-          Punch out
+          {t().admin.punchOut}
         </button>
         <button
           type="button"
@@ -50,7 +55,7 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
           onClick={props.onPunchIn}
         >
           <Zap size={18} aria-hidden="true" />
-          Punch in
+          {t().admin.punchIn}
         </button>
       </div>
     </div>

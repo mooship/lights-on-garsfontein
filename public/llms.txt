@@ -5,6 +5,7 @@
 Garsfontein, Pretoria: measured in Garsfontein Extension 16, which is in Ward 45 (DA), Region 6 of the City of Tshwane. Supplied by the Garsfontein substation (fed from Highlands, fed from Njala).
 
 Site: https://garsfontein.timothybrits.co.za/
+The site is in Afrikaans by default, with a switch to English. The API and this file are in English.
 Source code (GPL-3.0-only): https://github.com/mooship/lights-on-garsfontein
 
 ## Endpoints

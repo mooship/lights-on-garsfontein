@@ -1,13 +1,15 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
 import { MINUTE_MS as MINUTE, type StatusResponse } from '../../shared/api';
+import { t } from './i18n';
 
-/** Tab-friendly duration: "3d 4h", "2h 14m", "5m". */
+/** Tab-friendly duration: "3d 4u", "1u 5m", "5m" ("h" in English). */
 function compactDuration(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / MINUTE));
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  const h = t().units.h;
+  if (days > 0) return `${days}d ${hours}${h}`;
+  if (hours > 0) return `${hours}${h} ${minutes % 60}m`;
   return `${minutes}m`;
 }
 
@@ -26,7 +28,7 @@ export function useStatusTab(status: Accessor<StatusResponse | undefined>, minut
     const s = status();
     if (!s) return;
     const duration = s.status === 'OFF' && s.since ? ` ${compactDuration(minute() - Date.parse(s.since))}` : '';
-    document.title = `${s.status}${duration} · Lights On?`;
+    document.title = `${t().tab[s.status]}${duration} · Lights On?`;
     if (icon) icon.href = s.status === 'ON' ? '/favicon-on.svg' : '/favicon-off.svg';
   });
 

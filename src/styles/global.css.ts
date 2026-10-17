@@ -143,6 +143,11 @@ globalStyle('.gg-icon-button', {
   cursor: 'pointer',
 });
 
+globalStyle('.gg-masthead-actions', { flex: 'none', display: 'flex', gap: '0.5rem' });
+
+// The language switch is the same 44px circle as the theme toggle, with a two-letter code.
+globalStyle('.gg-lang-button', { fontSize: '0.8125rem', fontWeight: 700, letterSpacing: '0.04em' });
+
 globalStyle('.gg-footer', {
   fontSize: '0.875rem',
   color: vars.color.muted,

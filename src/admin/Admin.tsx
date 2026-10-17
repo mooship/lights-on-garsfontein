@@ -7,6 +7,7 @@ import type { AdminOutage, AdminOutagesResponse, TimerAction } from '../../share
 import { PunchClock } from '../components/PunchClock';
 import { ApiError, api } from '../lib/api';
 import { formatDay, formatDuration, formatTime, fromLocalInput, outageDurationMs, toLocalInput } from '../lib/format';
+import { t } from '../lib/i18n';
 import { useMinute, useNow } from '../lib/now';
 import { getTurnstileToken } from '../lib/turnstile';
 import { button, errorText, input, label, plainList } from '../styles/ui.css';
@@ -21,24 +22,10 @@ const FormError: Component<{ message: string }> = (props) => (
   </Show>
 );
 
-const SESSION_EXPIRED = 'Your session expired. Sign in again.';
-
 const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401;
 
 const describeError = (error: unknown) =>
-  error instanceof ApiError
-    ? ({
-        unauthorized: 'Wrong username or password.',
-        rate_limited: 'Too many attempts. Wait a minute and try again.',
-        turnstile_failed: 'The bot check failed. Please try again.',
-        outage_already_open: 'An outage is already open.',
-        no_open_outage: 'There is no open outage to close.',
-        end_before_start: 'The end must be after the start.',
-        invalid_json: 'The request was garbled. Reload the page and try again.',
-        bad_request: 'Check the times and try again. They can’t be in the future.',
-        not_found: 'That outage no longer exists. Reload the page.',
-      }[error.code] ?? `Request failed (${error.code}).`)
-    : 'Network error.';
+  error instanceof ApiError ? (t().admin.errors[error.code] ?? t().admin.requestFailed(error.code)) : t().admin.network;
 
 /** Reports a failed dashboard action: a 401 ends the session, anything else shows through `show`. */
 type OnError = (error: unknown, show: (message: string) => void) => void;
@@ -74,12 +61,12 @@ const LoginForm: Component<{ notice: string; focus: boolean; onLoggedIn: () => v
   return (
     <section class="gg-card">
       <h2 ref={heading} class="gg-card-title" tabindex="-1">
-        Admin sign in
+        {t().admin.signInTitle}
       </h2>
       {/* Named form, ids and autocomplete hints so password managers recognise and fill it. */}
       <form class={css.stack} onSubmit={submit} id="admin-sign-in" name="admin-sign-in">
         <label class={label}>
-          Username
+          {t().admin.username}
           <input
             class={input}
             type="text"
@@ -92,13 +79,13 @@ const LoginForm: Component<{ notice: string; focus: boolean; onLoggedIn: () => v
           />
         </label>
         <label class={label}>
-          Password
+          {t().admin.password}
           <input class={input} type="password" id="password" name="password" autocomplete="current-password" required />
         </label>
         <div ref={widget} />
         <FormError message={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
-          {busy() ? 'Checking…' : 'Sign in'}
+          {busy() ? t().admin.checking : t().admin.signIn}
         </button>
       </form>
     </section>
@@ -132,13 +119,13 @@ const OutageRow: Component<{
       <div class={clsx(props.outage.isFalsePositive && css.flagged)}>
         <strong id={titleId()}>
           {formatDay(props.outage.startTime)}, {formatTime(props.outage.startTime)} –{' '}
-          {props.outage.endTime ? formatTime(props.outage.endTime) : 'ongoing'}
+          {props.outage.endTime ? formatTime(props.outage.endTime) : t().admin.ongoing}
         </strong>
         <div class={css.itemMeta}>
-          {formatDuration(outageDurationMs(props.outage, props.now))} · {props.outage.source} ·{' '}
-          {props.outage.confirmations} confirmed
-          {props.outage.planned ? ' · planned' : ''}
-          {props.outage.isFalsePositive ? ' · false positive' : ''}
+          {formatDuration(outageDurationMs(props.outage, props.now))} · {t().admin.source[props.outage.source]} ·{' '}
+          {t().admin.confirmed(props.outage.confirmations)}
+          {props.outage.planned ? t().admin.plannedTag : ''}
+          {props.outage.isFalsePositive ? t().admin.falsePositiveTag : ''}
         </div>
       </div>
       <div class={css.actions}>
@@ -150,7 +137,7 @@ const OutageRow: Component<{
             disabled={busy()}
             onClick={() => run(() => api.updateOutage(props.outage.id, { endTime: new Date().toISOString() }))}
           >
-            Close now
+            {t().admin.closeNow}
           </button>
         </Show>
         <button
@@ -163,7 +150,7 @@ const OutageRow: Component<{
             run(() => api.updateOutage(props.outage.id, { isFalsePositive: !props.outage.isFalsePositive }))
           }
         >
-          False positive
+          {t().admin.falsePositive}
         </button>
         <button
           type="button"
@@ -173,16 +160,16 @@ const OutageRow: Component<{
           disabled={busy()}
           onClick={() => run(() => api.updateOutage(props.outage.id, { isPlanned: !props.outage.planned }))}
         >
-          Planned
+          {t().admin.planned}
         </button>
         <button
           type="button"
           class={button.ghost}
           aria-describedby={titleId()}
           disabled={busy()}
-          onClick={() => confirm('Delete this outage?') && run(() => api.deleteOutage(props.outage.id))}
+          onClick={() => confirm(t().admin.deleteConfirm) && run(() => api.deleteOutage(props.outage.id))}
         >
-          Delete
+          {t().admin.delete}
         </button>
       </div>
       <FormError message={error()} />
@@ -204,14 +191,14 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
     setError('');
     setSaved('');
     if (end && Date.parse(end) <= Date.parse(start)) {
-      setError('The end must be after the start.');
+      setError(t().admin.errors.end_before_start ?? '');
       return;
     }
     setBusy(true);
     try {
       await api.createOutage(start, end, data.get('planned') === 'on');
       form.reset();
-      setSaved('Outage logged.');
+      setSaved(t().admin.logged);
       await props.onLogged();
     } catch (e) {
       props.onError(e, setError);
@@ -222,11 +209,11 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
 
   return (
     <section class="gg-card">
-      <h2 class="gg-card-title">Log a past outage</h2>
+      <h2 class="gg-card-title">{t().admin.logTitle}</h2>
       <form class={css.stack} onSubmit={submit}>
         <div class={css.formRow}>
           <label class={label}>
-            Started
+            {t().admin.started}
             <input
               class={input}
               type="datetime-local"
@@ -236,16 +223,16 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
             />
           </label>
           <label class={label}>
-            Ended
+            {t().admin.ended}
             <input class={input} type="datetime-local" name="end" />
           </label>
         </div>
         <label class={css.checkbox}>
-          <input type="checkbox" name="planned" /> Planned (announced maintenance or upgrades)
+          <input type="checkbox" name="planned" /> {t().admin.plannedHint}
         </label>
         <FormError message={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
-          <Plus size={18} aria-hidden="true" /> {busy() ? 'Saving…' : 'Log outage'}
+          <Plus size={18} aria-hidden="true" /> {busy() ? t().admin.saving : t().admin.log}
         </button>
         <p class={css.saved} role="status">
           {saved()}
@@ -279,7 +266,7 @@ const Dashboard: Component<{
   const [error, setError] = createSignal('');
   const open = () => outages().outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
   const onError: OnError = (e, show) =>
-    isUnauthorized(e) ? props.onLoggedOut(SESSION_EXPIRED) : show(describeError(e));
+    isUnauthorized(e) ? props.onLoggedOut(t().admin.sessionExpired) : show(describeError(e));
 
   const punch = async (action: TimerAction) => {
     setBusy(true);
@@ -304,10 +291,10 @@ const Dashboard: Component<{
       <section class="gg-card">
         <div class={css.header}>
           <h2 ref={heading} class="gg-card-title" tabindex="-1">
-            Punch clock
+            {t().admin.punchClock}
           </h2>
           <button type="button" class={button.ghost} onClick={logout}>
-            <LogOut size={16} aria-hidden="true" /> Sign out
+            <LogOut size={16} aria-hidden="true" /> {t().admin.signOut}
           </button>
         </div>
         <PunchClock
@@ -323,8 +310,8 @@ const Dashboard: Component<{
       <LogOutageForm onLogged={refetch} onError={onError} />
 
       <section class="gg-card">
-        <h2 class="gg-card-title">Outages</h2>
-        <Show when={outages().outages.length > 0} fallback={<p>No outages yet.</p>}>
+        <h2 class="gg-card-title">{t().admin.outages}</h2>
+        <Show when={outages().outages.length > 0} fallback={<p>{t().admin.noOutages}</p>}>
           <ul class={plainList}>
             <For each={outages().outages}>
               {(o) => <OutageRow outage={o} now={minute()} onChange={refetch} onError={onError} />}
@@ -359,22 +346,22 @@ const Admin: Component = () => {
   return (
     <>
       <a class={css.backLink} href="/">
-        <ArrowLeft size={16} aria-hidden="true" /> Public page
+        <ArrowLeft size={16} aria-hidden="true" /> {t().admin.back}
       </a>
       <Switch
         fallback={
           <p class="gg-status-note" role="status">
-            Loading…
+            {t().loading}
           </p>
         }
       >
         <Match when={session.error}>
           <section class={clsx('gg-card', css.stack)}>
             <p class={errorText} role="alert">
-              Couldn’t reach the server.
+              {t().admin.unreachable}
             </p>
             <button type="button" class={button.ghost} disabled={session.loading} onClick={() => refetch()}>
-              Try again
+              {t().admin.retry}
             </button>
           </section>
         </Match>

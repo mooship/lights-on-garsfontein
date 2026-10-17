@@ -1,15 +1,17 @@
 import { DAY_MS, HOUR_MS } from '../../shared/api';
+import { intlLocale, t } from './i18n';
 
 export { outageDurationMs } from '../../shared/api';
 
 const TIME_ZONE = 'Africa/Johannesburg';
 
-/** Builds a formatter on first use: time-zone formatters are costly to create on slow phones. */
+/** Builds a formatter per locale on first use: time-zone formatters are costly to create on slow phones. */
 function lazyFormat(options: Intl.DateTimeFormatOptions): (date: Date) => string {
-  let formatter: Intl.DateTimeFormat | undefined;
+  const formatters: Record<string, Intl.DateTimeFormat> = {};
   return (date) => {
-    formatter ??= new Intl.DateTimeFormat('en-ZA', options);
-    return formatter.format(date);
+    const locale = intlLocale();
+    formatters[locale] ??= new Intl.DateTimeFormat(locale, options);
+    return formatters[locale].format(date);
   };
 }
 
@@ -18,38 +20,49 @@ const timeFormat = lazyFormat({ timeZone: TIME_ZONE, hour: '2-digit', minute: '2
 const dateFormat = lazyFormat({ timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
 const shortDateFormat = lazyFormat({ timeZone: 'UTC', day: 'numeric', month: 'short' });
 
+/** "Sa. 17 Okt." / "Sat, 17 Oct" */
 export const formatDay = (iso: string) => dayFormat(new Date(iso));
-/** "17 Oct 2026" */
+/** "17 Okt. 2026" / "17 Oct 2026" */
 export const formatDate = (iso: string) => dateFormat(new Date(iso));
-/** Formats a plain YYYY-MM-DD calendar date as "19 Oct". */
+/** Formats a plain YYYY-MM-DD calendar date as "19 Okt." / "19 Oct". */
 export const formatCalendarDay = (ymd: string) => shortDateFormat(new Date(`${ymd}T00:00:00Z`));
 
-/** "12.5 h" with one decimal below 100 hours. */
+const numberFormats: Record<string, Intl.NumberFormat> = {};
+
+/** "12,5": at most one decimal, in the active locale. */
+export function formatNumber(n: number): string {
+  const locale = intlLocale();
+  numberFormats[locale] ??= new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
+  return numberFormats[locale].format(n);
+}
+
+/** "12,5 u" / "12,5 h" with one decimal below 100 hours. */
 export function formatHours(hours: number): string {
-  return `${hours >= 100 ? Math.round(hours) : Math.round(hours * 10) / 10} h`;
+  return `${formatNumber(hours >= 100 ? Math.round(hours) : hours)} ${t().units.h}`;
 }
 export const formatTime = (iso: string) => timeFormat(new Date(iso));
 
 const sastDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
 
-/** "today", "yesterday" or "Sat, 17 Oct", judged in South African time. */
+/** "vandag", "gister" or "op Sa. 17 Okt." (or the English), judged in South African time. */
 export function formatRelativeDay(iso: string, now: number): string {
   const day = sastDay(new Date(iso));
-  if (day === sastDay(new Date(now))) return 'today';
-  if (day === sastDay(new Date(now - DAY_MS))) return 'yesterday';
-  return formatDay(iso);
+  if (day === sastDay(new Date(now))) return t().day.today;
+  if (day === sastDay(new Date(now - DAY_MS))) return t().day.yesterday;
+  return t().day.on(formatDay(iso));
 }
 
-/** "3 d 4 h", "2 h 14 min", "5 min", "40 s" */
+/** "3 d 4 u", "2 u 14 min", "5 min", "40 s" ("h" in English) */
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const days = Math.floor(totalSeconds / 86_400);
   const hours = Math.floor((totalSeconds % 86_400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (days > 0) return `${days} d ${hours} h`;
-  if (hours > 0) return `${hours} h ${minutes} min`;
-  if (minutes > 0) return `${minutes} min`;
-  return `${totalSeconds} s`;
+  const u = t().units;
+  if (days > 0) return `${days} ${u.d} ${hours} ${u.h}`;
+  if (hours > 0) return `${hours} ${u.h} ${minutes} ${u.min}`;
+  if (minutes > 0) return `${minutes} ${u.min}`;
+  return `${totalSeconds} ${u.s}`;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0');

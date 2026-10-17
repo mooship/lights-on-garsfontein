@@ -1,6 +1,7 @@
 import Users from 'lucide-solid/icons/users';
 import { type Component, createSignal, Show } from 'solid-js';
 import { ApiError, api } from '../lib/api';
+import { t } from '../lib/i18n';
 import { getTurnstileToken } from '../lib/turnstile';
 import { button, errorText, muted } from '../styles/ui.css';
 import * as css from './ConfirmOutage.css';
@@ -12,14 +13,6 @@ interface ConfirmOutageProps {
   confirmations: number;
   siteKey: string;
 }
-
-const MESSAGES: Record<string, string> = {
-  already_confirmed: 'You’ve already confirmed this one. Thanks!',
-  rate_limited: 'Too many tries. Give it a minute.',
-  no_active_outage: 'Looks like the power’s back.',
-  outage_changed: 'That outage has ended. The status will update shortly.',
-  turnstile_failed: 'We couldn’t check that you’re human. Please try again.',
-};
 
 const storageKey = (id: number) => `confirmed:${id}`;
 
@@ -36,14 +29,16 @@ export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
   const [busy, setBusy] = createSignal(false);
   const [confirmed, setConfirmed] = createSignal(remembered(props.outageId));
   const [count, setCount] = createSignal<number | null>(null);
-  const [message, setMessage] = createSignal('');
+  // The error code, so the message follows a language switch.
+  const [errorCode, setErrorCode] = createSignal('');
+  const message = () => errorCode() && (t().confirm.errors[errorCode()] ?? t().confirm.unknown);
   const total = () => count() ?? props.confirmations;
   const disabled = () => busy() || confirmed();
 
   async function confirm() {
     if (disabled()) return;
     setBusy(true);
-    setMessage('');
+    setErrorCode('');
     try {
       const token = await getTurnstileToken(widget, props.siteKey, 'confirm');
       const res = await api.confirm(token, props.outageId);
@@ -55,7 +50,7 @@ export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
     } catch (error) {
       const code = error instanceof ApiError ? error.code : 'unknown';
       if (code === 'already_confirmed') setConfirmed(true);
-      setMessage(MESSAGES[code] ?? 'Something went wrong. Please try again.');
+      setErrorCode(code);
     } finally {
       setBusy(false);
     }
@@ -71,18 +66,11 @@ export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
         data-testid="confirm-outage"
       >
         <Users size={18} aria-hidden="true" />
-        {confirmed() ? 'Thanks for letting us know' : busy() ? 'Checking…' : 'My power’s off too'}
+        {confirmed() ? t().confirm.done : busy() ? t().confirm.busy : t().confirm.button}
       </button>
       <div ref={widget} class={css.widget} />
       <p class={message() ? errorText : muted} aria-live="polite">
-        <Show
-          when={message()}
-          fallback={
-            total() === 0
-              ? 'Be the first neighbour to confirm.'
-              : `${total()} ${total() === 1 ? 'neighbour says theirs is' : 'neighbours say theirs is'} off too.`
-          }
-        >
+        <Show when={message()} fallback={total() === 0 ? t().confirm.first : t().confirm.count(total())}>
           {message()}
         </Show>
       </p>

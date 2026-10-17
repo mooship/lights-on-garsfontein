@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { type Component, For, Show } from 'solid-js';
 import type { OutageSummary } from '../../shared/api';
 import { formatDay, formatDuration, formatTime, outageDurationMs } from '../lib/format';
+import { t } from '../lib/i18n';
 import { plainList } from '../styles/ui.css';
 import * as css from './OutageHistory.css';
 
@@ -11,7 +12,7 @@ interface OutageHistoryProps {
 }
 
 export const OutageHistory: Component<OutageHistoryProps> = (props) => (
-  <Show when={props.outages.length > 0} fallback={<p class={css.empty}>No outages recorded yet.</p>}>
+  <Show when={props.outages.length > 0} fallback={<p class={css.empty}>{t().history.empty}</p>}>
     <ul class={plainList}>
       <For each={props.outages}>
         {(outage) => (
@@ -19,7 +20,10 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
             <div>
               <div class={css.primary}>{formatDay(outage.startTime)}</div>
               <div class={css.secondary}>
-                {formatTime(outage.startTime)} to {outage.endTime ? formatTime(outage.endTime) : 'now'}
+                {t().history.range(
+                  formatTime(outage.startTime),
+                  outage.endTime ? formatTime(outage.endTime) : t().history.now,
+                )}
               </div>
             </div>
             <div class={css.end}>
@@ -28,9 +32,9 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
               </div>
               <div class={css.secondary}>
                 {[
-                  outage.endTime ? '' : 'Ongoing',
-                  outage.planned ? 'Planned work' : '',
-                  outage.confirmations ? `${outage.confirmations} confirmed` : '',
+                  outage.endTime ? '' : t().history.ongoing,
+                  outage.planned ? t().history.planned : '',
+                  outage.confirmations ? t().history.confirmed(outage.confirmations) : '',
                 ]
                   .filter(Boolean)
                   .join(' · ') || ' '}

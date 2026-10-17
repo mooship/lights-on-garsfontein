@@ -4,8 +4,8 @@ import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
 import { HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
-import { formatCalendarDay, formatDate, formatDuration, formatHours } from '../lib/format';
-import { TRENDS_TABLE_LABEL, TRENDS_TITLE } from './Skeletons';
+import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
+import { t } from '../lib/i18n';
 import * as css from './Trends.css';
 
 const { AXIS_WIDTH } = css;
@@ -31,10 +31,10 @@ function delta(
 ): Delta | null {
   if (previous === undefined) return null;
   const diff = Math.round((current - previous) * 10) / 10;
-  if (diff === 0) return { text: 'Same as the 30 days before', tone: 'same', direction: 'flat' };
+  if (diff === 0) return { text: t().trends.same, tone: 'same', direction: 'flat' };
   const up = diff > 0;
   return {
-    text: `${up ? '+' : '−'}${format(Math.abs(diff))} on the 30 days before`,
+    text: t().trends.change(up ? '+' : '−', format(Math.abs(diff))),
     tone: up === upIsBad ? 'worse' : 'better',
     direction: up ? 'up' : 'down',
   };
@@ -71,8 +71,10 @@ function niceMax(value: number): number {
   return NICE_MAXIMA.find((n) => n >= value) ?? Math.ceil(value / 24) * 24;
 }
 
-const readout = (w: WeekStats, current: boolean) =>
-  `Week of ${formatCalendarDay(w.weekStart)}: ${formatHours(w.hoursOff)} off · ${w.outages} ${w.outages === 1 ? 'outage' : 'outages'}${current ? ' (so far)' : ''}`;
+const readout = (w: WeekStats, current: boolean) => {
+  const m = t().trends;
+  return `${m.weekOf(formatCalendarDay(w.weekStart))}: ${formatHours(w.hoursOff)} ${m.off} · ${m.outageCount(w.outages)}${current ? m.soFar : ''}`;
+};
 
 const CHART_HEIGHT = 144;
 const TOP_PAD = 6;
@@ -123,15 +125,15 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
 
   return (
     <div class={css.chartBlock}>
-      <h3 class={css.chartTitle}>Hours without power, week by week</h3>
+      <h3 class={css.chartTitle}>{t().trends.chartTitle}</h3>
       <p class={css.readout}>
         <Show when={activeWeek()}>
           {(w) => (
             <>
-              Week of {formatCalendarDay(w().weekStart)}:{' '}
-              <span class={css.readoutValue}>{formatHours(w().hoursOff)}</span> off · {w().outages}{' '}
-              {w().outages === 1 ? 'outage' : 'outages'}
-              {activeIndex() === props.weeks.length - 1 ? ' (so far)' : ''}
+              {t().trends.weekOf(formatCalendarDay(w().weekStart))}:{' '}
+              <span class={css.readoutValue}>{formatHours(w().hoursOff)}</span> {t().trends.off} ·{' '}
+              {t().trends.outageCount(w().outages)}
+              {activeIndex() === props.weeks.length - 1 ? t().trends.soFar : ''}
             </>
           )}
         </Show>
@@ -143,7 +145,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
         ref={svg}
         class={css.svg}
         role="img"
-        aria-label="Weekly hours without power. Use the arrow keys to read each week, or open the table below."
+        aria-label={t().trends.chartLabel}
         tabindex="0"
         onKeyDown={onKey}
         onPointerMove={onPointer}
@@ -154,7 +156,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
             <>
               <line class={css.grid} x1={AXIS_WIDTH} x2={width()} y1={y(tick)} y2={y(tick)} />
               <text class={css.axisText} x={AXIS_WIDTH - 6} y={y(tick)} dy="0.32em" text-anchor="end">
-                {tick === 0 ? '0' : `${tick}h`}
+                {tick === 0 ? '0' : `${formatNumber(tick)}${t().units.h}`}
               </text>
             </>
           )}
@@ -204,7 +206,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
       </svg>
       <div class={css.xLabels}>
         <span>{props.weeks.length > 1 && props.weeks[0] ? formatCalendarDay(props.weeks[0].weekStart) : ''}</span>
-        <span>This week</span>
+        <span>{t().trends.thisWeek}</span>
       </div>
     </div>
   );
@@ -216,62 +218,64 @@ export const Trends: Component<TrendsProps> = (props) => {
   const s = () => props.stats.last30;
   const prev = () => props.stats.previous30;
   const subtitle = () => {
-    if (!started()) return `Tracking starts on ${formatDate(props.stats.trackingSince)}.`;
-    return s().trackedHours < 30 * 24 ? `Since ${formatDate(props.stats.trackingSince)}.` : 'The last 30 days.';
+    if (!started()) return t().trends.startsOn(formatDate(props.stats.trackingSince));
+    return s().trackedHours < 30 * 24 ? t().trends.since(formatDate(props.stats.trackingSince)) : t().trends.last30;
   };
 
   return (
     <>
       <div class="gg-trends-body">
         <h2 id="trends-heading" class="gg-card-title">
-          {TRENDS_TITLE}
+          {t().trends.title}
         </h2>
         <p class={css.subtitle}>{subtitle()}</p>
         <div class={css.tiles}>
           <Tile
-            label="Without power"
+            label={t().trends.withoutPower}
             value={started() ? formatHours(s().hoursOff) : '—'}
             delta={delta(s().hoursOff, prev()?.hoursOff, formatHours, true)}
           />
           <Tile
-            label="Outages"
+            label={t().trends.outages}
             value={started() ? String(s().outages) : '—'}
             delta={s().plannedOutages === 0 ? delta(s().outages, prev()?.outages, String, true) : null}
-            note={s().plannedOutages > 0 ? `${s().plannedOutages} planned` : undefined}
+            note={s().plannedOutages > 0 ? t().trends.planned(s().plannedOutages) : undefined}
           />
-          <Tile label="Days affected" value={started() ? `${s().daysWithOutage} of ${s().daysTracked}` : '—'} />
           <Tile
-            label="Longest outage"
+            label={t().trends.daysAffected}
+            value={started() ? t().trends.daysOf(s().daysWithOutage, s().daysTracked) : '—'}
+          />
+          <Tile
+            label={t().trends.longest}
             value={
               s().outages === 0
                 ? '—'
                 : s().longestMinutes > 0
                   ? formatDuration(s().longestMinutes * MINUTE_MS)
-                  : '< 1 min'
+                  : `< 1 ${t().units.min}`
             }
-            note={s().outages > 1 ? `Average ${formatDuration((s().hoursOff / s().outages) * HOUR_MS)}` : undefined}
+            note={
+              s().outages > 1 ? t().trends.average(formatDuration((s().hoursOff / s().outages) * HOUR_MS)) : undefined
+            }
           />
         </div>
-        <Show
-          when={props.stats.weeks.length > 0}
-          fallback={<p class={css.chartEmpty}>The weekly chart fills in once tracking starts.</p>}
-        >
+        <Show when={props.stats.weeks.length > 0} fallback={<p class={css.chartEmpty}>{t().trends.chartEmpty}</p>}>
           <WeeklyChart weeks={props.stats.weeks} />
         </Show>
       </div>
       <details class="gg-trends-details">
-        <summary>{TRENDS_TABLE_LABEL}</summary>
+        <summary>{t().trends.tableLabel}</summary>
         <table class={css.table}>
           <thead>
             <tr>
               <th class={css.th} scope="col">
-                Week of
+                {t().trends.weekCol}
               </th>
               <th class={css.th} scope="col">
-                Hours off
+                {t().trends.hoursCol}
               </th>
               <th class={css.th} scope="col">
-                Outages
+                {t().trends.outagesCol}
               </th>
             </tr>
           </thead>
@@ -288,7 +292,7 @@ export const Trends: Component<TrendsProps> = (props) => {
           </tbody>
         </table>
         <a class={css.download} href="/api/outages.csv" download="lights-on-garsfontein-outages.csv">
-          <Download size={14} aria-hidden="true" /> Download the full record (CSV)
+          <Download size={14} aria-hidden="true" /> {t().trends.download}
         </a>
       </details>
     </>

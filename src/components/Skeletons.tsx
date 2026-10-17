@@ -1,14 +1,13 @@
 import { type Component, For } from 'solid-js';
+import { t } from '../lib/i18n';
 
 // Loading placeholders. index.html renders the same markup statically before any
-// JavaScript runs, so keep the two in step: identical boxes mean zero layout shift.
-
-export const TRENDS_TITLE = 'By the numbers';
-export const TRENDS_TABLE_LABEL = 'Show the weekly numbers';
+// JavaScript runs, so keep the two in step (text in both languages too): identical boxes
+// mean zero layout shift.
 
 export const StatusSkeleton: Component = () => (
   <>
-    <p class="gg-sr-only">Loading the current status…</p>
+    <p class="gg-sr-only">{t().status.loading}</p>
     <div class="gg-skel-row" aria-hidden="true">
       <span class="gg-skel gg-skel-badge" />
       <span class="gg-skel-stack">
@@ -28,7 +27,7 @@ export const TrendsCardSkeleton: Component = () => (
   <>
     <div class="gg-trends-body">
       <h2 id="trends-heading" class="gg-card-title">
-        {TRENDS_TITLE}
+        {t().trends.title}
       </h2>
       <div class="gg-skel-stack" aria-hidden="true">
         <span class="gg-skel gg-skel-text gg-w-45" />
@@ -39,7 +38,7 @@ export const TrendsCardSkeleton: Component = () => (
       </div>
     </div>
     <details class="gg-trends-details">
-      <summary>{TRENDS_TABLE_LABEL}</summary>
+      <summary>{t().trends.tableLabel}</summary>
     </details>
   </>
 );

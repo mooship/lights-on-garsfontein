@@ -4,6 +4,7 @@ import ZapOff from 'lucide-solid/icons/zap-off';
 import { type Component, Show } from 'solid-js';
 import type { PowerStatus } from '../../shared/api';
 import { formatDuration } from '../lib/format';
+import { t } from '../lib/i18n';
 import * as css from './StatusBadge.css';
 
 interface StatusBadgeProps {
@@ -12,11 +13,6 @@ interface StatusBadgeProps {
   /** Current time in ms, injected so the duration ticks. */
   now: number;
 }
-
-const HEADLINES: Record<PowerStatus, string> = {
-  ON: 'Power is on',
-  OFF: 'Power is off',
-};
 
 export const StatusBadge: Component<StatusBadgeProps> = (props) => {
   const duration = () => (props.since ? formatDuration(props.now - Date.parse(props.since)) : null);
@@ -32,11 +28,11 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
       <div>
         {/* Only the headline is live, so the ticking duration is never re-announced. */}
         <p class={clsx(css.headline, css.tone[props.status])} role="status">
-          {HEADLINES[props.status]}
+          {t().status[props.status]}
         </p>
         <p class={css.detail}>
           <Show when={duration()} fallback={' '}>
-            {(d) => <>for {d()}</>}
+            {(d) => t().status.for(d())}
           </Show>
         </p>
       </div>

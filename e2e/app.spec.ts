@@ -6,6 +6,14 @@ test.describe.configure({ mode: 'serial' });
 const ADMIN_USERNAME = 'admin'; // matches .dev.vars.example
 const ADMIN_PASSWORD = 'test-password';
 
+// Public copy never says how an outage was recorded, in either language.
+const RECORDING_METHOD = /by hand|sensor|met die hand|handmatig|voeler/i;
+
+/** Starts the page in English (the default is Afrikaans) so most tests read the English copy. */
+const inEnglish = (page: Page) => page.addInitScript(() => localStorage.setItem('locale', 'en'));
+
+test.beforeEach(({ page }) => inEnglish(page));
+
 // Log in through the UI once and reuse the cookie: the login endpoint allows 5 attempts a minute.
 let sessionCookies: Cookie[] = [];
 
@@ -36,6 +44,7 @@ test.describe('theme boot', () => {
   test('a saved preference beats the system theme and the toggle persists it', async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });
     const page = await context.newPage();
+    await inEnglish(page);
     await page.addInitScript(() => {
       if (!sessionStorage.getItem('seeded')) {
         localStorage.setItem('theme', 'light');
@@ -54,29 +63,87 @@ test.describe('theme boot', () => {
   });
 });
 
+test.describe('language', () => {
+  test('is Afrikaans by default', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'af');
+    await expect(page.getByRole('status')).toContainText('Die krag is aan');
+    await expect(page.getByRole('heading', { name: 'In syfers' })).toBeVisible();
+    await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0);
+    await expect(page).toHaveTitle('AAN · Lights On?');
+    await context.close();
+  });
+
+  test('switches to English at once and remembers it', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('/');
+    await expect(page.getByRole('status')).toContainText('Die krag is aan');
+    await page.evaluate(() => Object.assign(window, { __sameDocument: true }));
+
+    await page.getByRole('button', { name: 'Switch to English' }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('status')).toContainText('Power is on');
+    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveAttribute('lang', 'af');
+    expect(await page.evaluate(() => '__sameDocument' in window)).toBe(true); // no reload
+
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('status')).toContainText('Power is on');
+    expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('en');
+    await context.close();
+  });
+
+  test('shows the loading shell in the stored language before the app loads', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'af');
+    await expect(page.getByRole('heading', { name: 'In syfers' })).toBeVisible();
+
+    await inEnglish(page);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent outages' })).toBeVisible();
+    await expect(page.getByText('Run by a Garsfontein resident.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveText('AF');
+    await context.close();
+  });
+});
+
 test.describe('public page', () => {
   test('shows power on by default without a sensor', async ({ page }) => {
     await page.goto('/');
     const status = page.getByRole('status');
     await expect(status).toContainText('Power is on');
-    await expect(page.getByText(/by hand|sensor/i)).toHaveCount(0); // never says how outages are recorded
+    await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0); // never says how outages are recorded
     await expect(page.getByRole('heading', { name: 'By the numbers' })).toBeVisible();
   });
 
-  test('has zero cumulative layout shift while loading', async ({ page }) => {
-    await page.addInitScript(() => {
-      (window as unknown as { __cls: number }).__cls = 0;
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
-          if (!entry.hadRecentInput) (window as unknown as { __cls: number }).__cls += entry.value;
-        }
-      }).observe({ type: 'layout-shift', buffered: true });
+  for (const locale of ['af', 'en']) {
+    test(`has zero cumulative layout shift while loading (${locale})`, async ({ page }) => {
+      // Runs after the English default from beforeEach, so it wins.
+      await page.addInitScript((l) => localStorage.setItem('locale', l), locale);
+      await page.addInitScript(() => {
+        (window as unknown as { __cls: number }).__cls = 0;
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
+            if (!entry.hadRecentInput) (window as unknown as { __cls: number }).__cls += entry.value;
+          }
+        }).observe({ type: 'layout-shift', buffered: true });
+      });
+      await page.goto('/');
+      await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      await expect(page.getByRole('status')).toBeVisible();
+      await page.waitForTimeout(1000);
+      expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
     });
-    await page.goto('/');
-    await expect(page.getByRole('status')).toBeVisible();
-    await page.waitForTimeout(1000);
-    expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
-  });
+  }
 
   test('loads without CSP violations or console errors', async ({ page }) => {
     const errors: string[] = [];
@@ -140,6 +207,10 @@ test.describe('admin', () => {
     await expect(page.getByRole('status')).toContainText('Power is off');
     await expect(page).toHaveTitle(/^OFF \d+m · Lights On\?$/);
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-off.svg');
+    await page.getByRole('button', { name: 'Skakel oor na Afrikaans' }).click();
+    await expect(page.getByRole('status')).toContainText('Die krag is af');
+    await expect(page).toHaveTitle(/^AF \d+m · Lights On\?$/);
+    await page.getByRole('button', { name: 'Switch to English' }).click();
 
     await login(page);
     await page.getByRole('button', { name: 'Punch in' }).click();
@@ -163,19 +234,25 @@ test.describe('community confirmation', () => {
     await login(page);
     await page.getByRole('button', { name: 'Punch out' }).click();
     await expect(page.getByRole('button', { name: 'Punch in' })).toBeEnabled();
+    try {
+      await page.goto('/');
+      // Cloudflare's test site key passes Turnstile without a challenge.
+      await page.getByTestId('confirm-outage').click();
+      await expect(page.getByTestId('confirm-outage')).toHaveText('Thanks for letting us know', { timeout: 20_000 });
+      await expect(page.getByText('1 neighbour says theirs is off too.')).toBeVisible();
 
-    await page.goto('/');
-    // Cloudflare's test site key passes Turnstile without a challenge.
-    await page.getByTestId('confirm-outage').click();
-    await expect(page.getByTestId('confirm-outage')).toHaveText('Thanks for letting us know', { timeout: 20_000 });
-    await expect(page.getByText('1 neighbour says theirs is off too.')).toBeVisible();
-
-    // Same client again: one confirmation per outage, then 5 requests per minute.
-    const codes: number[] = [];
-    for (let i = 0; i < 5; i++) {
-      codes.push((await request.post('/api/confirm', { data: { token: 'XXXX.DUMMY.TOKEN' } })).status());
+      // Same client again: one confirmation per outage, then 5 requests a minute. The limiter counts in
+      // fixed one-minute windows, so a window boundary can reset the count: post until the first 429.
+      const codes: number[] = [];
+      while (codes.length < 12 && !codes.includes(429)) {
+        codes.push((await request.post('/api/confirm', { data: { token: 'XXXX.DUMMY.TOKEN' } })).status());
+      }
+      expect(codes).toContain(429);
+      expect(codes.slice(0, -1).every((code) => code === 409)).toBe(true);
+    } finally {
+      // Close the outage this test opened, so a retry starts from a clean state.
+      await page.request.post('/api/admin/timer', { data: { action: 'punch_in' } });
     }
-    expect(codes).toEqual([409, 409, 409, 409, 429]);
   });
 });
 
