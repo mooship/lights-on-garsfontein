@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const heartbeats = sqliteTable('heartbeats', {
@@ -12,8 +13,8 @@ export const outages = sqliteTable(
     startTime: text('start_time').notNull(),
     endTime: text('end_time'),
     source: text('source', { enum: ['sensor', 'manual'] }).notNull(),
-    isFalsePositive: integer('is_false_positive').notNull().default(0),
-    isPlanned: integer('is_planned').notNull().default(0),
+    isFalsePositive: integer('is_false_positive', { mode: 'boolean' }).notNull().default(sql`0`),
+    isPlanned: integer('is_planned', { mode: 'boolean' }).notNull().default(sql`0`),
   },
   // "Newest first" queries (status, admin list) read only the rows they return.
   (table) => [index('outages_start_time_idx').on(table.startTime)],

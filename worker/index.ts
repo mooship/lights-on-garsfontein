@@ -1,13 +1,15 @@
 import { createDb } from './db/client';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
 import { errors } from './lib/http';
-import { handleAdminRoutes } from './routes/admin';
-import { handleAuthRoutes } from './routes/auth';
-import { handleHistoryRoutes } from './routes/history';
-import { handleSeoRoutes } from './routes/seo';
-import { handleStatusRoutes } from './routes/status';
+import { dispatch, type Routes } from './lib/router';
+import { adminRoutes } from './routes/admin';
+import { authRoutes } from './routes/auth';
+import { historyRoutes } from './routes/history';
+import { seoRoutes } from './routes/seo';
+import { statusRoutes } from './routes/status';
 
-const routers = [handleStatusRoutes, handleHistoryRoutes, handleAuthRoutes, handleAdminRoutes, handleSeoRoutes];
+/** Every Worker endpoint, keyed by "METHOD /path". */
+const routes: Routes = { ...statusRoutes, ...historyRoutes, ...authRoutes, ...adminRoutes, ...seoRoutes };
 
 // public/_headers only covers static assets; Worker responses (API, SEO) get these.
 // None of them is HTML, so the CSP can forbid everything.
@@ -31,10 +33,8 @@ function withSecurityHeaders(routed: Response): Response {
 
 async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  for (const router of routers) {
-    const response = await router(request, env, url);
-    if (response) return response;
-  }
+  const match = routes[`${request.method} ${url.pathname}`];
+  if (match) return dispatch(match, request, env, url);
   if (url.pathname.startsWith('/api/')) return errors.notFound();
   return env.ASSETS.fetch(request);
 }

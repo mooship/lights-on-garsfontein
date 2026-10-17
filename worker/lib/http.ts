@@ -57,6 +57,3 @@ export function isCrossOrigin(request: Request): boolean {
   const origin = request.headers.get('Origin');
   return origin !== null && origin !== new URL(request.url).origin;
 }
-
-/** Read-only open data (status, stats, CSV) may be fetched by any site's browser. */
-export const PUBLIC_CORS = { 'Access-Control-Allow-Origin': '*' } as const;

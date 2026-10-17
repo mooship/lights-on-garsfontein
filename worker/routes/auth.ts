@@ -1,9 +1,10 @@
 import { and, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
-import { createDb } from '../db/client';
+import type { Db } from '../db/client';
 import { sessions } from '../db/schema';
 import { randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
-import { clientIp, errors, isCrossOrigin, isRateLimited, json, parseBody } from '../lib/http';
+import { errors, json, parseBody } from '../lib/http';
+import type { RouteContext, Routes } from '../lib/router';
 
 const SESSION_COOKIE = 'admin_session';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -26,19 +27,17 @@ function readCookie(request: Request, name: string): string | null {
 }
 
 /** Returns the session's user id when the request carries a valid, unexpired session cookie. */
-export async function getSessionUser(request: Request, env: Env): Promise<string | null> {
+export async function getSessionUser(request: Request, db: Db): Promise<string | null> {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return null;
   const id = await sha256Hex(token);
-  const session = await createDb(env.DB).query.sessions.findFirst({
+  const session = await db.query.sessions.findFirst({
     where: and(eq(sessions.id, id), gt(sessions.expiresAt, new Date().toISOString())),
   });
   return session?.userId ?? null;
 }
 
-async function login(request: Request, env: Env): Promise<Response> {
-  if (isCrossOrigin(request)) return errors.forbidden();
-  if (await isRateLimited(env.LOGIN_LIMITER, clientIp(request))) return errors.rateLimited();
+async function login({ request, env, db }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, loginSchema);
   if ('response' in parsed) return parsed.response;
   if (!env.ADMIN_PASSWORD_HASH || !(await verifyPassword(parsed.data.password, env.ADMIN_PASSWORD_HASH))) {
@@ -46,35 +45,23 @@ async function login(request: Request, env: Env): Promise<Response> {
   }
 
   const token = randomToken();
-  await createDb(env.DB)
-    .insert(sessions)
-    .values({
-      id: await sha256Hex(token),
-      userId: ADMIN_USER_ID,
-      expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
-    });
+  await db.insert(sessions).values({
+    id: await sha256Hex(token),
+    userId: ADMIN_USER_ID,
+    expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+  });
   return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SECONDS) });
 }
 
-async function logout(request: Request, env: Env): Promise<Response> {
-  if (isCrossOrigin(request)) return errors.forbidden();
+async function logout({ request, db }: RouteContext): Promise<Response> {
   const token = readCookie(request, SESSION_COOKIE);
   if (token) {
-    await createDb(env.DB)
-      .delete(sessions)
-      .where(eq(sessions.id, await sha256Hex(token)));
+    await db.delete(sessions).where(eq(sessions.id, await sha256Hex(token)));
   }
   return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
 }
 
-export async function handleAuthRoutes(request: Request, env: Env, url: URL): Promise<Response | null> {
-  const route = `${request.method} ${url.pathname}`;
-  switch (route) {
-    case 'POST /api/admin/login':
-      return login(request, env);
-    case 'POST /api/admin/logout':
-      return logout(request, env);
-    default:
-      return null;
-  }
-}
+export const authRoutes: Routes = {
+  'POST /api/admin/login': { handler: login, sameOrigin: true, limiter: 'LOGIN_LIMITER' },
+  'POST /api/admin/logout': { handler: logout, sameOrigin: true },
+};

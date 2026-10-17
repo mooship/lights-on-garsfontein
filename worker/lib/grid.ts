@@ -6,7 +6,7 @@ import { heartbeats, type Outage, outageConfirmations, outages, sessions } from 
 const RECENT_LIMIT = 5;
 
 /** Open and not flagged as a false positive. */
-const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, 0));
+const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, false));
 
 async function getHeartbeat(db: Db) {
   return db.query.heartbeats.findFirst({ where: eq(heartbeats.id, 1) });
@@ -60,7 +60,7 @@ export function summarise(
   confirmations: number,
 ): OutageSummary {
   const { id, startTime, endTime, isPlanned } = outage;
-  return { id, startTime, endTime, confirmations, planned: isPlanned === 1 };
+  return { id, startTime, endTime, confirmations, planned: isPlanned };
 }
 
 /** Until a sensor reports, the punch clock is the source of truth: no open outage means ON. */
@@ -81,7 +81,7 @@ export async function getGridState(db: Db, now: Date) {
   const [heartbeat, [open], recentRows] = await Promise.all([
     getHeartbeat(db),
     outagesWithCounts(db, isOpen).orderBy(desc(outages.startTime)).limit(1),
-    outagesWithCounts(db, eq(outages.isFalsePositive, 0)).orderBy(desc(outages.startTime)).limit(RECENT_LIMIT),
+    outagesWithCounts(db, eq(outages.isFalsePositive, false)).orderBy(desc(outages.startTime)).limit(RECENT_LIMIT),
   ]);
   const state = powerState(open?.startTime, heartbeat?.lastSeen, now);
   return {

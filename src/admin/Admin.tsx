@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
 import { type Component, createResource, createSignal, For, Show } from 'solid-js';
-import type { AdminOutage } from '../../shared/api';
+import type { AdminOutage, AdminOutagesResponse } from '../../shared/api';
 import { PunchClock } from '../components/PunchClock';
 import { ApiError, api } from '../lib/api';
 import { formatDay, formatDuration, formatTime, outageDurationMs, toLocalInput } from '../lib/format';
@@ -186,12 +186,22 @@ const LogOutageForm: Component<{ onLogged: () => void }> = (props) => {
   );
 };
 
-const Dashboard: Component<{ onLoggedOut: () => void }> = (props) => {
+const Dashboard: Component<{ initial: AdminOutagesResponse; onLoggedOut: () => void }> = (props) => {
   const now = useNow(1000);
-  const [outages, { refetch }] = createResource(() => api.outages());
+  // Starts from the list the session check already fetched; changes refresh it.
+  const [outages, setOutages] = createSignal(props.initial);
+  const [loading, setLoading] = createSignal(false);
+  const refetch = async () => {
+    setLoading(true);
+    try {
+      setOutages(await api.outages());
+    } finally {
+      setLoading(false);
+    }
+  };
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
-  const open = () => outages.latest?.outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
+  const open = () => outages().outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
 
   const punch = async (action: 'punch_out' | 'punch_in') => {
     setBusy(true);
@@ -223,7 +233,7 @@ const Dashboard: Component<{ onLoggedOut: () => void }> = (props) => {
         <PunchClock
           outage={open()}
           now={now()}
-          busy={busy() || outages.loading}
+          busy={busy() || loading()}
           onPunchOut={() => punch('punch_out')}
           onPunchIn={() => punch('punch_in')}
         />
@@ -234,14 +244,10 @@ const Dashboard: Component<{ onLoggedOut: () => void }> = (props) => {
 
       <section class="gg-card">
         <h2 class="gg-card-title">Outages</h2>
-        <Show when={outages.latest} fallback={<p>Loading…</p>}>
-          {(data) => (
-            <Show when={data().outages.length > 0} fallback={<p>No outages yet.</p>}>
-              <ul class={css.table}>
-                <For each={data().outages}>{(o) => <OutageRow outage={o} now={now()} onChange={refetch} />}</For>
-              </ul>
-            </Show>
-          )}
+        <Show when={outages().outages.length > 0} fallback={<p>No outages yet.</p>}>
+          <ul class={css.table}>
+            <For each={outages().outages}>{(o) => <OutageRow outage={o} now={now()} onChange={refetch} />}</For>
+          </ul>
         </Show>
       </section>
     </>
@@ -249,13 +255,12 @@ const Dashboard: Component<{ onLoggedOut: () => void }> = (props) => {
 };
 
 const Admin: Component = () => {
-  // Probe the session by asking for the protected outage list.
+  // The protected outage list doubles as the session check: null means signed out.
   const [session, { refetch }] = createResource(async () => {
     try {
-      await api.outages();
-      return true;
+      return await api.outages();
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) return false;
+      if (e instanceof ApiError && e.status === 401) return null;
       throw e;
     }
   });
@@ -263,7 +268,7 @@ const Admin: Component = () => {
   return (
     <Show when={session() !== undefined} fallback={<p class="gg-status-note">Loading…</p>}>
       <Show when={session()} fallback={<LoginForm onLoggedIn={refetch} />}>
-        <Dashboard onLoggedOut={refetch} />
+        {(data) => <Dashboard initial={data()} onLoggedOut={refetch} />}
       </Show>
     </Show>
   );

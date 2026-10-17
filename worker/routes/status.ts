@@ -1,38 +1,31 @@
 import { z } from 'zod';
 import type { ConfirmResponse, StatusResponse } from '../../shared/api';
-import { createDb } from '../db/client';
 import { outageConfirmations } from '../db/schema';
 import { safeEqual, sha256Hex } from '../lib/crypto';
 import { countConfirmations, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
-import { bearerToken, clientIp, errors, isCrossOrigin, isRateLimited, json, PUBLIC_CORS, parseBody } from '../lib/http';
+import { bearerToken, errors, json, parseBody } from '../lib/http';
+import type { RouteContext, Routes } from '../lib/router';
 import { verifyTurnstile } from '../lib/turnstile';
 
 const confirmSchema = z.object({ token: z.string().min(1).max(2048) });
 
-async function getStatus(request: Request, env: Env): Promise<Response> {
-  if (await isRateLimited(env.STATUS_LIMITER, clientIp(request))) return errors.rateLimited();
+async function getStatus({ env, db }: RouteContext): Promise<Response> {
   const now = new Date();
-  const state = await getGridState(createDb(env.DB), now);
   const body: StatusResponse = {
-    ...state,
+    ...(await getGridState(db, now)),
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
     generatedAt: now.toISOString(),
   };
-  return json(body, 200, PUBLIC_CORS);
+  return json(body);
 }
 
-async function postConfirm(request: Request, env: Env): Promise<Response> {
-  if (isCrossOrigin(request)) return errors.forbidden();
-  const ip = clientIp(request);
-  if (await isRateLimited(env.CONFIRM_LIMITER, ip)) return errors.rateLimited();
-
+async function postConfirm({ request, env, db, ip }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, confirmSchema);
   if ('response' in parsed) return parsed.response;
   if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip))) {
     return errors.forbidden('turnstile_failed');
   }
 
-  const db = createDb(env.DB);
   const outage = await detectOutage(db, new Date());
   if (!outage) return errors.conflict('no_active_outage');
 
@@ -48,24 +41,16 @@ async function postConfirm(request: Request, env: Env): Promise<Response> {
   return json(body, 201);
 }
 
-async function postHeartbeat(request: Request, env: Env): Promise<Response> {
+async function postHeartbeat({ request, env, db }: RouteContext): Promise<Response> {
   const token = bearerToken(request);
   // No sensor configured yet: refuse every heartbeat rather than compare against an unset secret.
   if (!env.HEARTBEAT_TOKEN || !token || !(await safeEqual(token, env.HEARTBEAT_TOKEN))) return errors.unauthorized();
-  const closed = await recordHeartbeat(createDb(env.DB), new Date());
+  const closed = await recordHeartbeat(db, new Date());
   return json({ ok: true, closedOutages: closed });
 }
 
-export async function handleStatusRoutes(request: Request, env: Env, url: URL): Promise<Response | null> {
-  const route = `${request.method} ${url.pathname}`;
-  switch (route) {
-    case 'GET /api/status':
-      return getStatus(request, env);
-    case 'POST /api/confirm':
-      return postConfirm(request, env);
-    case 'POST /api/heartbeat':
-      return postHeartbeat(request, env);
-    default:
-      return null;
-  }
-}
+export const statusRoutes: Routes = {
+  'GET /api/status': { handler: getStatus, limiter: 'STATUS_LIMITER', cors: true },
+  'POST /api/confirm': { handler: postConfirm, sameOrigin: true, limiter: 'CONFIRM_LIMITER' },
+  'POST /api/heartbeat': { handler: postHeartbeat },
+};
