@@ -1,6 +1,8 @@
 // Prints an ADMIN_PASSWORD_HASH value for the given password.
 // Usage: npm run hash-password            (prompts, input hidden)
 //        echo -n "secret" | npm run hash-password
+// Pipe straight into Wrangler (prompt goes to stderr, so only the hash reaches the pipe):
+//        npm run --silent hash-password | npx wrangler secret put ADMIN_PASSWORD_HASH
 import { createInterface } from 'node:readline';
 import { hashPassword } from '../worker/lib/crypto.ts';
 
@@ -12,13 +14,13 @@ async function readPassword(): Promise<string> {
       .toString('utf8')
       .replace(/\r?\n$/, '');
   }
-  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-  process.stdout.write('Admin password: ');
+  const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
+  process.stderr.write('Admin password: ');
   // Mute echo while the password is typed.
   (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = () => {};
   const answer = await new Promise<string>((resolve) => rl.question('', resolve));
   rl.close();
-  process.stdout.write('\n');
+  process.stderr.write('\n');
   return answer;
 }
 
@@ -27,4 +29,6 @@ if (password.length < 12) {
   console.error('Use a password of at least 12 characters.');
   process.exit(1);
 }
-console.log(await hashPassword(password));
+const hash = await hashPassword(password);
+// No trailing newline when piped, so the secret is exactly the hash.
+process.stdout.write(process.stdout.isTTY ? `${hash}\n` : hash);

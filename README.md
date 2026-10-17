@@ -49,7 +49,7 @@ The Worker, D1 database and custom domain are defined in `wrangler.toml`. Set th
 
 ```sh
 npx wrangler login
-npm run hash-password | npx wrangler secret put ADMIN_PASSWORD_HASH
+npm run --silent hash-password | npx wrangler secret put ADMIN_PASSWORD_HASH
 npx wrangler secret put TURNSTILE_SECRET_KEY   # from the Turnstile widget
 npx wrangler secret put IP_SALT                # any long random string; never change it
 npm run deploy

@@ -13,7 +13,7 @@ run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png"]
 
 [vars]
 SITE_URL = "https://garsfontein.timothybrits.co.za"
-TURNSTILE_SITE_KEY = "REPLACE_WITH_TURNSTILE_SITE_KEY"
+TURNSTILE_SITE_KEY = "0x4AAAAAAFZLuwPL3UZam75R"
 
 [[d1_databases]]
 binding = "DB"
