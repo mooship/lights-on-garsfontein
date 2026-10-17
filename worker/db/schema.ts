@@ -49,6 +49,25 @@ export const outageConfirmations = sqliteTable(
   ],
 );
 
+/**
+ * "Still off where you are?": a resident says the power is still off while the status is ON
+ * (e.g. a back-fed street). Counted and shown, never acted on: reports do not change the status.
+ */
+export const stillOffReports = sqliteTable(
+  'still_off_reports',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    createdAt: text('created_at').notNull(),
+    clientHash: text('client_hash').notNull(),
+  },
+  (table) => [
+    // The per-client dedupe check.
+    index('still_off_reports_client_created_idx').on(table.clientHash, table.createdAt),
+    // The recent count and the hourly purges.
+    index('still_off_reports_created_at_idx').on(table.createdAt),
+  ],
+);
+
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(), // Hashed session token
   userId: text('user_id').notNull(),

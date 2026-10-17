@@ -45,6 +45,13 @@ export const saved = style({
   selectors: { '&:empty': { marginTop: '-0.875rem' } },
 });
 
+// The punch announcement: a live region that stays in the DOM; empty, it takes no room.
+export const announce = style({
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  selectors: { '&:not(:empty)': { marginTop: '0.75rem' } },
+});
+
 export const checkbox = style({
   display: 'flex',
   alignItems: 'center',

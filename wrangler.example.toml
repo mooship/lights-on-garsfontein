@@ -12,7 +12,8 @@
 #    site.config.ts.
 # 4. Set the secrets (npx wrangler secret put <NAME>; see README):
 #      ADMIN_USERNAME, ADMIN_PASSWORD_HASH (npm run hash-password), ADMIN_API_TOKEN,
-#      HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY (the widget's secret key)
+#      HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY (the widget's secret key), and optionally
+#      CONTACT_EMAIL (the privacy page reveals it only after a Turnstile check)
 # 5. npm run db:migrate:remote, then npm run deploy.
 name = "lights-on"
 main = "worker/index.ts"
@@ -28,7 +29,7 @@ upload_source_maps = true
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png"]
+run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png", "/feed.xml"]
 
 [vars]
 SITE_URL = "<SITE_URL>"

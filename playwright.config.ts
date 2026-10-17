@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 8788;
 // A throwaway local D1 so every run starts empty.
 const STATE = '.wrangler/e2e-state';
+// The placeholder from .dev.vars.example (--var beats .dev.vars), so a real address set there is never used.
+const CONTACT_EMAIL = /^CONTACT_EMAIL="([^"\s]+)"/m.exec(readFileSync('.dev.vars.example', 'utf8'))?.[1];
+if (!CONTACT_EMAIL) throw new Error('.dev.vars.example has no CONTACT_EMAIL');
 
 export default defineConfig({
   testDir: './e2e',
@@ -20,7 +24,7 @@ export default defineConfig({
       `node -e "require('node:fs').rmSync('${STATE}',{recursive:true,force:true})"`,
       'npm run build',
       `npx wrangler d1 migrations apply DB --local --persist-to ${STATE}`,
-      `npx wrangler dev --port ${PORT} --persist-to ${STATE}`,
+      `npx wrangler dev --port ${PORT} --persist-to ${STATE} --var CONTACT_EMAIL:${CONTACT_EMAIL}`,
     ].join(' && '),
     url: `http://localhost:${PORT}/api/status`,
     timeout: 180_000,

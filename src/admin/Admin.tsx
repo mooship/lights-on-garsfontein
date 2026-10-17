@@ -274,14 +274,18 @@ const Dashboard: Component<{
   };
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<unknown>();
+  // The last punch and its time, announced; kept as data so it follows a language switch.
+  const [punched, setPunched] = createSignal<{ action: TimerAction; at: string } | null>(null);
   const open = () => outages().outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
   const onError: OnError = (e, show) => (isUnauthorized(e) ? props.onLoggedOut('session_expired') : show(e));
 
   const punch = async (action: TimerAction) => {
     setBusy(true);
     setError(undefined);
+    setPunched(null);
     try {
       await api.punch(action);
+      setPunched({ action, at: new Date().toISOString() });
       await refetch();
     } catch (e) {
       onError(e, setError);
@@ -314,6 +318,14 @@ const Dashboard: Component<{
           onPunchIn={() => punch('punch_in')}
         />
         <FormError error={error()} />
+        <p class={css.announce} role="status">
+          {(() => {
+            const p = punched();
+            if (!p) return '';
+            const time = formatTime(p.at);
+            return p.action === 'punch_out' ? t().admin.punchedOut(time) : t().admin.punchedIn(time);
+          })()}
+        </p>
       </section>
 
       <LogOutageForm onLogged={refetch} onError={onError} />

@@ -3,7 +3,8 @@
 
 export const af = {
   // The language switch's label: switching to the next locale in site.locales, in that language.
-  lang: { switchTo: 'Switch to English' },
+  // `next` is shown on the switch: the next language's name, in that language.
+  lang: { switchTo: 'Switch to English', next: 'English' },
   theme: { label: 'Wissel tema', toDark: 'Skakel oor na donker modus', toLight: 'Skakel oor na ligte modus' },
   // `m` is the compact minute for the tab title ("1u 5m").
   units: { d: 'd', h: 'u', min: 'min', m: 'm', s: 's' },
@@ -11,22 +12,55 @@ export const af = {
   tab: { ON: 'AAN', OFF: 'AF' },
   banner: { region: 'Kennisgewing', dismiss: 'Maak toe' },
   masthead: {
-    eyebrow: 'Garsfontein Uitb. 16 · Wyk 45 · Pretoria',
-    notice: 'Onafhanklike diens. Nie verbonde aan die Stad Tshwane of Eskom nie.',
+    eyebrow: 'Wyk 45 · Pretoria',
+    notice: 'Onafhanklike diens. Nie verbonde aan of onderskryf deur die Stad Tshwane of Eskom nie.',
   },
   footer: {
     nav: 'Webwerf',
-    privacy: 'Privaatheid',
+    privacy: 'Privaatheid en voorwaardes',
     csv: 'Onderbrekingsdata (CSV)',
+    feed: 'Atom-voer',
     signIn: 'Teken in',
-    measured: 'Gemeet in Garsfontein Uitb. 16, Pretoria · Wyk 45 · Streek 6, Stad Tshwane · Garsfontein-substasie',
+    licence: 'Onderbrekingsdata:',
+    measured: 'Gemeet in Garsfontein Uitb. 16, Pretoria · Wyk 45 · Streek 6, Stad Tshwane',
     operator: 'Onafhanklik bedryf deur ’n inwoner van Garsfontein Uitb. 16.',
   },
   loading: 'Laai tans…',
+  share: {
+    button: 'Deel met bure',
+    text: 'Is die krag af in Garsfontein? Kyk hier:',
+    whatsapp: 'Deel op WhatsApp',
+    telegram: 'Deel op Telegram',
+    copy: 'Kopieer skakel',
+    // Added to the WhatsApp and Telegram links' names: they open in a new tab.
+    newTab: '(maak in ’n nuwe oortjie oop)',
+    copied: 'Skakel gekopieer',
+    copyFailed: 'Kon nie die skakel kopieer nie.',
+  },
+  // What the measuring point covers; `measured` gets site.landmark, which may be empty.
+  scope: {
+    measured: (landmark: string) =>
+      landmark
+        ? `Gemeet in Garsfontein Uitb. 16, naby ${landmark}. Party strate kan anders wees.`
+        : 'Gemeet in Garsfontein Uitb. 16. Party strate kan anders wees.',
+    why: 'Waarom?',
+    whyText:
+      'Die gebied kry sy krag van die Garsfontein-substasie en gaan gewoonlik as geheel af. Party strate is op ’n ander toevoer, en hul krag kan op ander tye afgaan of terugkom. As joune anders is, gebruik die knoppie hieronder.',
+  },
+  // `report` is the link to site.faultReporting.url.
+  safety: {
+    live: 'Behandel kraglyne altyd as lewendig.',
+    report: 'Meld foute by die Stad Tshwane aan',
+  },
+  // The social card (scripts/build-og.ts).
+  og: { question: 'Is die krag af in Garsfontein?', cta: 'Kyk hier vir die huidige status' },
   status: {
     heading: 'Huidige status',
     ON: 'Die krag is aan',
     OFF: 'Die krag is af',
+    // ON without a fresh live reading: no outage is known, but nothing measured the power as on.
+    NONE: 'Geen onderbreking aangemeld nie',
+    noLiveReading: 'Nie intyds gemeet nie.',
     for: (duration: string) => `Al ${duration}`,
     loading: 'Laai tans die huidige status…',
     wentOff: (time: string, day: string) => `Die onderbreking het ${day} om ${time} begin.`,
@@ -39,10 +73,12 @@ export const af = {
     unreachable: 'Kan nie die bediener bereik nie. Ons probeer binnekort weer.',
   },
   confirm: {
+    helper:
+      'Is jou krag ook af? Een tik, anoniem. Dit wys bure hoe wyd die onderbreking is. Dit stel nie die Stad in kennis nie.',
     button: 'My krag is ook af',
     busy: 'Stuur tans…',
     done: 'Bevestiging aangeteken',
-    first: 'Nog geen gemeenskapsbevestigings nie.',
+    first: 'Wees die eerste om te bevestig.',
     count: (n: number) => `${n} ${n === 1 ? 'gemeenskapsbevestiging' : 'gemeenskapsbevestigings'}.`,
     errors: {
       already_confirmed: 'Jy het hierdie onderbreking reeds bevestig.',
@@ -52,6 +88,19 @@ export const af = {
       turnstile_failed: 'Die sekuriteitskontrole kon nie voltooi word nie. Probeer asseblief weer.',
     },
     unknown: 'Iets het skeefgeloop. Probeer asseblief weer.',
+  },
+  stillOff: {
+    button: 'Steeds af by jou?',
+    busy: 'Stuur tans…',
+    done: 'Dankie, aangeteken.',
+    note: 'Dit verander nie die status nie en stel nie die Stad in kennis nie.',
+    count: (n: number) => `${n} ${n === 1 ? 'inwoner' : 'inwoners'} het die afgelope uur gesê hul krag is steeds af.`,
+    errors: {
+      already_reported: 'Jy het die afgelope twee uur reeds aangemeld.',
+      outage_in_progress: 'Daar is reeds ’n onderbreking aan die gang. Die status word binnekort bygewerk.',
+      rate_limited: 'Te veel versoeke. Probeer asseblief oor ’n minuut weer.',
+      turnstile_failed: 'Die sekuriteitskontrole kon nie voltooi word nie. Probeer asseblief weer.',
+    },
   },
   history: {
     title: 'Onlangse onderbrekings',
@@ -80,7 +129,7 @@ export const af = {
     daysOf: (days: number, total: number) => `${days} van ${total}`,
     longest: 'Langste onderbreking',
     average: (duration: string) => `Gemiddeld ${duration}`,
-    chartEmpty: 'Die weeklikse grafiek verskyn sodra die rekord begin.',
+    chartEmpty: 'Nog geen onderbrekings om te wys nie.',
     chartTitle: 'Ure sonder krag per week',
     chartLabel:
       'Ure sonder krag per week. Gebruik die pyltjiesleutels om tussen weke te beweeg, of maak die tabel hieronder oop.',
@@ -89,11 +138,20 @@ export const af = {
     // "keer" keeps the readout on one line on a phone; "onderbrekings" wraps.
     outageCount: (n: number) => `${n} keer`,
     soFar: ' (tot dusver)',
+    // The first week, when records began after its Monday.
+    partial: (day: string) => ` (vanaf ${day})`,
     thisWeek: 'Hierdie week',
     weekCol: 'Week van',
     hoursCol: 'Ure sonder krag',
     outagesCol: 'Onderbrekings',
     download: 'Laai alle onderbrekings af (CSV)',
+    howTitle: 'Hoe ons meet',
+    how: [
+      'Onderbrekings korter as sowat 3 minute word dalk nie aangeteken nie.',
+      'Beplande onderbrekings is ingesluit.',
+      '’n Dag tel as daar op enige tydstip daardie dag ’n onderbreking was.',
+      'Die syfers dek net onderbrekings wat by die meetpunt aangeteken is.',
+    ],
   },
   admin: {
     back: 'Openbare bladsy',
@@ -144,6 +202,8 @@ export const af = {
     idle: 'Geen onderbreking aan die gang nie.',
     punchOut: 'Klok uit',
     punchIn: 'Klok in',
+    punchedOut: (time: string) => `Uitgeklok om ${time}`,
+    punchedIn: (time: string) => `Ingeklok om ${time}`,
   },
 };
 

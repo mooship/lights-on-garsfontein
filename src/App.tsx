@@ -8,8 +8,11 @@ import { SiteBanner } from './components/Banner';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { LanguageToggle } from './components/LanguageToggle';
 import { OutageHistory } from './components/OutageHistory';
+import { Share } from './components/Share';
 import { HistorySkeleton, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
+import { SafetyLine, Scope } from './components/StatusNotes';
+import { StillOff } from './components/StillOff';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api } from './lib/api';
@@ -39,14 +42,12 @@ const clockTime = (ms: number) => formatTime(new Date(ms).toISOString());
 const Masthead: Component<{ notice: boolean }> = (props) => (
   <>
     <header class="gg-masthead">
-      <div>
-        <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
-        <h1 class="gg-title">{site.brand.short}</h1>
-      </div>
+      <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
       <div class="gg-masthead-actions">
         <LanguageToggle />
         <ThemeToggle />
       </div>
+      <h1 class="gg-title">{site.brand.full}</h1>
     </header>
     <Show when={props.notice}>
       <p class="gg-notice">{t().masthead.notice}</p>
@@ -54,18 +55,28 @@ const Masthead: Component<{ notice: boolean }> = (props) => (
   </>
 );
 
-const Footer: Component<{ signIn: boolean }> = (props) => (
+/** `isPublic` adds sharing and the sign-in link, which the admin page doesn't need. */
+const Footer: Component<{ isPublic: boolean }> = (props) => (
   <footer class="gg-footer">
+    <Show when={props.isPublic}>
+      <Share />
+    </Show>
     <nav aria-label={t().footer.nav}>
       <a href="/privacy">{t().footer.privacy}</a>
       <a href="/api/outages.csv">{t().footer.csv}</a>
-      <Show when={props.signIn}>
+      <a href="/feed.xml" type="application/atom+xml">
+        {t().footer.feed}
+      </a>
+      <Show when={props.isPublic}>
         <a href="/admin" rel="nofollow">
           {t().footer.signIn}
         </a>
       </Show>
     </nav>
     <p>{t().footer.measured}</p>
+    <p>
+      {t().footer.licence} <a href={site.dataLicence.url}>{site.dataLicence.name}</a>
+    </p>
     <p>{t().footer.operator}</p>
   </footer>
 );
@@ -125,7 +136,8 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
           <Match when={data()}>
             {(s) => (
               <>
-                <StatusBadge status={s().status} since={s().since} now={now()} />
+                <StatusBadge status={s().status} monitored={s().monitored} since={s().since} now={now()} />
+                <Scope />
                 <div class="gg-status-detail">
                   <p>{statusDetail(s(), minute())}</p>
                   <Show
@@ -147,6 +159,10 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                     />
                   )}
                 </Show>
+                <Show when={s().status === 'ON'}>
+                  <StillOff reports={s().stillOffReports} siteKey={s().turnstileSiteKey} />
+                </Show>
+                <SafetyLine />
               </>
             )}
           </Match>
@@ -154,6 +170,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             <p class={css.error} role="alert">
               {t().status.unreachable}
             </p>
+            <SafetyLine />
           </Match>
           <Match when={true}>
             <StatusSkeleton />
@@ -234,11 +251,12 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
         >
           {(initial) => <PublicView initial={initial()} />}
         </Show>
+        {/* In the flow after the last card: index.html has nothing below it, so it shifts nothing. */}
+        <Show when={showBanner}>
+          <SiteBanner />
+        </Show>
       </main>
-      <Footer signIn={!!props.initial} />
-      <Show when={showBanner}>
-        <SiteBanner />
-      </Show>
+      <Footer isPublic={!!props.initial} />
     </div>
   );
 };

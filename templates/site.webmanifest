@@ -2,7 +2,7 @@
   "name": "%site.brand.full%",
   "id": "/",
   "short_name": "%site.brand.short%",
-  "description": "Intydse kragstatus en onderbrekingsgeskiedenis vir Garsfontein, Pretoria, gemeet in Uitbreiding 16 (Wyk 45). Live power status and outage history for Garsfontein, Pretoria, measured in Extension 16 (Ward 45).",
+  "description": "Kragstatus soos laas gemeet in Garsfontein Uitbreiding 16 (Wyk 45), Pretoria, en ’n rekord van kragonderbrekings. Power status as last measured in Garsfontein Extension 16 (Ward 45), Pretoria, and a record of outages.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

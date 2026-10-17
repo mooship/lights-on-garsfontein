@@ -141,10 +141,24 @@ function siteConfig(): Plugin {
   };
 }
 
-function message(dict: object, key: string): string {
+/** A string from the dictionaries, or a message function's result for `args`. */
+function message(dict: object, key: string, args: readonly string[] = []): string {
   const value = key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], dict);
-  if (typeof value !== 'string') throw new Error(`static-i18n: ${key} is not a string in the dictionaries`);
-  return escapeHtml(value);
+  const text = typeof value === 'function' ? (value as (...a: readonly string[]) => unknown)(...args) : value;
+  if (typeof text !== 'string') throw new Error(`static-i18n: ${key} is not a string in the dictionaries`);
+  return escapeHtml(text);
+}
+
+/** The values for data-i18n-args: space-separated `site.<path>` names, each a string. */
+function messageArgs(names: string | undefined): string[] {
+  return (names ?? '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((name) => {
+      const value = placeholder(name);
+      if (typeof value !== 'string') throw new Error(`static-i18n: ${name} is not a string in site.config.ts`);
+      return value;
+    });
 }
 
 /**
@@ -153,9 +167,11 @@ function message(dict: object, key: string): string {
  * - data-i18n="key" fills it with a <span data-l> per locale.
  * - data-i18n-label="key" (an aria-label) repeats the whole element per locale instead,
  *   with data-i18n as its text.
+ * - data-i18n-args="site.landmark ..." passes those site.config.ts values to a message that is a
+ *   function, such as scope.measured.
  * - data-i18n-switch marks the language switch (src/components/LanguageToggle.tsx): each copy
- *   shows the next locale's code (with two, the other one), with lang set to that locale. With
- *   one locale there is no switch.
+ *   shows the next locale's name (`lang.next`; with two, the other one), with lang set to that
+ *   locale. With one locale there is no switch.
  */
 function staticI18n(): Plugin {
   const marked = /<([a-z][\w-]*)(\s[^>]*?\bdata-i18n[^>]*)>\s*<\/\1>/g;
@@ -168,16 +184,17 @@ function staticI18n(): Plugin {
         const out = html.replace(marked, (_element, tag: string, attrs: string) => {
           const text = attr(attrs, 'data-i18n');
           const label = attr(attrs, 'data-i18n-label');
+          const args = messageArgs(attr(attrs, 'data-i18n-args'));
           const isSwitch = /\sdata-i18n-switch\b/.test(attrs);
           if (isSwitch && LOCALES.length === 1) return '';
-          const rest = attrs.replace(/\sdata-i18n(?:-label)?="[^"]*"|\sdata-i18n-switch\b/g, '');
+          const rest = attrs.replace(/\sdata-i18n(?:-label|-args)?="[^"]*"|\sdata-i18n-switch\b/g, '');
           const copies = LOCALES.map((locale, i) => {
             const dict = DICTIONARIES[locale];
             const next = LOCALES[(i + 1) % LOCALES.length] ?? locale;
             return {
               locale,
               lang: isSwitch ? next : locale,
-              text: isSwitch ? next.toUpperCase() : text ? message(dict, text) : '',
+              text: isSwitch ? message(dict, 'lang.next') : text ? message(dict, text, args) : '',
               label: label && message(dict, label),
             };
           });
@@ -244,6 +261,7 @@ export default defineConfig({
       '/og.png': WORKER,
       '/sitemap.xml': WORKER,
       '/robots.txt': WORKER,
+      '/feed.xml': WORKER,
     },
   },
 });

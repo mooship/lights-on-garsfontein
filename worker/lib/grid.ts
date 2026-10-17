@@ -5,9 +5,11 @@ import {
   type OutageSource,
   type OutageSummary,
   type PowerStatus,
+  STILL_OFF_DEDUPE_MS,
+  STILL_OFF_WINDOW_MS,
 } from '../../shared/api';
 import type { Db } from '../db/client';
-import { heartbeats, type Outage, outageConfirmations, outages, sessions } from '../db/schema';
+import { heartbeats, type Outage, outageConfirmations, outages, sessions, stillOffReports } from '../db/schema';
 
 const RECENT_LIMIT = 5;
 
@@ -121,17 +123,36 @@ function powerState(
   return { status: 'ON', since: null };
 }
 
-/** Just ON or OFF, for callers that do not need the history (e.g. the social card). */
-export async function getPowerStatus(db: Db, now: Date): Promise<PowerStatus> {
-  const [[heartbeat], [open]] = await db.batch([heartbeatQuery(db), openOutageQuery(db)]);
-  return powerState(open?.startTime, heartbeat, now).status;
+/** "Still off" reports since `now - STILL_OFF_WINDOW_MS`. */
+function stillOffCountQuery(db: Db, now: Date) {
+  const since = new Date(now.getTime() - STILL_OFF_WINDOW_MS).toISOString();
+  return db.select({ total: count() }).from(stillOffReports).where(gte(stillOffReports.createdAt, since));
+}
+
+export async function countStillOffReports(db: Db, now: Date): Promise<number> {
+  const [row] = await stillOffCountQuery(db, now);
+  return row?.total ?? 0;
+}
+
+/**
+ * Records a "still off" report unless this client made one within STILL_OFF_DEDUPE_MS, as a
+ * single statement so two concurrent requests cannot both insert. Returns whether it was recorded.
+ */
+export async function recordStillOff(db: Db, clientHash: string, now: Date): Promise<boolean> {
+  const iso = now.toISOString();
+  const recent = new Date(now.getTime() - STILL_OFF_DEDUPE_MS).toISOString();
+  const { meta } = await db.run(
+    sql`insert into ${stillOffReports} (created_at, client_hash) select ${iso}, ${clientHash} where not exists (select 1 from ${stillOffReports} where ${stillOffReports.clientHash} = ${clientHash} and ${stillOffReports.createdAt} >= ${recent})`,
+  );
+  return meta.changes > 0;
 }
 
 export async function getGridState(db: Db, now: Date) {
-  const [[heartbeat], [open], recentRows] = await db.batch([
+  const [[heartbeat], [open], recentRows, [stillOff]] = await db.batch([
     heartbeatQuery(db),
     outagesWithCounts(db, isOpen).orderBy(desc(outages.startTime)).limit(1),
     outagesWithCounts(db, eq(outages.isFalsePositive, false)).orderBy(desc(outages.startTime)).limit(RECENT_LIMIT),
+    stillOffCountQuery(db, now),
   ]);
   const state = powerState(open?.startTime, heartbeat, now);
   // When ON, the current state began when the last outage ended (outages can overlap, so the latest end).
@@ -144,6 +165,9 @@ export async function getGridState(db: Db, now: Date) {
     since: state.since ?? lastEnd,
     outage: open ? summarise(open) : null,
     recent: recentRows.map(summarise),
+    // Whether a sensor is online now; says nothing about how any outage was recorded.
+    monitored: heartbeat !== undefined && !isStale(heartbeat.lastSeen, now),
+    stillOffReports: state.status === 'ON' ? (stillOff?.total ?? 0) : 0,
   };
 }
 
@@ -161,14 +185,15 @@ export async function detectOutage(db: Db, now: Date): Promise<{ outage?: Outage
 }
 
 /**
- * Records a heartbeat and closes any open sensor outages (power is back). If the heartbeat had
- * gone stale but no outage was opened for it (power came back between two cron runs), the gap
- * is recorded as a closed sensor outage, unless the gap is already on record.
+ * Records a heartbeat and closes every open outage, manual ones included: the sensor seeing power
+ * means power is on at the measuring point. If the heartbeat had gone stale but no outage was
+ * opened for it (power came back between two cron runs), the gap is recorded as a closed sensor
+ * outage, unless the gap is already on record or an open outage (closed here) covers it.
  */
 export async function recordHeartbeat(db: Db, now: Date): Promise<number> {
   const iso = now.toISOString();
   const staleBefore = new Date(now.getTime() - HEARTBEAT_THRESHOLD_MS).toISOString();
-  const openSensor = and(isNull(outages.endTime), eq(outages.source, 'sensor'));
+  const anyOpen = isNull(outages.endTime);
   // Insert-select (raw `db.run` cannot be batched): it needs every column, in table order.
   const missedOutage = db
     .select({
@@ -184,7 +209,7 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<number> {
       and(
         eq(heartbeats.id, 1),
         lt(heartbeats.lastSeen, staleBefore),
-        sql`not exists (select 1 from ${outages} where ${outages.startTime} >= ${heartbeats.lastSeen} or ${openSensor})`,
+        sql`not exists (select 1 from ${outages} where ${outages.startTime} >= ${heartbeats.lastSeen} or ${anyOpen})`,
       ),
     );
   const [, , closed] = await db.batch([
@@ -193,7 +218,7 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<number> {
       .insert(heartbeats)
       .values({ id: 1, lastSeen: iso })
       .onConflictDoUpdate({ target: heartbeats.id, set: { lastSeen: iso } }),
-    db.update(outages).set({ endTime: iso }).where(openSensor).returning({ id: outages.id }),
+    db.update(outages).set({ endTime: iso }).where(anyOpen).returning({ id: outages.id }),
   ]);
   return closed.length;
 }
@@ -214,4 +239,24 @@ export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
     .update(outageConfirmations)
     .set({ clientHash: sql`'purged:' || ${outageConfirmations.id}` })
     .where(and(lt(outageConfirmations.createdAt, cutoff), sql`${outageConfirmations.clientHash} not like 'purged:%'`));
+}
+
+const STILL_OFF_KEEP_DAYS = 90;
+
+/**
+ * "Still off" reports: fingerprints go after 30 days, like confirmations, and the rows after 90
+ * (they only ever count for an hour).
+ */
+export async function purgeOldStillOffReports(db: Db, now: Date): Promise<void> {
+  const fingerprintCutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();
+  const rowCutoff = new Date(now.getTime() - STILL_OFF_KEEP_DAYS * DAY_MS).toISOString();
+  await db.batch([
+    db.delete(stillOffReports).where(lt(stillOffReports.createdAt, rowCutoff)),
+    db
+      .update(stillOffReports)
+      .set({ clientHash: sql`'purged:' || ${stillOffReports.id}` })
+      .where(
+        and(lt(stillOffReports.createdAt, fingerprintCutoff), sql`${stillOffReports.clientHash} not like 'purged:%'`),
+      ),
+  ]);
 }

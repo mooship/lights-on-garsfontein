@@ -47,7 +47,6 @@ globalStyle('.gg-shell', {
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
-  // Lets the bottom banner (components/Banner.css.ts) sit at the screen's foot on a short page.
   minHeight: '100dvh',
 });
 
@@ -56,13 +55,16 @@ globalStyle('.gg-main', { display: 'flex', flexDirection: 'column', gap: '1rem' 
 // Focused only from script (tabindex=-1, after the banner closes), so it needs no ring.
 globalStyle('.gg-main:focus', { outline: 'none' });
 
+// The eyebrow and the switches share the first row; the full brand name gets the width below.
 globalStyle('.gg-masthead', {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: '1rem',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  alignItems: 'center',
+  columnGap: '1rem',
   paddingTop: '0.5rem',
 });
+
+globalStyle('.gg-masthead .gg-title', { gridColumn: '1 / -1' });
 
 globalStyle('.gg-eyebrow', {
   fontSize: '0.8125rem',
@@ -119,13 +121,36 @@ globalStyle('.gg-trends-body', { minHeight: '32.75rem' });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
 
-globalStyle('.gg-trends-details > summary', {
+// A second details (how we measure) sits right under the first.
+globalStyle('.gg-trends-details + .gg-trends-details', { marginTop: 0 });
+
+// Disclosures draw their own ▸/▾: a flex summary loses the browser's marker. The marker has empty
+// alt text so screen readers, which already announce expanded or collapsed, skip it.
+const summaries = '.gg-trends-details > summary, .gg-why > summary';
+
+globalStyle(summaries, {
   cursor: 'pointer',
   fontWeight: 600,
   minHeight: '2.75rem',
   display: 'flex',
   alignItems: 'center',
+  gap: '0.375rem',
+  listStyle: 'none',
 });
+
+globalStyle('.gg-trends-details > summary::-webkit-details-marker, .gg-why > summary::-webkit-details-marker', {
+  display: 'none',
+});
+
+globalStyle('.gg-trends-details > summary::before, .gg-why > summary::before', {
+  content: '"▸" / ""',
+  width: '0.75em',
+  flex: 'none',
+});
+
+globalStyle('.gg-trends-details[open] > summary::before, .gg-why[open] > summary::before', { content: '"▾" / ""' });
+
+globalStyle('.gg-trends-details ul', { margin: '0 0 0.5rem', paddingLeft: '1.25rem', lineHeight: 1.45 });
 
 globalStyle('.gg-card-title', {
   fontFamily: vars.font.display,
@@ -150,8 +175,8 @@ globalStyle('.gg-icon-button', {
 
 globalStyle('.gg-masthead-actions', { flex: 'none', display: 'flex', gap: '0.5rem' });
 
-// The language switch is the same 44px circle as the theme toggle, with a two-letter code.
-globalStyle('.gg-lang-button', { fontSize: '0.8125rem', fontWeight: 700, letterSpacing: '0.04em' });
+// The language switch is a 44px-high pill with the next language's name.
+globalStyle('.gg-lang-button', { width: 'auto', padding: '0 0.875rem', fontSize: '0.875rem', fontWeight: 600 });
 
 globalStyle('.gg-footer', {
   fontSize: '0.875rem',
@@ -164,11 +189,46 @@ globalStyle('.gg-footer', {
 
 globalStyle('.gg-footer nav', { display: 'flex', flexWrap: 'wrap', gap: '0 1rem' });
 
-globalStyle('.gg-footer a', {
+globalStyle('.gg-footer nav a', {
   display: 'inline-flex',
   alignItems: 'center',
   minHeight: '2.75rem',
 });
+
+// The status card's lower rows. The shell in index.html renders them too, so they keep global
+// names: the scope line and its "Why?", the "Still off where you are?" link button with its
+// note, and the safety line.
+globalStyle('.gg-scope', { fontSize: '0.9375rem', lineHeight: 1.45, color: vars.color.muted });
+
+globalStyle('.gg-why', { marginTop: '0.125rem' });
+
+globalStyle('.gg-why > summary', { minHeight: '2.25rem', width: 'fit-content', fontSize: '0.875rem' });
+
+globalStyle('.gg-why > p', { paddingBottom: '0.25rem' });
+
+globalStyle('.gg-still-off', { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
+
+// A secondary action: link-styled, still a 44px touch target.
+globalStyle('.gg-link-button', {
+  minHeight: '2.75rem',
+  padding: 0,
+  border: 'none',
+  background: 'none',
+  fontWeight: 650,
+  textDecoration: 'underline',
+  textUnderlineOffset: '0.2em',
+  cursor: 'pointer',
+});
+
+globalStyle('.gg-link-button:disabled, .gg-link-button[aria-disabled="true"]', {
+  textDecoration: 'none',
+  color: vars.color.muted,
+  cursor: 'default',
+});
+
+globalStyle('.gg-still-off-note, .gg-safety', { fontSize: '0.8125rem', lineHeight: 1.45, color: vars.color.muted });
+
+globalStyle('.gg-safety', { paddingTop: '0.75rem', borderTop: `1px solid ${vars.color.border}` });
 
 globalStyle('.gg-sr-only', {
   position: 'absolute',
@@ -221,7 +281,8 @@ globalStyle('.gg-skel::after', {
   animation: 'gg-shimmer 1.4s ease-in-out infinite',
 });
 
-globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem' });
+// The same min-height as the status badge (components/StatusBadge.css.ts).
+globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem', minHeight: '5rem' });
 globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1 });
 globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' });
 globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.25rem' });

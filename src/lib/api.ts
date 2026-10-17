@@ -3,6 +3,7 @@ import type {
   ConfirmResponse,
   StatsResponse,
   StatusResponse,
+  StillOffResponse,
   TimerAction,
 } from '../../shared/api';
 
@@ -32,6 +33,7 @@ export const api = {
   status: () => request<StatusResponse>('/api/status'),
   stats: () => request<StatsResponse>('/api/stats'),
   confirm: (token: string, outageId: number) => post<ConfirmResponse>('/api/confirm', { token, outageId }),
+  stillOff: (token: string) => post<StillOffResponse>('/api/still-off', { token }),
   login: (username: string, password: string, token: string) =>
     post<{ ok: true }>('/api/admin/login', { username, password, token }),
   logout: () => post<{ ok: true }>('/api/admin/logout'),

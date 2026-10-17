@@ -3,43 +3,56 @@
 [![CI](https://github.com/mooship/lights-on-garsfontein/actions/workflows/ci.yml/badge.svg)](https://github.com/mooship/lights-on-garsfontein/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-An open, continuous record of power outages for one neighbourhood. The site shows whether the electricity supply is on right now and keeps a history of every outage, so residents, researchers and journalists can see how often the power goes off, for how long, and whether that is changing. It runs on a single Cloudflare Worker with a D1 database, and the code is written so that anyone can run it for their own area.
+An open record of power outages for one neighbourhood. The site shows the state of the electricity supply as last recorded at one measuring point and keeps a history of every outage recorded there, so residents, researchers and journalists can see how often the power goes off and for how long. It runs on a single Cloudflare Worker with a D1 database, and the code is written so that anyone can run it for their own area.
+
+**Why this exists.** It is an ultra-local service: it exists only to show the state of the electricity supply in Garsfontein, for the people who live there.
 
 ## This deployment
 
 Live at **https://garsfontein.timothybrits.co.za**. Records begin on **17 October 2026**.
 
-> Independent service, operated by a resident of Garsfontein Extension 16. Not affiliated with the City of Tshwane or Eskom.
+> Independent service, operated by a resident of Garsfontein Extension 16. Not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
 
-**Area.** Measurements are taken at a home in **Garsfontein Extension 16**, in Ward 45, Region 6 of the City of Tshwane, so the record is exact for Ext. 16. Homes there are supplied by the **Garsfontein substation**, which is fed from **Highlands**, which in turn is fed from **Njala**. In practice a single fault on this part of the network usually affects the whole Garsfontein substation area at once, so the record is a reasonable guide for the rest of Garsfontein. An outage limited to another extension will not appear.
+**Area.** The supply is measured at one home in **Garsfontein Extension 16**, near **Mediclinic Denmar**, in Ward 45, Region 6 of the City of Tshwane. Most residents know their ward rather than their extension, so the site names both. Homes there are normally supplied by the **Garsfontein substation**, which is fed from **Highlands**, which in turn is fed from **Njala**. A fault on this part of the network usually affects the Garsfontein substation area as a whole, so the record is usually representative of that area, but some streets can differ. During faults or maintenance, parts of the network can be back-fed from another substation, so a street may have power while the measuring point does not, or the other way round. An outage limited to another street or extension will not appear.
 
-**What it measures.** Every interruption to the supply at the measuring point, planned or unplanned, whatever the cause. It is not a load-shedding schedule and does not predict outages.
+**What it measures.** Every interruption to the supply at the measuring point, planned or unplanned, whatever the cause. It is not a load-shedding schedule and does not predict outages. The statistics describe outages recorded at that one point; they are not a statement about any organisation's performance.
 
-- **Live status**: whether the power is on or off, and for how long. The browser tab title and favicon follow the status.
+- **Status**: whether the power is on or off at the measuring point, as last recorded, and for how long. The browser tab title and favicon follow the status.
 - **Statistics**: hours without power, number of outages, days with an outage and the longest outage over the last 30 days, compared with the previous 30 days once enough data exists, with a weekly chart and table. Only time since records began is counted.
 - **Planned outages**: outages announced in advance (for example maintenance or upgrades) are tagged as planned. They still count as time without power.
 - **Community confirmations**: during an outage, the "My power is off too" button records one confirmation per connection per outage, protected by Cloudflare Turnstile.
-- **Open data**: every outage as CSV, plus a public JSON API.
+- **"Still off" reports**: while the status is on, residents whose power is still off (for example on a back-fed street) can say so, once per connection every 2 hours. The count of the last hour is shown. Reports never change the status.
+- **Open data**: every outage as CSV, an Atom feed and a public JSON API.
 
 **Languages.** The site is in Afrikaans by default, with an English option. The API and `llms.txt` are in English.
 
 ## Using the data
 
-The CSV and the public API are free to use. Times are UTC (ISO 8601); local time for this deployment is SAST (UTC+2, no daylight saving). Please poll no more than once every 30 seconds.
+The CSV, the feed and the public API are free to use. The outage data is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (`site.dataLicence`): credit "Lights On, Garsfontein?" and link to the site. It is provided as is, with no warranty of accuracy. The code is MIT. Times are UTC (ISO 8601); local time for this deployment is SAST (UTC+2, no daylight saving). Please poll no more than once every 30 seconds.
 
 | Method and path | Purpose | Caching | Limits and access |
 | --- | --- | --- | --- |
-| `GET /api/status` | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages, `generatedAt` | `no-store` for browsers; 12 s at the edge, cleared on writes | Shared 60/min; CORS |
+| `GET /api/status` | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages, `monitored`, `stillOffReports`, `generatedAt` | `no-store` for browsers; 12 s at the edge, cleared on writes | Shared 60/min; CORS |
 | `GET /api/stats` | Last 7, 30 and 365 days, the previous 30 days (once tracked), up to 26 weekly totals | `max-age=60` | Shared 60/min; CORS |
 | `GET /api/outages.csv` | Every outage, false positives excluded | `max-age=300` | Shared 60/min; CORS |
-| `GET /og.png` | Social card for the live status | `max-age=60` | Shared 60/min |
+| `GET /feed.xml` | Atom feed of the 20 most recent outages, false positives excluded | `max-age=300` | Shared 60/min; CORS |
+| `GET /og.png` | Social card: a single status-neutral image that never claims on or off | `max-age=60` | None |
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
 | `POST /api/confirm` | Community confirmation: once per connection per outage | `no-store` | 5/min; same-origin; Turnstile |
+| `POST /api/still-off` | "Still off" report while the status is `ON`: once per connection every 2 hours. Never changes the status | `no-store` | 5/min, shared with `/api/confirm`; same-origin; Turnstile (action `still_off`) |
 | `POST /api/heartbeat` | Sensor check-in | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Same-origin. Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
 "Shared 60/min" is one limit across those endpoints, per connection, with IPv6 addresses counted per /64. Over a limit, the API answers `429` with `Retry-After: 60`. The edge cache is per Cloudflare datacentre, so a write clears only the copy in the datacentre that handled it; elsewhere the short TTL bounds the delay.
+
+### Status fields
+
+- `monitored` is `true` while the sensor at the measuring point is reporting (its last heartbeat is fresh). When it is `false`, `ON` only means that no outage has been reported, not that power was measured.
+- `stillOffReports` is the number of "still off" reports in the last hour while the status is `ON`, and always `0` while it is `OFF`.
+- `confirmations` and `stillOffReports` are counts from residents, not measurements. They never change `status`.
+
+`POST /api/still-off` takes `{ "token": "<Turnstile token for the still_off action>" }` and answers `201` with `{ "reports": n }`, or `409` with `outage_in_progress` (use `/api/confirm` instead) or `already_reported` (within the last 2 hours).
 
 ### CSV contract
 
@@ -152,7 +165,10 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `url` | The public origin, no trailing slash; must equal `SITE_URL` in `wrangler.toml` |
    | `repo` | Source code link, shown in the privacy notice and `llms.txt` |
    | `brand.short`, `brand.full` | Short and full site names |
-   | `operator.name` | The operator, for structured data |
+   | `operator.name` | The operator: the responsible party in the privacy notice, and the provider in structured data |
+   | `landmark` | A place near the measuring point that residents recognise, never the exact address |
+   | `faultReporting.url` | The utility's official page for reporting faults (the link text is in the dictionaries). Check that the link still works |
+   | `dataLicence.name`, `dataLicence.url` | Licence for the outage data (CSV, feed and API), shown in the terms and `llms.txt`. The code stays MIT |
    | `area` | Name, region, city, province and country, for structured data (JSON-LD) only |
    | `trackingSince` | When records begin, with offset; nothing before it counts as tracked time |
    | `timeZone` | IANA zone for every displayed date and time |
@@ -176,17 +192,20 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `ADMIN_USERNAME` | Admin sign-in name (case-insensitive) |
    | `ADMIN_PASSWORD_HASH` | PBKDF2 hash of the admin password: `npm run --silent hash-password \| npx wrangler secret put ADMIN_PASSWORD_HASH` (input hidden, at least 12 characters) |
    | `TURNSTILE_SECRET_KEY` | The Turnstile widget's secret key |
-   | `IP_SALT` | Salt for the hashed connection fingerprints on confirmations. A long random string; never change it |
+   | `IP_SALT` | Salt for the hashed connection fingerprints on confirmations and "still off" reports. A long random string; never change it |
    | `ADMIN_API_TOKEN` | Optional: bearer token for scripts and agents |
    | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor |
+   | `CONTACT_EMAIL` | Optional: the email address for privacy requests. The privacy page reveals it only after a Turnstile check (`POST /api/contact`), so it never appears in the repo or the built site. Until it is set, requests go to GitHub issues, which are public |
 
    For random values, use for example `openssl rand -base64 32`. Changing `ADMIN_PASSWORD_HASH` signs out every session on its next use, as each session stores a short fingerprint of the hash.
 7. **Apply the migrations and deploy.** Manually: `npm run deploy` (build, apply pending migrations, deploy). With Cloudflare Workers Builds, connect the repository and use `npm run deploy:ci` as the deploy command; it applies pending D1 migrations first and only then deploys, so if a migration fails the previous version stays live. Pull requests are tested by GitHub Actions and are not deployed.
-8. **Regenerate the images**: `npm run og` for the social cards (brand and labels come from the config and dictionaries) and `npm run icons` for the app icons (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand.
-9. **Review `privacy.html`** for your jurisdiction. It is written for POPIA (South Africa) and describes this deployment's data handling.
+8. **Regenerate the images**: `npm run og` for the social card (one status-neutral image; brand and labels come from the config and dictionaries) and `npm run icons` for the app icons (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand.
+9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and the terms of use, is written for POPIA (South Africa) and describes this deployment's data handling, including Cloudflare's log retention on this plan. The `FORKERS` comments mark what to check.
+
+   Do not use utility or municipal logos or branding, and keep the independence disclaimer (masthead, footer, privacy page and `llms.txt`).
 10. **Banners.** `src/banners.ts` holds short, dated notices shown at the bottom of the public page. To add one, append an entry to `BANNERS` with a new, stable `id` (dismissals are remembered by it), `from` and `until` via `zoned('YYYY-MM-DDTHH:mm')` in the configured zone (`until` is exclusive), and the copy (required in the default locale, optional in others). To remove one, delete its entry; expired entries stop rendering on their own. At most one banner shows at a time.
 
-Two cron triggers run the Worker (`crons = ["* * * * *", "0 * * * *"]`). Every minute it checks for a silent sensor and opens an outage. Every hour it removes expired sessions and clears the hashed connection fingerprints from confirmations older than 30 days (the counts are kept).
+Two cron triggers run the Worker (`crons = ["* * * * *", "0 * * * *"]`). Every minute it checks for a silent sensor and opens an outage. Every hour it removes expired sessions, clears the hashed connection fingerprints from confirmations and "still off" reports older than 30 days (the confirmation counts are kept), and deletes "still off" reports older than 90 days.
 
 ## Extending
 
@@ -258,7 +277,7 @@ For hot reload, run `npm run dev:worker` and `npm run dev` side by side. Vite se
 | `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
 | `npm run db:migrate:local` / `db:migrate:remote` | Apply pending migrations locally / to the production database |
 | `npm run hash-password` | Print an `ADMIN_PASSWORD_HASH` value (input hidden) |
-| `npm run og` / `npm run icons` | Re-render the social cards and app icons |
+| `npm run og` / `npm run icons` | Re-render the social card and app icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
 ## Contributing
@@ -267,7 +286,6 @@ Issues and pull requests are welcome on [GitHub](https://github.com/mooship/ligh
 
 - Lefthook runs Biome and the type check on commit, and the unit tests on push. CI also runs the end-to-end tests. Before opening a pull request, run `npm run lint:ci`, `npm run typecheck`, `npm test` and `npm run test:e2e`.
 - User-facing text lives in `src/i18n/af.ts` (the source and default) and `src/i18n/en.ts`; add every new string to both.
-- The public site and API must never reveal how an outage was recorded.
 
 By contributing, you agree that your contributions are licensed under the MIT licence.
 

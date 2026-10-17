@@ -1,4 +1,7 @@
 <!doctype html>
+<!-- FORKERS: review the legal basis for your jurisdiction. This page is written for POPIA (South
+     Africa) and describes this deployment's data handling; check every claim against your code,
+     your wrangler.toml and your Cloudflare plan. -->
 <html lang="af">
   <head>
     <meta charset="UTF-8" />
@@ -12,10 +15,10 @@
         } catch (e) {}
       })();
     </script>
-    <title>Privaatheid · Privacy · %site.brand.full%</title>
+    <title>Privaatheid en gebruiksvoorwaardes · Privacy and terms of use · %site.brand.full%</title>
     <meta
       name="description"
-      content="Hoe %site.brand.full% jou inligting ingevolge POPIA hanteer. How %site.brand.full% handles your information under POPIA."
+      content="Hoe %site.brand.full% jou inligting ingevolge POPIA hanteer, en die voorwaardes vir die gebruik van die webwerf. How %site.brand.full% handles your information under POPIA, and the terms of use."
     />
     <link rel="canonical" href="%site.url%/privacy" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -23,6 +26,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="stylesheet" href="/src/styles/privacy.css" />
+    <script type="module" src="/src/privacy.ts"></script>
   </head>
   <body>
     <main>
@@ -30,129 +34,301 @@
       <p><a href="#af">Afrikaans</a> · <a href="#en" hreflang="en" lang="en">English</a></p>
 
       <section id="af">
-        <h1>Privaatheidskennisgewing</h1>
+        <h1>Privaatheid en gebruiks&shy;voorwaardes</h1>
         <p class="updated">Laas bygewerk op 17 Oktober 2026</p>
 
         <p>
-          Hierdie webwerf hou ’n oop rekord van kragonderbrekings vir huise wat hul krag van die Garsfontein-substasie in
-          Pretoria kry. Dit word onafhanklik deur ’n inwoner van Garsfontein bedryf en is nie aan die Stad Tshwane of
-          Eskom verbonde nie. Hierdie kennisgewing verduidelik hoe die webwerf inligting oor jou hanteer, ooreenkomstig
-          die Wet op die Beskerming van Persoonlike Inligting (POPIA).
+          Hierdie webwerf hou ’n rekord van kragonderbrekings in Garsfontein, Pretoria. Die toevoer word by een punt in
+          Garsfontein Uitbreiding 16, naby %site.landmark%, gemeet. Dit is gewoonlik verteenwoordigend van die gebied
+          wat deur die Garsfontein-substasie voorsien word, maar sommige strate kan verskil. Die webwerf word onafhanklik
+          deur ’n inwoner bedryf en is nie aan die Stad Tshwane of Eskom verbonde nie.
+        </p>
+        <p>
+          <strong>Behandel kraglyne altyd as lewendig. Moenie op hierdie webwerf staatmaak vir veiligheids- of mediese
+          besluite nie.</strong>
         </p>
 
-        <h2>Wat ons insamel</h2>
+        <h2>Privaatheids&shy;kennisgewing</h2>
+        <p>
+          Hierdie kennisgewing verduidelik watter inligting oor jou die webwerf hanteer en hoekom, ooreenkomstig die Wet
+          op die Beskerming van Persoonlike Inligting, 4 van 2013 (POPIA).
+        </p>
+
+        <h3>Wie is verantwoordelik</h3>
+        <p>
+          Die verantwoordelike party is %site.operator.name%, ’n onafhanklike inwoner wat die webwerf in sy persoonlike
+          hoedanigheid bedryf. Daar is geen maatskappy of organisasie agter die webwerf nie.
+        </p>
+
+        <h3>Wat ons insamel</h3>
         <ul>
           <li>
-            <strong>Gemeenskapsbevestigings.</strong> Wanneer jy op “My krag is ook af” tik, stoor ons ’n onomkeerbare
-            vingerafdruk van jou IP-adres (vir IPv6, van sy netwerkvoorvoegsel; ’n gesoute SHA-256-hash), saam met die
-            onderbreking en die tyd. Sodoende word elke verbinding net een keer per onderbreking getel. Die adres self
-            word nooit gestoor nie, en die vingerafdruk kan nie sonder ’n geheime sleutel, wat net die webwerf het, weer
-            in die adres omgeskakel word nie. Vingerafdrukke word ná 30 dae geskrap; die telling word behou.
+            <strong>Gemeenskapsbevestigings.</strong> Wanneer jy op “My krag is ook af” tik, stoor ons die onderbreking,
+            die tyd en ’n onomkeerbare kode wat van jou internetverbinding afgelei word (’n gesoute SHA-256-hash van jou
+            IP-adres, of vir IPv6 van die /64-voorvoegsel). Die kode sorg dat elke verbinding net een keer per
+            onderbreking getel word. Jou IP-adres self word nie in die databasis gestoor nie. Ná 30 dae word die kode
+            uitgevee; die telling bly behoue.
           </li>
           <li>
-            <strong>Beskerming teen bots.</strong> Bevestigings word deur Cloudflare Turnstile gekontroleer, wat eers
-            laai wanneer jy op die knoppie tik. Cloudflare gebruik seine van jou blaaier om mense van outomatiese verkeer
-            te onderskei; sien
+            <strong>“Steeds af”-verslae.</strong> As die webwerf wys dat die krag aan is, maar jy aandui dat jou krag
+            steeds af is, stoor ons die tyd en dieselfde soort onomkeerbare kode, sodat ’n verbinding hoogstens een verslag
+            elke 2 uur kan stuur. Ná 30 dae word die kode uitgevee, en ná 90 dae word die verslag self geskrap.
+            Bevestigings en verslae is tellings van inwoners; hulle verander nooit die status nie.
+          </li>
+          <li>
+            <strong>Beskerming teen bots.</strong> Bevestigings, verslae en die e-posadres op hierdie bladsy word deur Cloudflare Turnstile beskerm,
+            wat eers laai wanneer jy op die knoppie tik. Turnstile gebruik seine van jou blaaier om mense van outomatiese
+            verkeer te onderskei, en om die kontrole te voltooi stuur die webwerf jou IP-adres saam met die
+            Turnstile-token na Cloudflare. Sien
             <a href="https://www.cloudflare.com/turnstile-privacy-policy/" hreflang="en">Cloudflare se
             privaatheidsaanhangsel vir Turnstile</a> (in Engels).
           </li>
           <li>
-            <strong>Versoeklogs.</strong> Soos die meeste webwerwe word hierdie webwerf deur tempobeperkings beskerm en hou
-            dit kortstondige versoeklogs (wat IP-adresse insluit) om probleme op te los en misbruik te voorkom. Cloudflare,
-            ons webgasheer, skrap hierdie logs outomaties ná ’n paar dae.
+            <strong>Versoeklogs.</strong> Cloudflare, wat die webwerf huisves, teken elke versoek aan, insluitend jou
+            IP-adres, die adres van die bladsy, die tyd en jou blaaier se tipe. Ons gebruik dit om probleme op te los en
+            misbruik te voorkom, en tempobeperkings tel versoeke per verbinding. Cloudflare Workers Logs hou hierdie logs
+            vir ’n beperkte tyd wat van die plan afhang, tans tot 7 dae, en skrap hulle dan outomaties.
           </li>
           <li>
             <strong>Besoekerstatistiek.</strong> Ons gebruik Cloudflare Web Analytics om te sien hoeveel mense die
-            webwerf besoek en watter bladsye hulle bekyk. Dit plaas geen koekies nie, neem nie ’n vingerafdruk van jou
-            toestel nie en volg jou nie na ander webwerwe nie; sien
+            webwerf besoek en watter bladsye hulle bekyk. Dit plaas geen koekies nie en volg jou nie na ander webwerwe
+            nie; sien
             <a href="https://www.cloudflare.com/web-analytics/" hreflang="en">hoe Cloudflare Web Analytics werk</a> (in
             Engels).
           </li>
           <li>
-            <strong>Jou tema en taal.</strong> As jy ligte of donker modus, of ’n taal, kies, stoor jou blaaier die keuse
-            plaaslik. Dit verlaat nooit jou toestel nie.
+            <strong>Instellings in jou blaaier.</strong> Jou blaaier stoor jou tema (lig of donker), jou taal, watter
+            kennisgewings jy toegemaak het en of jy ’n onderbreking reeds bevestig het. Dit bly op jou toestel en word nie
+            na ons gestuur nie.
           </li>
         </ul>
+        <p>Die webwerf het geen gebruikersrekeninge, advertensies of naspoorkoekies nie, en ons verkoop nie jou inligting nie.</p>
 
-        <h2>Wat ons nie doen nie</h2>
+        <h3>Doel en regsgrondslag</h3>
+        <p>
+          Ons verwerk hierdie inligting om bevestigings en verslae regverdig te tel, die webwerf te laat werk en misbruik
+          te voorkom. Die regsgrondslag is ons regmatige belang daarin (artikel 11(1)(f) van POPIA). Ons gebruik dit vir
+          niks anders nie.
+        </p>
+
+        <h3>Wie die inligting verwerk</h3>
+        <p>
+          Cloudflare, Inc. verwerk die inligting namens ons as operateur: dit huisves die webwerf en die databasis, hou
+          die versoeklogs en bied Turnstile en Web Analytics. Cloudflare se netwerk is wêreldwyd, so die inligting kan
+          buite Suid-Afrika verwerk word, ook in die Verenigde State. Cloudflare is deur sy
+          <a href="https://www.cloudflare.com/cloudflare-customer-dpa/" hreflang="en">dataverwerkingsooreenkoms</a> (in
+          Engels) gebind om die inligting te beskerm en dit net te gebruik om sy dienste te lewer (artikel 72(1)(a) van
+          POPIA). Sien ook
+          <a href="https://www.cloudflare.com/privacypolicy/" hreflang="en">Cloudflare se privaatheidsbeleid</a> (in
+          Engels). Ons deel jou inligting met niemand anders nie, tensy die wet dit vereis.
+        </p>
+
+        <h3>Hoe lank ons dit hou</h3>
         <ul>
-          <li>Geen rekeninge, naspoorkoekies of advertensies nie.</li>
-          <li>Ons verkoop of deel nie jou inligting nie.</li>
+          <li>Die onomkeerbare kode by bevestigings en verslae: 30 dae.</li>
+          <li>“Steeds af”-verslae: 90 dae.</li>
+          <li>Onderbrekings en hul bevestigingstellings: as ’n openbare rekord, sonder enige kode.</li>
+          <li>Versoeklogs by Cloudflare: tot 7 dae.</li>
         </ul>
 
-        <h2>Bewaring</h2>
+        <h3>Jou regte</h3>
         <p>
-          Onderbrekings en hul bevestigingstellings bly as ’n openbare rekord op die webwerf. As jy wil hê jou bevestiging
-          moet verwyder word, laat weet ons min of meer wanneer jy dit gedoen het. Omdat ons net die onomkeerbare
-          vingerafdruk hou, kan ons dit slegs aan die hand van die tyd uitken.
+          Jy kan vra om te sien watter inligting ons oor jou hou, en om dit reg te stel of te skrap. Jy kan ook beswaar
+          maak teen die verwerking. Omdat ons net die onomkeerbare kode hou, kan ons ’n bevestiging of verslag slegs aan
+          die hand van die tyd uitken, en net solank die kode bestaan (tot 30 dae). Daarna is dit anoniem en kan dit nie
+          meer aan jou gekoppel word nie. Laat weet ons dus min of meer wanneer jy dit gestuur het.
         </p>
 
-        <h2>Kontak</h2>
+        <h3>Klagtes</h3>
         <p>
-          Vrae of versoeke:
-          <a href="%site.repo%/issues">maak ’n issue op GitHub oop</a>.
+          As jy nie tevrede is met hoe ons jou inligting hanteer nie, kan jy ’n klagte by die Inligtingsreguleerder
+          (Suid-Afrika) indien: <a href="https://inforegulator.org.za">inforegulator.org.za</a>.
         </p>
+
+        <h3>Kontak</h3>
+        <!-- FORKERS: the email address is the CONTACT_EMAIL Worker secret (npx wrangler secret put
+             CONTACT_EMAIL), never this file or the bundle, so scrapers cannot harvest it. src/privacy.ts
+             shows it after a Turnstile check (POST /api/contact); without the secret it points to
+             GitHub instead. Keep the GitHub link: it is the route without JavaScript. -->
+        <p>
+          Vrae of versoeke: <a href="%site.repo%/issues" data-contact-github>maak ’n issue op GitHub oop</a>. Issues is
+          openbaar, so moenie persoonlike inligting daar plaas nie; vra eerder dat ons privaat met jou in verbinding
+          tree.
+        </p>
+        <div class="contact" data-contact data-fallback="Gebruik eerder GitHub:" hidden>
+          <p>Of e-pos ons privaat: <button type="button" class="contact-reveal">Wys e-posadres</button></p>
+          <div class="contact-widget"></div>
+          <p class="contact-result" role="status"></p>
+        </div>
+
+        <h2>Gebruiks&shy;voorwaardes</h2>
+        <!-- FORKERS: review for your jurisdiction. -->
+        <ul>
+          <li>
+            Die inligting op hierdie webwerf is slegs vir algemene inligting en word verskaf soos dit is, sonder enige
+            waarborg. Dit kan onvolledig, vertraag of verkeerd wees.
+          </li>
+          <li>Dit is nie bedoel vir veiligheids-, mediese of finansiële besluite nie.</li>
+          <li>
+            Sover die wet dit toelaat, aanvaar die operateur geen aanspreeklikheid vir enige verlies wat uit die gebruik
+            van die webwerf ontstaan nie.
+          </li>
+          <li>
+            Die webwerf is onafhanklik. Dit is nie verbonde aan, onderskryf deur of ’n spreekbuis vir die Stad Tshwane
+            of Eskom nie. Hul name word slegs gebruik om feitelik na hulle te verwys.
+          </li>
+          <li>
+            Die statistiek beskryf onderbrekings wat by een meetpunt aangeteken is. Dit is nie ’n uitspraak oor enige
+            organisasie se prestasie nie.
+          </li>
+          <li>
+            Die onderbrekingsdata is onder <a href="%site.dataLicence.url%" hreflang="en">%site.dataLicence.name%</a>
+            beskikbaar en word verskaf soos dit is, sonder enige waarborg dat dit akkuraat is. Die bronkode is onder die
+            <a href="%site.repo%/blob/main/LICENSE" hreflang="en">MIT-lisensie</a> beskikbaar.
+          </li>
+        </ul>
       </section>
 
       <section id="en" lang="en">
-        <h1>Privacy notice</h1>
+        <h1>Privacy and terms of use</h1>
         <p class="updated">Last updated 17 October 2026</p>
 
         <p>
-          This site keeps an open record of power outages for homes supplied by the Garsfontein substation in
-          Pretoria. It is operated independently by a Garsfontein resident and is not affiliated with the City of
-          Tshwane or Eskom. This notice explains how the site handles information about you, in line with the
-          Protection of Personal Information Act (POPIA).
+          This site keeps a record of power outages in Garsfontein, Pretoria. The supply is measured at one point in
+          Garsfontein Extension 16, near %site.landmark%. This is usually representative of the area supplied by the
+          Garsfontein substation, but some streets can differ. The site is operated independently by a resident and is
+          not affiliated with the City of Tshwane or Eskom.
+        </p>
+        <p>
+          <strong>Always treat power lines as live. Do not rely on this site for safety or medical decisions.</strong>
         </p>
 
-        <h2>What we collect</h2>
+        <h2>Privacy notice</h2>
+        <p>
+          This notice explains what information about you the site handles and why, in line with the Protection of
+          Personal Information Act 4 of 2013 (POPIA).
+        </p>
+
+        <h3>Who is responsible</h3>
+        <p>
+          The responsible party is %site.operator.name%, an independent resident who runs the site in a personal
+          capacity. There is no company or organisation behind the site.
+        </p>
+
+        <h3>What we collect</h3>
         <ul>
           <li>
-            <strong>Community confirmations.</strong> When you tap “My power is off too”, we store a one-way fingerprint
-            of your IP address (for IPv6, of its network prefix; a salted SHA-256 hash), together with the outage and the time. This allows each
-            connection to be counted once per outage. The address itself is never stored, and the fingerprint cannot be
-            converted back into the address without a secret key held only by the site. Fingerprints are deleted after
-            30 days; the count is kept.
+            <strong>Community confirmations.</strong> When you tap “My power is off too”, we store the outage, the time
+            and an irreversible code derived from your internet connection (a salted SHA-256 hash of your IP address, or
+            for IPv6 of its /64 prefix). The code makes sure each connection is counted once per outage. Your IP address
+            itself is not stored in the database. After 30 days the code is erased; the count is kept.
           </li>
           <li>
-            <strong>Bot protection.</strong> Confirmations are checked by Cloudflare Turnstile, which loads only when you
-            tap the button. Cloudflare uses signals from your browser to distinguish people from automated traffic; see
+            <strong>“Still off” reports.</strong> If the site shows the power as on but you indicate that your power is
+            still off, we store the time and the same kind of irreversible code, so that a connection can send at most one report
+            every 2 hours. After 30 days the code is erased, and after 90 days the report itself is deleted.
+            Confirmations and reports are counts from residents; they never change the status.
+          </li>
+          <li>
+            <strong>Bot protection.</strong> Confirmations, reports and the email address on this page are protected by Cloudflare Turnstile, which loads
+            only when you tap the button. Turnstile uses signals from your browser to distinguish people from automated
+            traffic, and to complete the check the site sends your IP address to Cloudflare with the Turnstile token. See
             <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Cloudflare’s Turnstile privacy addendum</a>.
           </li>
           <li>
-            <strong>Request logs.</strong> As with most websites, the site is protected by rate limits and keeps
-            short-lived request logs (which include IP addresses) to resolve problems and prevent abuse. Cloudflare, our
-            hosting provider, deletes these logs automatically after a few days.
+            <strong>Request logs.</strong> Cloudflare, which hosts the site, logs each request, including your IP
+            address, the page address, the time and your browser type. We use these logs to resolve problems and prevent
+            abuse, and rate limits count requests per connection. Cloudflare Workers Logs keep these logs for a limited
+            period that depends on the plan, currently up to 7 days, and then delete them automatically.
           </li>
           <li>
             <strong>Visitor statistics.</strong> We use Cloudflare Web Analytics to see how many people visit the site and
-            which pages they view. It sets no cookies, does not fingerprint your device and does not track you across
-            other sites; see <a href="https://www.cloudflare.com/web-analytics/">how Cloudflare Web Analytics works</a>.
+            which pages they view. It sets no cookies and does not track you across other sites; see
+            <a href="https://www.cloudflare.com/web-analytics/">how Cloudflare Web Analytics works</a>.
           </li>
           <li>
-            <strong>Your theme and language.</strong> If you choose light or dark mode, or a language, your browser stores
-            the choice locally. It never leaves your device.
+            <strong>Settings in your browser.</strong> Your browser stores your theme (light or dark), your language,
+            which notices you have dismissed and whether you have already confirmed an outage. These stay on your device
+            and are not sent to us.
           </li>
         </ul>
+        <p>The site has no user accounts, advertising or tracking cookies, and we do not sell your information.</p>
 
-        <h2>What we do not do</h2>
+        <h3>Purpose and legal basis</h3>
+        <p>
+          We process this information to count confirmations and reports fairly, to run the site and to prevent abuse.
+          The legal basis is our legitimate interest in doing so (section 11(1)(f) of POPIA). We use it for nothing
+          else.
+        </p>
+
+        <h3>Who processes the information</h3>
+        <p>
+          Cloudflare, Inc. processes the information on our behalf as operator: it hosts the site and the database, keeps
+          the request logs and provides Turnstile and Web Analytics. Cloudflare’s network is global, so the information
+          may be processed outside South Africa, including in the United States. Cloudflare is bound by its
+          <a href="https://www.cloudflare.com/cloudflare-customer-dpa/">data processing addendum</a> to protect the
+          information and to use it only to provide its services (section 72(1)(a) of POPIA). See also
+          <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare’s privacy policy</a>. We share your information
+          with no one else, unless the law requires it.
+        </p>
+
+        <h3>How long we keep it</h3>
         <ul>
-          <li>No accounts, tracking cookies or advertising.</li>
-          <li>We do not sell or share your information.</li>
+          <li>The irreversible code on confirmations and reports: 30 days.</li>
+          <li>“Still off” reports: 90 days.</li>
+          <li>Outages and their confirmation counts: as a public record, without any code.</li>
+          <li>Request logs at Cloudflare: up to 7 days.</li>
         </ul>
 
-        <h2>Retention</h2>
+        <h3>Your rights</h3>
         <p>
-          Outages and their confirmation counts remain on the site as a public record. To have your confirmation
-          removed, tell us approximately when you made it. Because we hold only the one-way fingerprint, the time is how
-          we can identify it.
+          You can ask to see what information we hold about you, and to have it corrected or deleted. You can also object
+          to the processing. Because we hold only the irreversible code, we can identify a confirmation or report only by
+          its time, and only while the code exists (up to 30 days). After that it is anonymous and can no longer be linked
+          to you. So please tell us approximately when you sent it.
         </p>
 
-        <h2>Contact</h2>
+        <h3>Complaints</h3>
         <p>
-          Questions or requests:
-          <a href="%site.repo%/issues">open an issue on GitHub</a>.
+          If you are not satisfied with how we handle your information, you can lodge a complaint with the Information
+          Regulator (South Africa): <a href="https://inforegulator.org.za">inforegulator.org.za</a>.
         </p>
+
+        <h3>Contact</h3>
+        <p>
+          Questions or requests: <a href="%site.repo%/issues" data-contact-github>open an issue on GitHub</a>. Issues are
+          public, so do not post personal information there; ask us to contact you privately instead.
+        </p>
+        <div class="contact" data-contact data-fallback="Please use GitHub instead:" hidden>
+          <p>Or email us privately: <button type="button" class="contact-reveal">Show email address</button></p>
+          <div class="contact-widget"></div>
+          <p class="contact-result" role="status"></p>
+        </div>
+
+        <h2>Terms of use</h2>
+        <ul>
+          <li>
+            The information on this site is for general information only and is provided as is, without warranty. It may
+            be incomplete, delayed or wrong.
+          </li>
+          <li>It is not intended for safety, medical or financial decisions.</li>
+          <li>
+            To the extent the law allows, the operator accepts no liability for any loss arising from use of the site.
+          </li>
+          <li>
+            The site is independent. It is not affiliated with, endorsed by or speaking for the City of Tshwane or
+            Eskom. Their names are used only to refer to them factually.
+          </li>
+          <li>
+            The statistics describe outages recorded at one measuring point. They are not a statement about any
+            organisation’s performance.
+          </li>
+          <li>
+            The outage data is available under <a href="%site.dataLicence.url%">%site.dataLicence.name%</a> and is
+            provided as is, with no warranty of accuracy. The source code is available under the
+            <a href="%site.repo%/blob/main/LICENSE">MIT licence</a>.
+          </li>
+        </ul>
       </section>
     </main>
   </body>

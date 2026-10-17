@@ -1,35 +1,43 @@
 # %site.brand.full%
 
-> An open record of power outages for homes supplied by the Garsfontein substation in Pretoria, South Africa, kept since %since.en% (%site.timeZone%). There is no data from before that date. Independent service, operated by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.
+> A record of power outages in Garsfontein, Pretoria, South Africa, kept since %since.en% (%site.timeZone%). There is no data from before that date. Independent service, operated by a Garsfontein resident. Not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
 
-Area: measured in %site.area.name%, in %site.area.region%. Supplied by the Garsfontein substation (fed from Highlands, which is fed from Njala).
+What is measured: whether the electricity supply is on at one home in Garsfontein Extension 16, near %site.landmark% (%site.area.region%). That point is usually representative of the area supplied by the Garsfontein substation, but some streets can differ, and an outage limited to another street or extension will not appear. The site shows the status as last recorded; it is not a feed of every street.
 
-The record covers all power outages, planned and unplanned, whatever the cause. It is not a load-shedding schedule.
+The record covers all power outages at the measuring point, planned and unplanned, whatever the cause. It is not a load-shedding schedule and does not predict outages. The figures describe outages recorded at that one point; they are not a statement about any organisation's performance.
+
+An ultra-local service: it exists only to show the state of the electricity supply in Garsfontein.
+
+To report a fault, use the official channel: %site.faultReporting.url% (this site does not pass reports on).
 
 Site: %site.url%/
 The site is in Afrikaans by default, with an option to switch to English. The API and this file are in English.
+Outage data (CSV, API and feed): %site.dataLicence.name% (%site.dataLicence.url%), provided as is, with no warranty of accuracy. Please credit "%site.brand.full%" and link to the site.
 Source code (MIT): %site.repo%
 
 ## Endpoints
 
 All public endpoints are free to use and allow any origin (CORS). They share a limit of 60 requests a minute per connection, with IPv6 addresses counted per /64. Please poll no more than once every 30 seconds.
 
-- [Live status (JSON)](%site.url%/api/status)
+- [Status (JSON)](%site.url%/api/status): the status as last recorded at the measuring point
 - [Statistics (JSON)](%site.url%/api/stats): for the last 7, 30 and 365 days, hours without power, number of outages (and how many were planned), days with an outage, share of time with power, and the longest outage; the previous 30 days for comparison; and weekly totals. Only time since records began is counted.
 - [All outages (CSV)](%site.url%/api/outages.csv): one row per outage, with id, start and end (UTC), duration in minutes, whether it was planned, and the number of community confirmations. Outages marked as false positives are excluded.
+- [Outage feed (Atom)](%site.url%/feed.xml): the 20 most recent outages, for feed readers
 - [Sitemap](%site.url%/sitemap.xml)
-- [Privacy notice](%site.url%/privacy)
+- [Privacy and terms of use](%site.url%/privacy)
 
 ## /api/status fields
 
-- `status`: `"ON"` or `"OFF"`
+- `status`: `"ON"` or `"OFF"`, as last recorded
 - `since`: when the current state began (ISO 8601), or null
 - `outage`: the outage in progress (`id`, `startTime`, `endTime`, `planned`, `confirmations`), or null
 - `recent`: the five most recent outages, newest first
+- `monitored`: true while the sensor at the measuring point is reporting. When false, `"ON"` only means that no outage has been reported, not that power was measured.
+- `stillOffReports`: while `status` is `"ON"`, how many residents reported in the last hour that their power is still off where they are (always 0 while `"OFF"`). Reports never change `status`.
 - `generatedAt`: server time of the response
 
 All times are UTC. Local time is %site.timeZone% (SAST, UTC+2, no daylight saving).
 
 `planned` is true for outages announced in advance (for example maintenance or upgrades). Planned outages still count as time without power.
 
-`confirmations` is the number of community confirmations: residents who reported that their power was also off. At most one per connection per outage, verified with Cloudflare Turnstile.
+`confirmations` is the number of community confirmations: residents who reported that their power was also off. At most one per connection per outage, verified with Cloudflare Turnstile. Confirmations and still-off reports are counts from residents, not measurements, and never change the status.

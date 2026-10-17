@@ -1,9 +1,10 @@
 import { createDb } from './db/client';
-import { detectOutage, purgeExpiredSessions, purgeOldFingerprints } from './lib/grid';
+import { detectOutage, purgeExpiredSessions, purgeOldFingerprints, purgeOldStillOffReports } from './lib/grid';
 import { errors } from './lib/http';
 import { dispatch, purgeEdgeCache, type Routes } from './lib/router';
 import { adminRoutes } from './routes/admin';
 import { authRoutes } from './routes/auth';
+import { contactRoutes } from './routes/contact';
 import { historyRoutes } from './routes/history';
 import { seoRoutes } from './routes/seo';
 import { STATUS_PATH, statusRoutes } from './routes/status';
@@ -16,7 +17,14 @@ const HOURLY_CRON = '0 * * * *';
  * routes/, its route map spread here, the path in wrangler's `assets.run_worker_first` if it is
  * outside /api/, and the path in vite.config.ts's dev `server.proxy`.
  */
-const routes: Routes = { ...statusRoutes, ...historyRoutes, ...authRoutes, ...adminRoutes, ...seoRoutes };
+const routes: Routes = {
+  ...statusRoutes,
+  ...historyRoutes,
+  ...authRoutes,
+  ...adminRoutes,
+  ...seoRoutes,
+  ...contactRoutes,
+};
 
 // public/_headers only covers static assets; Worker responses (API, SEO) get these.
 // None of them is HTML, so the CSP can forbid everything.
@@ -61,7 +69,11 @@ export default {
     const db = createDb(env.DB);
     const now = new Date(controller.scheduledTime);
     if (controller.cron === HOURLY_CRON) {
-      await Promise.all([purgeExpiredSessions(db, now), purgeOldFingerprints(db, now)]);
+      await Promise.all([
+        purgeExpiredSessions(db, now),
+        purgeOldFingerprints(db, now),
+        purgeOldStillOffReports(db, now),
+      ]);
     } else {
       // Purges only this datacentre's copy; elsewhere the status edge TTL bounds the delay.
       const { opened } = await detectOutage(db, now);

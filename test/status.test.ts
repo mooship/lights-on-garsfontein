@@ -1,7 +1,16 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../shared/api';
-import { call, insertOutage, mockTurnstile, runCron, setHeartbeat, getStatus as status, uniqueIp } from './helpers';
+import {
+  call,
+  insertOutage,
+  insertStillOff,
+  mockTurnstile,
+  runCron,
+  setHeartbeat,
+  getStatus as status,
+  uniqueIp,
+} from './helpers';
 
 describe('GET /api/status', () => {
   it('is ON in manual mode before any sensor heartbeat arrives', async () => {
@@ -9,6 +18,41 @@ describe('GET /api/status', () => {
     expect(body).toMatchObject({ status: 'ON', since: null, turnstileSiteKey: 'test-site-key' });
     expect(body).not.toHaveProperty('mode');
     expect(body).not.toHaveProperty('lastSeen');
+  });
+
+  it('is not monitored before any heartbeat', async () => {
+    expect(await status()).toMatchObject({ status: 'ON', monitored: false, stillOffReports: 0 });
+  });
+
+  it('is monitored while the heartbeat is fresh', async () => {
+    await setHeartbeat(30);
+    expect(await status()).toMatchObject({ status: 'ON', monitored: true });
+  });
+
+  it('is not monitored once the heartbeat is stale, and OFF as before', async () => {
+    await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 60);
+    await runCron();
+    expect(await status()).toMatchObject({ status: 'OFF', monitored: false, outage: expect.anything() });
+  });
+
+  it('is not monitored when a stale heartbeat was dismissed as a false positive', async () => {
+    const lastSeen = await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 60);
+    await insertOutage({ startTime: lastSeen, endTime: new Date().toISOString(), isFalsePositive: 1 });
+    expect(await status()).toMatchObject({ status: 'ON', monitored: false });
+  });
+
+  it('counts "still off" reports from the last hour while ON', async () => {
+    const ago = (minutes: number) => new Date(Date.now() - minutes * MINUTE_MS).toISOString();
+    await insertStillOff({ createdAt: ago(61), clientHash: 'a' });
+    await insertStillOff({ createdAt: ago(59), clientHash: 'b' });
+    await insertStillOff({ createdAt: ago(1), clientHash: 'c' });
+    expect((await status()).stillOffReports).toBe(2);
+  });
+
+  it('shows no "still off" reports while OFF', async () => {
+    await insertStillOff();
+    await insertOutage({ source: 'manual' });
+    expect(await status()).toMatchObject({ status: 'OFF', stillOffReports: 0 });
   });
 
   it('is OFF in manual mode while the admin has an outage open', async () => {
@@ -118,10 +162,9 @@ describe('GET /api/status edge cache', () => {
   });
 
   it('is purged by a heartbeat', async () => {
-    expect((await status()).status).toBe('ON');
-    await insertOutage({ source: 'manual' });
+    expect((await status()).monitored).toBe(false);
     expect((await heartbeat()).status).toBe(200);
-    expect((await status()).status).toBe('OFF');
+    expect((await status()).monitored).toBe(true);
   });
 
   it('is purged by admin writes', async () => {
@@ -217,16 +260,38 @@ describe('POST /api/heartbeat', () => {
     expect(n).toBe(1);
   });
 
-  it('closes open sensor outages but leaves manual ones to the admin', async () => {
-    const sensor = await insertOutage({ source: 'sensor' });
-    const manual = await insertOutage({ source: 'manual' });
+  it('closes every open outage, manual ones included', async () => {
+    await insertOutage({ source: 'sensor' });
+    await insertOutage({ source: 'manual' });
     const res = await call('/api/heartbeat', { method: 'POST', headers: auth });
-    expect(await res.json()).toEqual({ ok: true, closedOutages: 1 });
-    const rows = await env.DB.prepare('SELECT id, end_time FROM outages ORDER BY id').all<{
+    expect(await res.json()).toEqual({ ok: true, closedOutages: 2 });
+    const rows = await env.DB.prepare('SELECT end_time FROM outages').all<{ end_time: string | null }>();
+    expect(rows.results.map((r) => r.end_time)).toEqual([expect.any(String), expect.any(String)]);
+    expect(await status()).toMatchObject({ status: 'ON', monitored: true });
+  });
+
+  it('closes an open manual outage over a stale gap without recording the gap again', async () => {
+    const lastSeen = await setHeartbeat(600);
+    const manual = await insertOutage({
+      startTime: new Date(Date.parse(lastSeen) + 60_000).toISOString(),
+      source: 'manual',
+    });
+    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    const rows = await env.DB.prepare('SELECT id, end_time FROM outages').all<{
       id: number;
       end_time: string | null;
     }>();
-    expect(rows.results.find((r) => r.id === sensor)?.end_time).not.toBeNull();
-    expect(rows.results.find((r) => r.id === manual)?.end_time).toBeNull();
+    expect(rows.results).toEqual([{ id: manual, end_time: expect.any(String) }]);
+  });
+
+  it('closes a manual outage that began before the last heartbeat, with no gap outage', async () => {
+    const manual = await insertOutage({ startTime: new Date(Date.now() - 3_600_000).toISOString(), source: 'manual' });
+    await setHeartbeat(600);
+    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    const rows = await env.DB.prepare('SELECT id, end_time FROM outages').all<{
+      id: number;
+      end_time: string | null;
+    }>();
+    expect(rows.results).toEqual([{ id: manual, end_time: expect.any(String) }]);
   });
 });

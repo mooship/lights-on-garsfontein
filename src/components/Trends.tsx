@@ -3,13 +3,30 @@ import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
-import { HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
+import { DAY_MS, HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
 import { site } from '../../site.config';
 import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
 import * as css from './Trends.css';
 
 const { AXIS_WIDTH } = css;
+
+/** The deltas compare with the previous 30 days, so they wait until that whole window is tracked. */
+const COMPARE_AFTER_MS = 60 * DAY_MS;
+
+/** The day records began in the configured zone, as YYYY-MM-DD, like WeekStats.weekStart. */
+const trackingDay = (iso: string) =>
+  new Date(Date.parse(iso) + site.utcOffsetMinutes * MINUTE_MS).toISOString().slice(0, 10);
+
+/** A tile duration like the history's ("5 u 23 min"); none at all reads "0 min". */
+const tileDuration = (hours: number) => (hours > 0 ? formatDuration(hours * HOUR_MS) : `0 ${t().units.min}`);
+
+/** The numbers in a duration at full size and its units smaller, so "12 u 34 min" fits a phone tile. */
+const DurationValue: Component<{ text: string }> = (props) => (
+  <For each={props.text.split(/(\d+)/).filter(Boolean)}>
+    {(part) => (/^\d+$/.test(part) ? part : <span class={css.unit}>{part}</span>)}
+  </For>
+);
 
 interface TrendsProps {
   stats: StatsResponse;
@@ -41,7 +58,7 @@ function delta(
   };
 }
 
-const Tile: Component<{ label: string; value: string; delta?: Delta | null; note?: string }> = (props) => (
+const Tile: Component<{ label: string; value: JSX.Element; delta?: Delta | null; note?: string }> = (props) => (
   <div class={css.tile}>
     <div class={css.tileLabel}>{props.label}</div>
     <div class={css.tileValue}>{props.value}</div>
@@ -72,25 +89,38 @@ function niceMax(value: number): number {
   return NICE_MAXIMA.find((n) => n >= value) ?? Math.ceil(value / 24) * 24;
 }
 
+/** Where a week sits: the last one is still running; the first may start before the records. */
+interface WeekPlace {
+  current: boolean;
+  /** The day records began, when that is after this week's Monday. */
+  from: string | null;
+}
+
+/** " (vanaf 17 Okt.)" for a partial first week, else " (tot dusver)" for the current one. */
+function weekNote(place: WeekPlace) {
+  const m = t().trends;
+  return place.from ? m.partial(formatCalendarDay(place.from)) : place.current ? m.soFar : '';
+}
+
 /** The readout for a week in parts, so the visible line can emphasise the hours. */
-function readoutParts(w: WeekStats, current: boolean) {
+function readoutParts(w: WeekStats, place: WeekPlace) {
   const m = t().trends;
   return {
     week: m.weekOf(formatCalendarDay(w.weekStart)),
     hours: formatHours(w.hoursOff),
-    rest: `${m.off} · ${m.outageCount(w.outages)}${current ? m.soFar : ''}`,
+    rest: `${m.off} · ${m.outageCount(w.outages)}${weekNote(place)}`,
   };
 }
 
-const readout = (w: WeekStats, current: boolean) => {
-  const p = readoutParts(w, current);
+const readout = (w: WeekStats, place: WeekPlace) => {
+  const p = readoutParts(w, place);
   return `${p.week}: ${p.hours} ${p.rest}`;
 };
 
 const CHART_HEIGHT = 144;
 const TOP_PAD = 6;
 
-const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
+const WeeklyChart: Component<{ weeks: WeekStats[]; place: (index: number) => WeekPlace }> = (props) => {
   let svg!: SVGSVGElement;
   const [width, setWidth] = createSignal(320);
   const [active, setActive] = createSignal(props.weeks.length - 1);
@@ -124,7 +154,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
     else return;
     event.preventDefault();
     const w = activeWeek();
-    if (w) setAnnouncement(readout(w, activeIndex() === last));
+    if (w) setAnnouncement(readout(w, props.place(activeIndex())));
   };
 
   // The whole column slot is the hit target, not just the painted bar.
@@ -140,7 +170,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
       <p class={css.readout}>
         <Show when={activeWeek()}>
           {(w) => {
-            const p = () => readoutParts(w(), activeIndex() === props.weeks.length - 1);
+            const p = () => readoutParts(w(), props.place(activeIndex()));
             return (
               <>
                 {p().week}: <span class={css.readoutValue}>{p().hours}</span> {p().rest}
@@ -227,7 +257,17 @@ export const Trends: Component<TrendsProps> = (props) => {
   const since = () => Date.parse(props.stats.trackingSince);
   const started = () => props.now >= since();
   const s = () => props.stats.last30;
-  const prev = () => props.stats.previous30;
+  // No comparison until a full previous 30 days exists.
+  const prev = () => (props.now - since() >= COMPARE_AFTER_MS ? props.stats.previous30 : null);
+  const firstDay = () => trackingDay(props.stats.trackingSince);
+  const place = (index: number): WeekPlace => {
+    const week = props.stats.weeks[index];
+    return {
+      current: index === props.stats.weeks.length - 1,
+      from: index === 0 && week && week.weekStart < firstDay() ? firstDay() : null,
+    };
+  };
+  const anyOutage = () => props.stats.weeks.some((w) => w.hoursOff > 0 || w.outages > 0);
   const subtitle = () => {
     if (!started()) return t().trends.startsOn(formatDate(props.stats.trackingSince));
     return s().trackedHours < 30 * 24 ? t().trends.since(formatDate(props.stats.trackingSince)) : t().trends.last30;
@@ -243,8 +283,8 @@ export const Trends: Component<TrendsProps> = (props) => {
         <div class={css.tiles}>
           <Tile
             label={t().trends.withoutPower}
-            value={started() ? formatHours(s().hoursOff) : '—'}
-            delta={delta(s().hoursOff, prev()?.hoursOff, formatHours, true)}
+            value={started() ? <DurationValue text={tileDuration(s().hoursOff)} /> : '—'}
+            delta={delta(s().hoursOff, prev()?.hoursOff, tileDuration, true)}
           />
           <Tile
             label={t().trends.outages}
@@ -259,19 +299,23 @@ export const Trends: Component<TrendsProps> = (props) => {
           <Tile
             label={t().trends.longest}
             value={
-              s().outages === 0
-                ? '—'
-                : s().longestMinutes > 0
-                  ? formatDuration(s().longestMinutes * MINUTE_MS)
-                  : `< 1 ${t().units.min}`
+              s().outages === 0 ? (
+                '—'
+              ) : (
+                <DurationValue
+                  text={
+                    s().longestMinutes > 0 ? formatDuration(s().longestMinutes * MINUTE_MS) : `< 1 ${t().units.min}`
+                  }
+                />
+              )
             }
             note={
               s().outages > 1 ? t().trends.average(formatDuration((s().hoursOff / s().outages) * HOUR_MS)) : undefined
             }
           />
         </div>
-        <Show when={props.stats.weeks.length > 0} fallback={<p class={css.chartEmpty}>{t().trends.chartEmpty}</p>}>
-          <WeeklyChart weeks={props.stats.weeks} />
+        <Show when={anyOutage()} fallback={<p class={css.chartEmpty}>{t().trends.chartEmpty}</p>}>
+          <WeeklyChart weeks={props.stats.weeks} place={place} />
         </Show>
       </div>
       <details class="gg-trends-details">
@@ -291,10 +335,13 @@ export const Trends: Component<TrendsProps> = (props) => {
             </tr>
           </thead>
           <tbody>
-            <For each={[...props.stats.weeks].reverse()}>
-              {(w) => (
+            <For each={props.stats.weeks.map((w, i) => ({ w, note: weekNote(place(i)) })).reverse()}>
+              {({ w, note }) => (
                 <tr>
-                  <td class={css.td}>{formatCalendarDay(w.weekStart)}</td>
+                  <td class={css.td}>
+                    {formatCalendarDay(w.weekStart)}
+                    {note}
+                  </td>
                   <td class={css.td}>{formatHours(w.hoursOff)}</td>
                   <td class={css.td}>{w.outages}</td>
                 </tr>
@@ -305,6 +352,12 @@ export const Trends: Component<TrendsProps> = (props) => {
         <a class={css.download} href="/api/outages.csv" download={`${site.slug}-outages.csv`}>
           <Download size={14} aria-hidden="true" /> {t().trends.download}
         </a>
+      </details>
+      <details class="gg-trends-details">
+        <summary>{t().trends.howTitle}</summary>
+        <ul>
+          <For each={t().trends.how}>{(point) => <li>{point}</li>}</For>
+        </ul>
       </details>
     </>
   );

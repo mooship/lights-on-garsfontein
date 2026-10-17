@@ -1,4 +1,3 @@
-import { getPowerStatus } from '../lib/grid';
 import type { RouteContext, Routes } from '../lib/router';
 
 const SITEMAP_PATHS = ['/', '/privacy'];
@@ -30,10 +29,12 @@ Sitemap: ${env.SITE_URL}/sitemap.xml
   });
 }
 
-/** Social card that reflects the live status: serves one of the pre-rendered PNGs. */
-async function ogImage({ request, env, db }: RouteContext): Promise<Response> {
-  const status = await getPowerStatus(db, new Date());
-  const asset = await env.ASSETS.fetch(new URL(`/og/${status.toLowerCase()}.png`, request.url));
+/**
+ * The social card. Status-neutral on purpose: a shared link's preview outlives the moment, so it
+ * never claims ON or OFF. A Worker route so the public URL stays stable whatever the asset is.
+ */
+async function ogImage({ request, env }: RouteContext): Promise<Response> {
+  const asset = await env.ASSETS.fetch(new URL('/og/card.png', request.url));
   const headers = new Headers(asset.headers);
   headers.set('Cache-Control', 'public, max-age=60');
   return new Response(asset.body, { status: asset.status, headers });
@@ -42,7 +43,8 @@ async function ogImage({ request, env, db }: RouteContext): Promise<Response> {
 const pages: Routes = {
   '/sitemap.xml': { handler: sitemap },
   '/robots.txt': { handler: robots },
-  '/og.png': { handler: ogImage, limiter: 'STATUS_LIMITER', edgeCache: true },
+  // A static asset now, with no D1 lookup to spare, so no limiter or edge cache.
+  '/og.png': { handler: ogImage },
 };
 
 /** Each page answers both GET and HEAD. */

@@ -6,6 +6,7 @@ import {
   HOURLY_CRON,
   insertConfirmation,
   insertOutage,
+  insertStillOff,
   openOutageCount,
   runCron,
   setHeartbeat,
@@ -94,6 +95,18 @@ describe('housekeeping (hourly cron)', () => {
     await insertConfirmation(id, { clientHash: 'bbb' });
     await runCron(HOURLY_CRON);
     const rows = await env.DB.prepare('SELECT client_hash FROM outage_confirmations ORDER BY id').all<{
+      client_hash: string;
+    }>();
+    expect(rows.results.map((r) => r.client_hash)).toEqual([expect.stringMatching(/^purged:\d+$/), 'bbb']);
+  });
+
+  it('replaces "still off" fingerprints after 30 days and deletes reports after 90', async () => {
+    const ago = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString();
+    await insertStillOff({ createdAt: ago(91), clientHash: 'old' });
+    await insertStillOff({ createdAt: ago(31), clientHash: 'aaa' });
+    await insertStillOff({ clientHash: 'bbb' });
+    await runCron(HOURLY_CRON);
+    const rows = await env.DB.prepare('SELECT client_hash FROM still_off_reports ORDER BY id').all<{
       client_hash: string;
     }>();
     expect(rows.results.map((r) => r.client_hash)).toEqual([expect.stringMatching(/^purged:\d+$/), 'bbb']);

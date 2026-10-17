@@ -1,11 +1,14 @@
-import { test as base, type Cookie, expect, type Page } from '@playwright/test';
+import { type APIRequestContext, test as base, type Cookie, expect, type Page } from '@playwright/test';
 import { DAY_MS } from '../shared/api';
 import { type Locale, site } from '../site.config';
 import { activeBanners, BANNERS, type Banner } from '../src/banners';
+import { en } from '../src/i18n/en';
 import { zoned } from '../src/lib/zone';
 
 const DEFAULT_LOCALE = site.locales[0];
 const BRAND = site.brand.short;
+/** The tab title without a live reading: it claims no status. */
+const NEUTRAL_TITLE = site.brand.full;
 /** The tab title during an outage: "OFF 5m · <brand>". */
 const outageTitle = (state: string) => new RegExp(`^${state} \\d+m · ${BRAND.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 
@@ -55,6 +58,19 @@ async function readLayoutShift(page: Page): Promise<number> {
 
 // Tests share one local database and run in order.
 test.describe.configure({ mode: 'serial' });
+
+/**
+ * The public API allows 60 requests a minute per client (STATUS_LIMITER), and the suite loads the
+ * page more often than that. Before a test that needs a clean load, wait out a spent window.
+ */
+async function waitForStatusQuota(request: APIRequestContext) {
+  await expect
+    .poll(async () => (await request.get('/api/status')).status(), { intervals: [5_000], timeout: 75_000 })
+    .toBe(200);
+}
+
+// Leave the quota for the specs that run after this one.
+test.afterAll(async ({ request }) => waitForStatusQuota(request));
 
 const ADMIN_USERNAME = 'admin'; // matches .dev.vars.example
 const ADMIN_PASSWORD = 'test-password';
@@ -117,10 +133,10 @@ test.describe('language', () => {
     const page = await context.newPage();
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('lang', DEFAULT_LOCALE);
-    await expect(page.getByRole('status')).toContainText('Die krag is aan');
+    await expect(page.getByRole('status')).toContainText('Geen onderbreking aangemeld nie');
     await expect(page.getByRole('heading', { name: 'Statistiek' })).toBeVisible();
     await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0);
-    await expect(page).toHaveTitle(`AAN · ${BRAND}`);
+    await expect(page).toHaveTitle(NEUTRAL_TITLE);
     await context.close();
   });
 
@@ -128,19 +144,21 @@ test.describe('language', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('/');
-    await expect(page.getByRole('status')).toContainText('Die krag is aan');
+    await expect(page.getByRole('status')).toContainText('Geen onderbreking aangemeld nie');
     await page.evaluate(() => Object.assign(window, { __sameDocument: true }));
+    await expect(page.getByRole('button', { name: 'Switch to English' })).toHaveText('English');
 
     await page.getByRole('button', { name: 'Switch to English' }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('status')).toContainText('Power is on');
+    await expect(page.getByRole('status')).toContainText('No outage reported');
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveAttribute('lang', 'af');
+    await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveText('Afrikaans');
     expect(await page.evaluate(() => '__sameDocument' in window)).toBe(true); // no reload
 
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('status')).toContainText('Power is on');
+    await expect(page.getByRole('status')).toContainText('No outage reported');
     expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('en');
     await context.close();
   });
@@ -159,18 +177,73 @@ test.describe('language', () => {
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent outages' })).toBeVisible();
     await expect(page.getByText('Independent service.', { exact: false })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveText('AF');
+    await expect(page.getByRole('button', { name: 'Skakel oor na Afrikaans' })).toHaveText('Afrikaans');
+    await expect(page.getByText('Measured in Garsfontein Ext. 16', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Still off where you are?' })).toBeDisabled();
     await context.close();
   });
 });
 
 test.describe('public page', () => {
-  test('shows power on by default without a sensor', async ({ page }) => {
+  test('without a live reading, says only that no outage is reported', async ({ page }) => {
     await page.goto('/');
     const status = page.getByRole('status');
-    await expect(status).toContainText('Power is on');
+    await expect(status).toHaveText('No outage reported');
+    await expect(page.getByText('Not measured live.')).toBeVisible();
+    await expect(page.getByText(/^for \d/)).toHaveCount(0); // no "for 7 h": nothing measured it on
+    await expect(page.locator('[data-status="NONE"]')).toBeVisible();
+    await expect(page).toHaveTitle(NEUTRAL_TITLE);
+    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon.svg');
     await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0); // never says how outages are recorded
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
+  });
+
+  test('with a live reading, says the power is on and for how long', async ({ page }) => {
+    await page.route('**/api/status', async (route) => {
+      const response = await route.fetch();
+      const since = new Date(Date.now() - 150 * 60_000).toISOString();
+      await route.fulfill({ response, json: { ...(await response.json()), monitored: true, since } });
+    });
+    await page.goto('/');
+    await expect(page.getByRole('status')).toHaveText('The power is on');
+    await expect(page.getByText(/^for 2 h \d+ min$/)).toBeVisible();
+    await expect(page).toHaveTitle(`ON · ${BRAND}`);
+    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-on.svg');
+  });
+
+  test('leads with the ward, names the full brand and says what the measurement covers', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(site.brand.full);
+    await expect(page.locator('.gg-eyebrow')).toHaveText('Ward 45 · Pretoria');
+    const scope = site.landmark
+      ? `Measured in Garsfontein Ext. 16, near ${site.landmark}. Some streets may differ.`
+      : 'Measured in Garsfontein Ext. 16. Some streets may differ.';
+    await expect(page.getByText(scope)).toBeVisible();
+    await page.getByText('Why?', { exact: true }).click();
+    await expect(page.getByText('usually goes off as a whole', { exact: false })).toBeVisible();
+  });
+
+  test('links fault reports to the configured page', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByText('Always treat power lines as live.', { exact: false })).toBeVisible();
+    const link = page.getByRole('link', { name: en.safety.report });
+    await expect(link).toHaveAttribute('href', site.faultReporting.url);
+  });
+
+  test('statistics show durations and say how they are measured', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.gg-trends-body')).toContainText('0 min');
+    await expect(page.getByText('No outages to chart yet.')).toBeVisible();
+    await expect(page.getByText(/compared with the previous 30 days/)).toHaveCount(0);
+    await page.getByText('How we measure').click();
+    await expect(page.getByText('Planned outages are included.')).toBeVisible();
+  });
+
+  test('the footer links the data licence and the feed', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: site.dataLicence.name })).toHaveAttribute('href', site.dataLicence.url);
+    await expect(page.getByRole('link', { name: 'Atom feed' })).toHaveAttribute('href', '/feed.xml');
+    await expect(page.getByRole('link', { name: 'Privacy and terms' })).toHaveAttribute('href', '/privacy');
   });
 
   for (const locale of site.locales) {
@@ -204,14 +277,14 @@ test.describe('public page', () => {
 
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('status')).toContainText('Power is on');
+    await expect(page.getByRole('status')).toContainText('No outage reported');
     await expect(page.getByText(/^Updated \d\d:\d\d$/)).toBeVisible();
     await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // polls now
     await expect(page.getByRole('alert')).toHaveText(
       /^Unable to reach the server\. Showing the status as at \d\d:\d\d\.$/,
     );
-    await expect(page.getByRole('status')).toContainText('Power is on');
+    await expect(page.getByRole('status')).toContainText('No outage reported');
   });
 
   test('serves the SEO manifests', async ({ request }) => {
@@ -243,11 +316,17 @@ test.describe('admin', () => {
 
   test('punch clock drives the public status', async ({ page }) => {
     await login(page);
+    await expect(page.getByRole('button', { name: 'Punch in' })).toHaveCount(0); // only the action that applies
     await page.getByRole('button', { name: 'Punch out' }).click();
     await expect(page.getByTestId('punch-clock')).not.toHaveText('00:00:00');
+    await expect(page.getByRole('status').filter({ hasText: /^Punched out at \d\d:\d\d$/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Punch out' })).toHaveCount(0);
 
     await page.goto('/');
-    await expect(page.getByRole('status')).toContainText('Power is off');
+    await expect(page.getByRole('status')).toContainText('The power is off');
+    await expect(page.getByText('Is your power off too? One tap, anonymous.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Be the first to confirm.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Still off where you are?' })).toHaveCount(0);
     await expect(page).toHaveTitle(outageTitle('OFF'));
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-off.svg');
     await page.getByRole('button', { name: 'Skakel oor na Afrikaans' }).click();
@@ -258,9 +337,10 @@ test.describe('admin', () => {
     await login(page);
     await page.getByRole('button', { name: 'Punch in' }).click();
     await expect(page.getByTestId('punch-clock')).toHaveText('00:00:00');
+    await expect(page.getByRole('status').filter({ hasText: /^Punched in at \d\d:\d\d$/ })).toBeVisible();
     await page.goto('/');
-    await expect(page.getByRole('status')).toContainText('Power is on');
-    await expect(page).toHaveTitle(`ON · ${BRAND}`);
+    await expect(page.getByRole('status')).toContainText('No outage reported');
+    await expect(page).toHaveTitle(NEUTRAL_TITLE);
   });
 
   test('logs a past outage', async ({ page }) => {
@@ -269,6 +349,88 @@ test.describe('admin', () => {
     await page.getByLabel('Ended').fill('2026-10-01T20:30');
     await page.getByRole('button', { name: 'Log outage' }).click();
     await expect(page.getByText('2 h 30 min · manual')).toBeVisible();
+  });
+});
+
+test.describe('still off where you are', () => {
+  test('reports once, shows the count and remembers the report', async ({ page, request }) => {
+    await page.goto('/');
+    await expect(page.getByText('This does not change the status or notify the City.')).toBeVisible();
+    // Cloudflare's test site key passes Turnstile without a challenge.
+    await page.getByRole('button', { name: 'Still off where you are?' }).click();
+    await expect(page.getByText('Thanks, noted.')).toBeVisible({ timeout: 20_000 });
+    const count = page.getByText('1 resident reported their power still off in the last hour.', { exact: false });
+    await expect(count).toBeVisible();
+    await expect(page.getByTestId('still-off')).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByRole('status')).toHaveText('No outage reported'); // the status does not change
+
+    // The count now comes from the status, and this browser remembers it reported.
+    await page.reload();
+    await expect(count).toBeVisible();
+    await expect(page.getByTestId('still-off')).toHaveAttribute('aria-disabled', 'true');
+
+    // The server allows one report per client per two hours.
+    const again = await request.post('/api/still-off', { data: { token: 'XXXX.DUMMY.TOKEN' } });
+    expect(again.status()).toBe(409);
+    expect(await again.json()).toMatchObject({ error: 'already_reported' });
+  });
+
+  test.describe('in Afrikaans', () => {
+    test.use({ appLocale: 'af' });
+
+    test('shows the error when the server says it was already reported', async ({ page }) => {
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Steeds af by jou?' }).click();
+      await expect(page.getByText('Jy het die afgelope twee uur reeds aangemeld.')).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText('1 inwoner het die afgelope uur gesê', { exact: false })).toBeVisible();
+    });
+  });
+});
+
+test.describe('share', () => {
+  const SHARE_URL = `${site.url}/`;
+  const TEXT = 'Is the power off in Garsfontein? Check here:';
+
+  test('links WhatsApp and Telegram with the text and link encoded, in a new tab', async ({ page }) => {
+    await page.goto('/');
+    const whatsapp = page.getByRole('link', { name: 'Share on WhatsApp (opens in a new tab)' });
+    await expect(whatsapp).toHaveAttribute('href', `https://wa.me/?text=${encodeURIComponent(`${TEXT} ${SHARE_URL}`)}`);
+    const telegram = page.getByRole('link', { name: 'Share on Telegram (opens in a new tab)' });
+    await expect(telegram).toHaveAttribute(
+      'href',
+      `https://t.me/share/url?url=${encodeURIComponent(SHARE_URL)}&text=${encodeURIComponent(TEXT)}`,
+    );
+    for (const link of [whatsapp, telegram]) {
+      await expect(link).toHaveAttribute('target', '_blank');
+      await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
+  });
+
+  test('uses the share sheet where there is one', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'share', {
+        configurable: true,
+        value: async (data: ShareData) => Object.assign(window, { __shared: data }),
+      });
+    });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Share with neighbours' }).click();
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __shared?: ShareData }).__shared))
+      .toEqual({ title: site.brand.full, text: TEXT, url: SHARE_URL });
+  });
+
+  test('copies the link where there is no share sheet', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.addInitScript(() => {
+      delete (Navigator.prototype as Partial<Navigator>).share;
+    });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Share with neighbours' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Copy link' }).click();
+    await expect(page.getByText('Link copied')).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(SHARE_URL);
   });
 });
 
@@ -379,17 +541,25 @@ test.describe('site banner', () => {
     expect(await page.evaluate((id) => localStorage.getItem(`banner-dismissed:${id}`), VOTE)).toBe('1');
   });
 
-  test('causes no layout shift and never covers the footer', async ({ page }) => {
+  test('sits in the page flow after the cards, causing no layout shift and covering nothing', async ({
+    page,
+    request,
+  }) => {
+    await waitForStatusQuota(request);
     await page.clock.setFixedTime(DURING);
     await trackLayoutShift(page);
     await page.goto('/');
     await expect(notice(page)).toBeVisible();
     expect(await readLayoutShift(page)).toBe(0);
 
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    const footer = await page.locator('.gg-footer').boundingBox();
+    expect(await notice(page).evaluate((el) => getComputedStyle(el).position)).toBe('static');
+    // The last thing in <main>, between the last card and the footer.
+    expect(await notice(page).evaluate((el) => el.parentElement?.lastElementChild === el)).toBe(true);
+    const card = await page.locator('.gg-main > .gg-card').last().boundingBox();
     const banner = await notice(page).boundingBox();
-    expect(footer && banner && banner.y >= footer.y + footer.height).toBe(true);
+    const footer = await page.locator('.gg-footer').boundingBox();
+    expect(card && banner && banner.y >= card.y + card.height).toBe(true);
+    expect(banner && footer && footer.y >= banner.y + banner.height).toBe(true);
   });
 });
 
@@ -410,4 +580,21 @@ test.describe('narrow screens', () => {
       });
     }
   }
+});
+
+test.describe('privacy contact', () => {
+  test('reveals the contact email after Turnstile', async ({ page }) => {
+    // playwright.config.ts passes the .dev.vars.example placeholder to wrangler dev.
+    const { readFileSync } = await import('node:fs');
+    const email = /^CONTACT_EMAIL="([^"\s]+)"/m.exec(readFileSync('.dev.vars.example', 'utf8'))?.[1];
+    if (!email) throw new Error('.dev.vars.example has no CONTACT_EMAIL');
+    await page.goto('/privacy');
+    const en = page.locator('#en');
+    await en.getByRole('button', { name: 'Show email address' }).click();
+    const mail = en.getByRole('link', { name: email });
+    await expect(mail).toHaveAttribute('href', `mailto:${email}`);
+    await expect(mail).toBeFocused();
+    await expect(en.getByRole('button', { name: 'Show email address' })).toHaveCount(0);
+    await expect(en.getByRole('link', { name: 'open an issue on GitHub' })).toBeVisible();
+  });
 });

@@ -50,6 +50,7 @@ export const ConfirmOutage: Component<ConfirmOutageProps> = (props) => {
 
   return (
     <div class={css.root}>
+      <p class={css.helper}>{t().confirm.helper}</p>
       <button
         type="button"
         class={button.off}

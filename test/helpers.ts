@@ -71,20 +71,28 @@ export async function setHeartbeat(secondsAgo: number): Promise<string> {
   return lastSeen;
 }
 
+export async function insertStillOff({ createdAt = new Date().toISOString(), clientHash = 'fingerprint' } = {}) {
+  await env.DB.prepare('INSERT INTO still_off_reports (created_at, client_hash) VALUES (?, ?)')
+    .bind(createdAt, clientHash)
+    .run();
+}
+
 export async function insertOutage(values: {
   startTime?: string;
   endTime?: string | null;
   source?: 'sensor' | 'manual';
   isFalsePositive?: 0 | 1;
+  isPlanned?: 0 | 1;
 }): Promise<number> {
   const row = await env.DB.prepare(
-    'INSERT INTO outages (start_time, end_time, source, is_false_positive) VALUES (?, ?, ?, ?) RETURNING id',
+    'INSERT INTO outages (start_time, end_time, source, is_false_positive, is_planned) VALUES (?, ?, ?, ?, ?) RETURNING id',
   )
     .bind(
       values.startTime ?? new Date(Date.now() - 600_000).toISOString(),
       values.endTime ?? null,
       values.source ?? 'sensor',
       values.isFalsePositive ?? 0,
+      values.isPlanned ?? 0,
     )
     .first<{ id: number }>();
   if (!row) throw new Error('insert failed');
