@@ -249,7 +249,7 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run test:e2e` | Playwright against a fresh local Worker and database |
 | `npm run lint` / `lint:fix` / `lint:ci` | Biome: check / fix / check as CI does |
 | `npm run typecheck` | Type-check the app, service worker, Worker, tests and Node scripts |
-| `npm run cf-typegen` | Regenerate `worker/worker-configuration.d.ts` after a `wrangler.toml` change |
+| `npm run cf-typegen` | Regenerate `worker/worker-configuration.d.ts` after a `wrangler.toml` or `.dev.vars.example` change |
 | `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
 | `npm run db:migrate:local` / `db:migrate:remote` | Apply pending migrations locally / to production |
 | `npm run hash-password` | Print an `ADMIN_PASSWORD_HASH` value (input hidden) |

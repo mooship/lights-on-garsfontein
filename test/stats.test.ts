@@ -233,7 +233,7 @@ describe('GET /api/outages.csv', () => {
       endTime: '2026-10-20T11:30:00.000Z',
     });
     for (const clientHash of ['a', 'b']) await insertConfirmation(confirmed, { clientHash });
-    await insertConfirmation(open);
+    await insertConfirmation(planned); // planned outages count confirmations too
 
     const res = await call('/api/outages.csv');
     expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
@@ -242,8 +242,8 @@ describe('GET /api/outages.csv', () => {
       [
         'id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations',
         `${confirmed},2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,no,2`,
-        `${planned},2026-10-21T06:00:00.000Z,2026-10-21T10:00:20.000Z,240,yes,0`,
-        `${open},2026-10-22T10:00:00.000Z,,,no,1`,
+        `${planned},2026-10-21T06:00:00.000Z,2026-10-21T10:00:20.000Z,240,yes,1`,
+        `${open},2026-10-22T10:00:00.000Z,,,no,0`,
         '',
       ].join('\n'),
     );

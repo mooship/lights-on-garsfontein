@@ -7,15 +7,15 @@ Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and 
 **Lights On, Garsfontein?** shows the state of the electricity supply in Garsfontein, Pretoria, and keeps a record of outages. It is measured at one home in Garsfontein Extension 16 (Ward 45), near Mediclinic Denmar, by a heartbeat sensor and an admin punch clock, with residents' confirmations and "still off" reports alongside.
 
 - **Ultra-local, and nothing more.** It exists only to show the supply in Garsfontein. It is not a load-shedding app and must never try to replicate one; do not name other outage products anywhere.
-- **Trust comes first.** Residents must find it reliable. Never claim more than is measured: the reading is one point and some streets can differ. Unless a sensor heartbeat is within `HEARTBEAT_THRESHOLD_MS` (`shared/api.ts`), the status reads "No outage reported", not "on".
+- **Trust comes first.** Residents must find it reliable. Copy never claims more than is measured or than the code does: the reading is one point and some streets can differ, and statements such as how often figures refresh must match the code (`STATS_POLL_MS`). Unless a sensor heartbeat is within `HEARTBEAT_THRESHOLD_MS` (`shared/api.ts`), the status reads "No outage reported", not "on".
 - **Independent and neutral.** Not affiliated with or endorsed by the City of Tshwane or Eskom. Copy states facts and never assigns blame ("failed", "neglect"), implies official status, or uses their logos or branding.
 
 ## Principles
 
 1. **The best code is the code we don't write.** Before adding anything, ask whether the platform, an existing helper or a config value already does it, and whether it needs to exist at all. Deleting dead code, unused options and speculative abstractions is progress. No dependency for what a few lines do; no abstraction before a second real use.
-2. **Test-driven.** Red, green, refactor: write a failing test that captures the behaviour or the bug, make it pass with the smallest change, then clean up. A bug fix starts with a test that reproduces it.
+2. **Test-driven.** Red, green, refactor: write a failing test that captures the behaviour or the bug, make it pass with the smallest change, then clean up. A bug fix starts with a test that reproduces it. If a reported bug does not reproduce, inject it briefly to prove the test would catch it; keep the test only if it fails where the existing tests pass, and prefer extending an existing test.
 3. **One home per fact.** Deployment identity lives in `site.config.ts`, copy in `src/i18n/`, shared paths and types in `shared/`. Import them; do not repeat literals.
-4. **Small, focused changes.** Commit summaries are short, sentence case and imperative, with no prefix or full stop (for example "Fix horizontal scroll on the privacy page on phones"). Changes reach `main` through pull requests, and CI must pass. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
+4. **Small, focused changes.** Commit summaries are short, sentence case and imperative, with no prefix or full stop (for example "Fix horizontal scroll on the privacy page on phones"). Commit each finished task locally (the hooks run); push or open a pull request only when asked. Changes reach `main` through pull requests, and CI must pass. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
 
 ## Commands
 
@@ -38,6 +38,7 @@ Lefthook runs Biome and the typecheck on commit and `npm test` on push. CI runs 
 ## Definition of done
 
 - Tests added or updated first, and they fail without the change.
+- Before the first e2e run, `cp .dev.vars.example .dev.vars` (copying the example is allowed); without it the Turnstile and admin tests fail.
 - `npm run lint:ci`, `npm run typecheck`, `npm run build`, `CHECK_DIST=1 npm test` and `npm run test:e2e` all pass, in that order.
 - Both languages updated; zero layout shift and no horizontal scroll at 320px still hold.
 - README updated when behaviour, configuration or the public API changes.
@@ -55,7 +56,7 @@ Lefthook runs Biome and the typecheck on commit and `npm test` on push. CI runs 
 | `test/`, `test/node/`, `e2e/` | Worker tests, Node tests (pure logic, build helpers, built output), Playwright |
 | `drizzle/` | Migrations (generated) |
 
-To add an endpoint or a language, follow "Adding an endpoint" and "Adding a language" in the README.
+To add an endpoint or a language, follow "Adding an endpoint" and "Adding a language" in the README. Public reads use `limiter: 'STATUS_LIMITER'` and `cors: true`; update the README API table with them. A new banner gets a test in `test/node/banners.test.ts` that it shows from `from` and is gone at `until` (e2e covers only the first entry).
 
 ## Hard rules
 
@@ -64,7 +65,7 @@ To add an endpoint or a language, follow "Adding an endpoint" and "Adding a lang
 - **Public contracts are stable.** CSV columns are only ever appended; API response fields are only added. Document changes in the README.
 - **Placeholders.** Static files use `%site.<path>%` and `%since.<locale>%`, and `index.html` also uses `%page.*%` (`build/html.ts`, `vite.config.ts`). An unknown or leftover placeholder fails the build.
 - **Inline scripts are frozen.** The boot scripts in `index.html` and `privacy.html` are CSP-hashed in `public/_headers`. Any edit, comments included, needs the hash updated (`test/csp.test.ts` fails otherwise). They must stay static: values reach them through `<html lang>` and `<html data-locales>`, never placeholders.
-- **Zero layout shift.** The `index.html` shell mirrors the app box for box, and its copy comes from the dictionaries at build time (`data-i18n`). Change both together.
+- **Zero layout shift.** The `index.html` shell mirrors the app box for box, and its copy comes from the dictionaries at build time (`data-i18n`). Change the shell, `src/components/Skeletons.tsx` and the app together. Shell copy must be a plain string or take only `site.*` arguments (`data-i18n-args`); copy tied to a code constant needs a coupling note at both ends.
 - **Migrations.** Generate them with `npm run db:generate`; never hand-write schema SQL, and commit the schema and `drizzle/` together. `deploy:ci` migrates seconds before the new code is live, so each migration must work with both the old and the new code: add a column before using it, stop using it before dropping it, give new columns a default or make them nullable, and never rename in place. Read the generated SQL, because a SQLite table rebuild can cascade-delete rows (see `drizzle/0003_boolean_flags.sql`). Run `npm run db:migrate:local` and the tests.
 - **Wrangler bindings.** A new var, binding or rate limit goes in the top level of `wrangler.toml` and in `[env.e2e]` (bindings are not inherited), and in `wrangler.example.toml`, with a `namespace_id` unique in the account. A new secret goes in `.dev.vars.example`, keeping its order. Then run `npm run cf-typegen`. `[env.e2e]` is for the test suite only: never deploy it.
 - **Edge cache.** A write that changes an edge-cached view declares `purges` (usually `OUTAGE_VIEWS` from `shared/paths.ts`). A new `edgeCache` route joins `EDGE_CACHED` in `test/helpers.ts`.
