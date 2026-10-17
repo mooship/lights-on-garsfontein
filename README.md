@@ -156,6 +156,7 @@ Machine-readable summary: [`/llms.txt`](https://garsfontein.timothybrits.co.za/l
 - **Social cards are pre-rendered PNGs** (one per status). `/og.png` serves the one matching the live status, which avoids shipping an image renderer in the Worker.
 - **Heartbeats need a bearer token**, which the spec left open.
 - **Passwords use PBKDF2-SHA256 through Web Crypto** (100,000 iterations, the Workers maximum).
+- **JSON-LD uses `Service`, not `GovernmentService`,** so search engines never present a volunteer project as an official one.
 
 ## Licence
 
