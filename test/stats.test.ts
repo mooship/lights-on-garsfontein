@@ -4,7 +4,7 @@ import { HOUR_MS as H, type StatsResponse, TRACKING_SINCE } from '../shared/api'
 import { site } from '../site.config';
 import { zoned } from '../src/lib/zone';
 import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
-import { call, insertOutage, uniqueIp } from './helpers';
+import { call, insertConfirmation, insertOutage, sameWindow, uniqueIp } from './helpers';
 
 const t = (iso: string) => Date.parse(iso);
 /** The configured zone's UTC offset in ms; days and weeks start at local midnight. */
@@ -108,7 +108,7 @@ describe('windowStats', () => {
       const intervals = mergeOutages(rows, base + 30 * D);
       const from = base + random() * 5 * D;
       const to = from + random() * 25 * D;
-      // The old scan: for each local day, does any interval overlap it?
+      // Reference: the plain per-day scan that windowStats's single forward pass replaces.
       const start = Math.max(from, since);
       let expected = 0;
       for (let day = Math.floor((start + OFFSET) / D) * D - OFFSET; day < to; day += D) {
@@ -166,18 +166,40 @@ describe('weekly stats', () => {
 });
 
 describe('GET /api/stats', () => {
-  it('returns the stats shape with the tracking start date', async () => {
-    await insertOutage({});
+  it('counts planned and open outages but not false positives', async () => {
+    const now = Date.now();
+    const ago = (ms: number) => new Date(now - ms).toISOString();
+    const outages = [
+      { startTime: ago(3 * H), endTime: ago(2 * H), isPlanned: 1 as const },
+      { startTime: ago(H / 2), endTime: null },
+    ];
+    for (const outage of outages) await insertOutage(outage);
+    await insertOutage({ startTime: ago(5 * H), endTime: ago(4 * H), isFalsePositive: 1 });
+
     const res = await call('/api/stats');
     expect(res.status).toBe(200);
     const body = (await res.json()) as StatsResponse;
     expect(body.trackingSince).toBe('2026-10-16T22:00:00.000Z');
-    expect(body).toHaveProperty('last30.hoursOff');
-    expect(Array.isArray(body.weeks)).toBe(true);
+    const window = { hoursOff: 1.5, outages: 2, plannedOutages: 1, longestMinutes: 60 };
+    expect(body.last7).toMatchObject(window);
+    expect(body.last30).toMatchObject(window);
+    // Null until the 60 days it compares have both been tracked.
+    if (now < t(TRACKING_SINCE) + 60 * 24 * H) expect(body.previous30).toBeNull();
+    else expect(body.previous30).toMatchObject({ hoursOff: 0, outages: 0 });
+
+    // This week's bar: the same outages, clipped to the week if it began less than 3 hours ago.
+    const week = weekStartOf(now);
+    const inWeek = outages.map((o) => Math.max(0, (o.endTime ? t(o.endTime) : now) - Math.max(t(o.startTime), week)));
+    expect(body.weeks.at(-1)).toEqual({
+      weekStart: new Date(week + OFFSET).toISOString().slice(0, 10),
+      hoursOff: Math.round((inWeek.reduce((a, b) => a + b, 0) / H) * 10) / 10,
+      outages: inWeek.filter((ms) => ms > 0).length,
+    });
   });
 
   it('shares the status rate limit', async () => {
     const ip = uniqueIp();
+    await sameWindow();
     for (let i = 0; i < 60; i++) await call('/api/stats', { ip });
     expect((await call('/api/stats', { ip })).status).toBe(429);
   });
@@ -197,17 +219,33 @@ describe('GET /api/outages.csv', () => {
     expect((await res.text()).trim().split('\n')).toHaveLength(121);
   });
 
-  it('exports outages as CSV without false positives', async () => {
-    await insertOutage({ startTime: '2026-10-20T10:00:00.000Z', endTime: '2026-10-20T11:30:00.000Z' });
-    await insertOutage({ startTime: '2026-10-21T10:00:00.000Z', endTime: null, source: 'manual' });
-    await insertOutage({ startTime: '2026-10-22T10:00:00.000Z', isFalsePositive: 1 });
+  it('exports every outage but false positives, oldest first, in its stable columns', async () => {
+    // Inserted newest first, so the id order is the reverse of the start order.
+    const open = await insertOutage({ startTime: '2026-10-22T10:00:00.000Z', endTime: null, source: 'manual' });
+    await insertOutage({ startTime: '2026-10-21T12:00:00.000Z', isFalsePositive: 1 });
+    const planned = await insertOutage({
+      startTime: '2026-10-21T06:00:00.000Z',
+      endTime: '2026-10-21T10:00:20.000Z',
+      isPlanned: 1,
+    });
+    const confirmed = await insertOutage({
+      startTime: '2026-10-20T10:00:00.000Z',
+      endTime: '2026-10-20T11:30:00.000Z',
+    });
+    for (const clientHash of ['a', 'b']) await insertConfirmation(confirmed, { clientHash });
+    await insertConfirmation(planned); // planned outages count confirmations too
+
     const res = await call('/api/outages.csv');
-    expect(res.headers.get('Content-Type')).toContain('text/csv');
-    const lines = (await res.text()).trim().split('\n');
-    expect(lines[0]).toBe('id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations');
-    expect(lines.slice(1).map((l) => l.split(',').slice(1).join(','))).toEqual([
-      '2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,no,0',
-      '2026-10-21T10:00:00.000Z,,,no,0',
-    ]);
+    expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+    expect(res.headers.get('Content-Disposition')).toBe(`attachment; filename="${site.slug}-outages.csv"`);
+    expect(await res.text()).toBe(
+      [
+        'id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations',
+        `${confirmed},2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,no,2`,
+        `${planned},2026-10-21T06:00:00.000Z,2026-10-21T10:00:20.000Z,240,yes,1`,
+        `${open},2026-10-22T10:00:00.000Z,,,no,0`,
+        '',
+      ].join('\n'),
+    );
   });
 });

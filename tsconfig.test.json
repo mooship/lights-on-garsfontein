@@ -3,5 +3,7 @@
   "compilerOptions": {
     "types": ["./worker/worker-configuration.d.ts", "@cloudflare/vitest-plugin/types", "vite/client"]
   },
-  "include": ["worker", "shared", "test"]
+  "include": ["worker", "shared", "test"],
+  // Node tests (tsconfig.node.json).
+  "exclude": ["test/node"]
 }

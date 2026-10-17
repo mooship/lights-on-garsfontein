@@ -1,10 +1,13 @@
 import { keyframes, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
+// The same min-height as .gg-skel-row (global.css.ts): a two-line NONE headline fits in it, so
+// every state keeps the loading shell's height.
 export const root = style({
   display: 'flex',
   alignItems: 'center',
   gap: '1rem',
+  minHeight: '5rem',
 });
 
 const pulse = keyframes({
@@ -25,8 +28,11 @@ const iconBase = style({
 export const icon = styleVariants({
   ON: [iconBase, { background: vars.color.onSoft, color: vars.color.on }],
   OFF: [iconBase, { background: vars.color.offSoft, color: vars.color.off }],
+  // No live reading: neutral, so it never reads as a measured "on".
+  NONE: [iconBase, { background: vars.color.bg, color: vars.color.muted, border: `1px solid ${vars.color.border}` }],
 });
 
+// Only rendered for OFF.
 export const ring = style({
   position: 'absolute',
   inset: 0,
@@ -46,6 +52,8 @@ export const headline = style({
 export const tone = styleVariants({
   ON: { color: vars.color.on },
   OFF: { color: vars.color.off },
+  // The longer, neutral headline is smaller so it takes at most two lines on a phone.
+  NONE: { color: vars.color.text, fontSize: '1.25rem' },
 });
 
 export const detail = style({

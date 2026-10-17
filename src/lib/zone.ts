@@ -2,7 +2,7 @@ import { site } from '../../site.config';
 
 // No imports beyond the config, so the banners, the tests and the e2e specs can use it too.
 
-const pad2 = (n: number) => String(n).padStart(2, '0');
+export const pad2 = (n: number) => String(n).padStart(2, '0');
 const abs = Math.abs(site.utcOffsetMinutes);
 
 /** The configured zone's UTC offset (fixed) as an ISO 8601 suffix, e.g. "+02:00". */

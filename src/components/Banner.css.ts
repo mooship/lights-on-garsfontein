@@ -1,15 +1,9 @@
 import { style } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
-// The banner is the shell's last child and sticks to the bottom of the viewport. Sticky rather
-// than fixed: it takes its own height at the end of the page, so it never covers the footer, and
-// nothing renders after it, so appearing or closing cannot shift content (index.html has no banner).
+// An inline notice after the last card in <main>: in the flow, so it never covers content, and after
+// everything the index.html shell renders, so appearing or closing shifts none of it.
 export const root = style({
-  position: 'sticky',
-  bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
-  zIndex: 1,
-  // A short page still puts it at the bottom of the screen (the shell is at least 100dvh).
-  marginTop: 'auto',
   display: 'flex',
   alignItems: 'flex-start',
   gap: '0.5rem',

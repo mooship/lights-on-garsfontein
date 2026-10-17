@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
-import type { Component } from 'solid-js';
+import { type Component, Show } from 'solid-js';
 import type { AdminOutage } from '../../shared/api';
 import { formatClock, formatDay, formatTime, outageDurationMs } from '../lib/format';
 import { t } from '../lib/i18n';
@@ -17,7 +17,6 @@ interface PunchClockProps {
   onPunchIn: () => void;
 }
 
-/** Admin punch clock: punch out when the power goes off, punch in when it is back. */
 export const PunchClock: Component<PunchClockProps> = (props) => {
   const elapsed = () => (props.outage ? outageDurationMs(props.outage, props.now) : 0);
 
@@ -38,26 +37,20 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
             : t().admin.idle}
         </p>
       </div>
-      <div class={css.actions}>
-        <button
-          type="button"
-          class={button.off}
-          disabled={props.busy || props.outage !== null}
-          onClick={props.onPunchOut}
-        >
-          <ZapOff size={18} aria-hidden="true" />
-          {t().admin.punchOut}
-        </button>
-        <button
-          type="button"
-          class={button.on}
-          disabled={props.busy || props.outage === null}
-          onClick={props.onPunchIn}
-        >
+      <Show
+        when={props.outage}
+        fallback={
+          <button type="button" class={button.off} disabled={props.busy} onClick={props.onPunchOut}>
+            <ZapOff size={18} aria-hidden="true" />
+            {t().admin.punchOut}
+          </button>
+        }
+      >
+        <button type="button" class={button.on} disabled={props.busy} onClick={props.onPunchIn}>
           <Zap size={18} aria-hidden="true" />
           {t().admin.punchIn}
         </button>
-      </div>
+      </Show>
     </div>
   );
 };

@@ -1,7 +1,8 @@
 <!doctype html>
-<!-- The values in percent signs come from site.config.ts (siteConfig in vite.config.ts). Keep them
+<!-- The values in percent signs come from site.config.ts (siteConfig in vite.config.ts); the
+     %page.…% ones differ per language page and come from src/i18n/head.ts (localePages). Keep them
      out of the inline script: its CSP hash is in public/_headers. -->
-<html lang="%site.locales.0%" data-locales="%site.locales%">
+<html lang="%page.lang%" data-locales="%site.locales%">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -12,18 +13,24 @@
           var s = localStorage.getItem('theme');
           var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
           h.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
-          // The shell below is in every language; base.css shows the one matching lang.
+          // Language pages (shared/locale.ts) carry their own lang and the URL wins there; / forwards
+          // a visitor who chose another language before anything renders. /admin shows the stored choice.
+          var all = h.getAttribute('data-locales').split(' ');
           var l = localStorage.getItem('locale');
-          if (l && h.getAttribute('data-locales').split(' ').indexOf(l) >= 0) h.lang = l;
+          var home = function(c) { return c === all[0] ? '/' : '/' + c + '/'; };
+          if (!l || all.indexOf(l) < 0) return;
+          if (location.pathname !== home(h.lang)) h.lang = l;
+          else if (h.lang === all[0] && l !== all[0]) {
+            h.lang = l;
+            location.replace(home(l) + location.search + location.hash);
+          }
         } catch (e) {}
       })();
     </script>
-    <title>%site.brand.full% · Is die krag aan in Garsfontein? Is the power on?</title>
-    <meta
-      name="description"
-      content="Is die krag aan in Garsfontein? Intydse kragstatus en ’n deurlopende rekord van kragonderbrekings in Garsfontein, Pretoria (gemeet in Uitbreiding 16, Wyk 45, Streek 6, Stad Tshwane), sedert %since.af%. Live power status and a continuous record of power outages in Garsfontein, Pretoria (measured in Extension 16, Ward 45, Region 6, City of Tshwane), since %since.en%."
-    />
-    <link rel="canonical" href="%site.url%/" />
+    <title>%page.title%</title>
+    <meta name="description" content="%page.description%" />
+    <link rel="canonical" href="%page.url%" />
+    %page.alternates%
     <meta name="theme-color" content="#F6F4EF" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#121312" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -34,17 +41,14 @@
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="%site.brand.full%" />
-    <!-- og:locale and og:locale:alternate are added from site.locales. -->
-    <meta property="og:url" content="%site.url%/" />
-    <meta property="og:title" content="%site.brand.full% · Is die krag aan in Garsfontein? Is the power on?" />
-    <meta
-      property="og:description"
-      content="Intydse kragstatus en ’n deurlopende rekord van kragonderbrekings in Garsfontein, Pretoria. Live power status and a record of power outages in Garsfontein, Pretoria."
-    />
+    %page.ogLocales%
+    <meta property="og:url" content="%page.url%" />
+    <meta property="og:title" content="%page.title%" />
+    <meta property="og:description" content="%page.ogDescription%" />
     <meta property="og:image" content="%site.url%/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="%site.brand.short% Die huidige kragstatus in Garsfontein, Pretoria. Current power status." />
+    <meta property="og:image:alt" content="%page.imageAlt%" />
     <meta name="twitter:card" content="summary_large_image" />
 
     <script type="application/ld+json">
@@ -53,7 +57,7 @@
         "@type": "Service",
         "name": "%site.brand.full%",
         "alternateName": ["Garsfontein power status", "Garsfontein kragstatus"],
-        "description": "’n Oop rekord van kragonderbrekings vir huise wat hul krag van die Garsfontein-substasie in Pretoria kry, bygehou sedert %since.af%. Onafhanklik bedryf deur ’n inwoner van Garsfontein. Nie verbonde aan die Stad Tshwane of Eskom nie. An open record of power outages for homes supplied by the Garsfontein substation in Pretoria, kept since %since.en%. Operated independently by a Garsfontein resident. Not affiliated with the City of Tshwane or Eskom.",
+        "description": "%page.serviceDescription%",
         "inLanguage": %site.locales%,
         "url": "%site.url%/",
         "serviceType": "Power outage tracking",
@@ -82,19 +86,18 @@
   </head>
   <body>
     <div id="root">
-      <!-- Static loading state. Mirrors the app's masthead and src/components/Skeletons.tsx box for box
+      <!-- Static loading state. Mirrors the app's masthead, src/components/Skeletons.tsx and the
+           status card's static rows (src/components/StatusNotes.tsx, StillOffPlaceholder) box for box
            (zero layout shift). The data-i18n* elements are filled from src/i18n in every language at
            build time (staticI18n in vite.config.ts). -->
       <div class="gg-shell">
         <header class="gg-masthead">
-          <div>
-            <p class="gg-eyebrow" data-i18n="masthead.eyebrow"></p>
-            <h1 class="gg-title">%site.brand.short%</h1>
-          </div>
+          <p class="gg-eyebrow" data-i18n="masthead.eyebrow"></p>
           <div class="gg-masthead-actions">
             <button type="button" class="gg-icon-button gg-lang-button" data-i18n-switch data-i18n-label="lang.switchTo" disabled></button>
             <button type="button" class="gg-icon-button" data-i18n-label="theme.label" disabled></button>
           </div>
+          <h1 class="gg-title">%site.brand.full%</h1>
         </header>
         <p class="gg-notice" data-i18n="masthead.notice"></p>
         <main class="gg-main">
@@ -107,10 +110,22 @@
                 <span class="gg-skel gg-skel-text gg-w-30"></span>
               </span>
             </div>
+            <div>
+              <p class="gg-scope" data-i18n="scope.measured" data-i18n-args="site.landmark"></p>
+              <details class="gg-why">
+                <summary data-i18n="scope.why"></summary>
+                <p class="gg-scope" data-i18n="scope.whyText"></p>
+              </details>
+            </div>
             <div class="gg-status-detail" aria-hidden="true">
               <span class="gg-skel gg-skel-text gg-w-80"></span>
               <span class="gg-skel gg-skel-text gg-w-30"></span>
             </div>
+            <div class="gg-still-off">
+              <button type="button" class="gg-link-button" data-i18n="stillOff.button" disabled></button>
+              <p class="gg-still-off-note" data-i18n="stillOff.note"></p>
+            </div>
+            <p class="gg-safety"><span data-i18n="safety.live"></span> <a href="%site.faultReporting.url%" data-i18n="safety.report"></a>.</p>
           </section>
           <section class="gg-card">
             <div class="gg-trends-body">
@@ -129,6 +144,9 @@
             <details class="gg-trends-details">
               <summary data-i18n="trends.tableLabel"></summary>
             </details>
+            <details class="gg-trends-details">
+              <summary data-i18n="trends.howTitle"></summary>
+            </details>
           </section>
           <section class="gg-card">
             <h2 class="gg-card-title" data-i18n="history.title"></h2>
@@ -144,8 +162,8 @@
       </div>
       <noscript
         ><p class="gg-shell">
-          Hierdie webwerf het JavaScript nodig. Die intydse status is ook by /api/status beskikbaar.
-          <span lang="en">This site requires JavaScript. The live status is also available at /api/status.</span>
+          Hierdie webwerf het JavaScript nodig. Die status is ook by /api/status beskikbaar.
+          <span lang="en">This site requires JavaScript. The status is also available at /api/status.</span>
         </p></noscript
       >
     </div>

@@ -1,5 +1,6 @@
 # Copy to .dev.vars for local development. These are Cloudflare's public
-# Turnstile test keys (always pass), username "admin" and a hash of the password "test-password".
+# Turnstile test keys (always pass), username "admin", a hash of the password "test-password" and a
+# placeholder contact address (the real one is the CONTACT_EMAIL secret).
 # Keep this order: `wrangler types --check` in CI reads it, and the order shapes the generated types.
 SITE_URL="http://localhost:8787"
 TURNSTILE_SITE_KEY="1x00000000000000000000AA"
@@ -9,3 +10,4 @@ HEARTBEAT_TOKEN="local-heartbeat-token"
 IP_SALT="local-salt"
 ADMIN_API_TOKEN="local-admin-api-token"
 ADMIN_USERNAME="admin"
+CONTACT_EMAIL="contact@example.invalid"

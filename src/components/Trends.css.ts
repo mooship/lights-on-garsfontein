@@ -32,6 +32,9 @@ export const tileLabel = style({ fontSize: '0.8125rem', fontWeight: 600, color: 
 
 export const tileValue = style({ fontSize: '1.625rem', fontWeight: 700, lineHeight: 1.1 });
 
+// The units in a duration ("u", "min"), smaller than its numbers.
+export const unit = style({ fontSize: '0.6em', fontWeight: 600 });
+
 export const tileDelta = style({
   display: 'flex',
   alignItems: 'center',
@@ -123,4 +126,16 @@ export const download = style({
   minHeight: '2.75rem',
 });
 
-export const chartEmpty = style({ marginTop: '1.25rem', color: vars.color.muted, fontSize: '0.9375rem' });
+// Takes the chart's place at about its height (.gg-skel-chart), so the card does not look broken.
+export const chartEmpty = style({
+  marginTop: '1.25rem',
+  minHeight: '11.5rem',
+  display: 'grid',
+  placeItems: 'center',
+  padding: '1rem',
+  textAlign: 'center',
+  borderRadius: vars.radius.control,
+  border: `1px dashed ${vars.color.border}`,
+  color: vars.color.muted,
+  fontSize: '0.9375rem',
+});

@@ -1,4 +1,4 @@
-// Response shapes shared by the Worker and the SolidJS client.
+// Imported by both the Worker and the browser bundle, so nothing here may depend on either runtime.
 
 import { site } from '../site.config';
 
@@ -28,6 +28,13 @@ export interface StatusResponse {
   since: string | null;
   outage: OutageSummary | null;
   recent: OutageSummary[];
+  /**
+   * A sensor has reported and its last heartbeat is fresh. When false, ON only means no outage
+   * has been reported, not that power was measured.
+   */
+  monitored: boolean;
+  /** "Still off where you are?" reports in the last STILL_OFF_WINDOW_MS; always 0 while OFF. */
+  stillOffReports: number;
   turnstileSiteKey: string;
   generatedAt: string;
 }
@@ -41,6 +48,16 @@ export interface ConfirmRequest {
 
 export interface ConfirmResponse {
   confirmations: number;
+}
+
+export interface StillOffRequest {
+  /** Turnstile token solved for the 'still_off' action. */
+  token: string;
+}
+
+export interface StillOffResponse {
+  /** Reports in the last STILL_OFF_WINDOW_MS, this one included. */
+  reports: number;
 }
 
 export interface AdminOutagesResponse {
@@ -87,7 +104,13 @@ export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 
 /** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
-export type TurnstileAction = 'confirm' | 'login';
+export type TurnstileAction = 'confirm' | 'login' | 'still_off' | 'contact';
+
+/** How far back "still off" reports are counted. Copy: `stillOff.count` in src/i18n ("last hour"). */
+export const STILL_OFF_WINDOW_MS = HOUR_MS;
+
+/** One "still off" report per client per this long. Copy: `already_reported` in src/i18n, privacy.html. */
+export const STILL_OFF_DEDUPE_MS = 2 * HOUR_MS;
 
 /** Admin punch clock: punch out when the power goes off, punch in when it comes back. */
 export type TimerAction = 'punch_out' | 'punch_in';
@@ -100,5 +123,5 @@ export function outageDurationMs(outage: { startTime: string; endTime: string | 
 /** Heartbeats older than this mean the grid is off. */
 export const HEARTBEAT_THRESHOLD_MS = 180_000;
 
-/** The public start of outage tracking (site.config.ts). Statistics never count time before it. */
+/** Statistics never count time before this. */
 export const TRACKING_SINCE = site.trackingSince;

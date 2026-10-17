@@ -3,8 +3,13 @@ import type {
   ConfirmResponse,
   StatsResponse,
   StatusResponse,
+  StillOffResponse,
   TimerAction,
 } from '../../shared/api';
+import { FROM_CACHE_HEADER } from '../sw/strategy';
+
+/** A status, flagged when the service worker answered from its cache because the network failed. */
+export type Status = StatusResponse & { fromCache?: true };
 
 export class ApiError extends Error {
   constructor(
@@ -22,16 +27,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = (await res.json().catch(() => ({}))) as { error?: string };
   if (!res.ok) throw new ApiError(res.status, body.error ?? `http_${res.status}`);
-  return body as T;
+  return (res.headers.has(FROM_CACHE_HEADER) ? { ...body, fromCache: true } : body) as T;
 }
 
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 
 export const api = {
-  status: () => request<StatusResponse>('/api/status'),
+  status: () => request<Status>('/api/status'),
   stats: () => request<StatsResponse>('/api/stats'),
   confirm: (token: string, outageId: number) => post<ConfirmResponse>('/api/confirm', { token, outageId }),
+  stillOff: (token: string) => post<StillOffResponse>('/api/still-off', { token }),
   login: (username: string, password: string, token: string) =>
     post<{ ok: true }>('/api/admin/login', { username, password, token }),
   logout: () => post<{ ok: true }>('/api/admin/logout'),

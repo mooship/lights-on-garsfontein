@@ -1,30 +1,57 @@
 import type { Messages } from './af.ts';
 
 export const en = {
-  lang: { switchTo: 'Skakel oor na Afrikaans' },
+  lang: { switchTo: 'Skakel oor na Afrikaans', next: 'Afrikaans' },
   theme: { label: 'Switch theme', toDark: 'Switch to dark theme', toLight: 'Switch to light theme' },
   units: { d: 'd', h: 'h', min: 'min', m: 'm', s: 's' },
   day: { today: 'today', yesterday: 'yesterday', on: (day: string) => `on ${day}` },
   tab: { ON: 'ON', OFF: 'OFF' },
   banner: { region: 'Notice', dismiss: 'Dismiss' },
   masthead: {
-    eyebrow: 'Garsfontein Ext. 16 · Ward 45 · Pretoria',
-    notice: 'Independent service. Not affiliated with the City of Tshwane or Eskom.',
+    eyebrow: 'Ward 45 · Pretoria',
+    notice: 'Independent service. Not affiliated with or endorsed by the City of Tshwane or Eskom.',
   },
   footer: {
     nav: 'Site',
-    privacy: 'Privacy',
+    privacy: 'Privacy and terms',
     csv: 'Outage data (CSV)',
+    feed: 'Atom feed',
     signIn: 'Sign in',
-    measured:
-      'Measured in Garsfontein Ext. 16, Pretoria · Ward 45 · Region 6, City of Tshwane · Garsfontein substation',
+    licence: 'Outage data:',
+    measured: 'Measured in Garsfontein Ext. 16, Pretoria · Ward 45 · Region 6, City of Tshwane',
     operator: 'Operated independently by a Garsfontein Ext. 16 resident.',
   },
   loading: 'Loading…',
+  share: {
+    button: 'Share with neighbours',
+    text: 'Is the power off in Garsfontein? Check here:',
+    whatsapp: 'Share on WhatsApp',
+    telegram: 'Share on Telegram',
+    copy: 'Copy link',
+    newTab: '(opens in a new tab)',
+    copied: 'Link copied',
+    copyFailed: 'Could not copy the link.',
+  },
+  scope: {
+    measured: (landmark: string) =>
+      landmark
+        ? `Measured in Garsfontein Ext. 16, near ${landmark}. Some streets may differ.`
+        : 'Measured in Garsfontein Ext. 16. Some streets may differ.',
+    why: 'Why?',
+    whyText:
+      'The area is supplied by the Garsfontein substation and usually goes off as a whole. Some streets are on a different feed, so their power can go off or come back at different times. If yours differs, use the button below.',
+  },
+  safety: {
+    live: 'Always treat power lines as live.',
+    report: 'Report faults to the City of Tshwane',
+  },
+  og: { question: 'Is the power off in Garsfontein?', cta: 'Check the current status' },
   status: {
     heading: 'Current status',
-    ON: 'Power is on',
-    OFF: 'Power is off',
+    ON: 'The power is on',
+    OFF: 'The power is off',
+    NONE: 'No outage reported',
+    noLiveReading: 'Not measured live.',
     for: (duration: string) => `for ${duration}`,
     loading: 'Loading the current status…',
     wentOff: (time: string, day: string) => `Outage started at ${time} ${day}.`,
@@ -34,13 +61,16 @@ export const en = {
       `Last outage: ${from} to ${to} ${day} (${lasted}).`,
     updated: (time: string) => `Updated ${time}`,
     stale: (time: string) => `Unable to reach the server. Showing the status as at ${time}.`,
+    offline: (time: string, day?: string) => `No connection · status as at ${time}${day ? ` ${day}` : ''}`,
     unreachable: 'Unable to reach the server. Retrying shortly.',
   },
   confirm: {
+    helper:
+      'Is your power off too? One tap, anonymous. It shows neighbours how widespread the outage is. It does not notify the City.',
     button: 'My power is off too',
     busy: 'Submitting…',
     done: 'Confirmation recorded',
-    first: 'No community confirmations yet.',
+    first: 'Be the first to confirm.',
     count: (n: number) => `${n} community ${n === 1 ? 'confirmation' : 'confirmations'}.`,
     errors: {
       already_confirmed: 'You have already confirmed this outage.',
@@ -50,6 +80,19 @@ export const en = {
       turnstile_failed: 'The security check could not be completed. Please try again.',
     },
     unknown: 'Something went wrong. Please try again.',
+  },
+  stillOff: {
+    button: 'Still off where you are?',
+    busy: 'Submitting…',
+    done: 'Thanks, noted.',
+    note: 'This does not change the status or notify the City.',
+    count: (n: number) => `${n} ${n === 1 ? 'resident' : 'residents'} reported their power still off in the last hour.`,
+    errors: {
+      already_reported: 'You have already reported in the last two hours.',
+      outage_in_progress: 'An outage is already in progress. The status will update shortly.',
+      rate_limited: 'Too many requests. Please try again in a minute.',
+      turnstile_failed: 'The security check could not be completed. Please try again.',
+    },
   },
   history: {
     title: 'Recent outages',
@@ -78,18 +121,26 @@ export const en = {
     daysOf: (days: number, total: number) => `${days} of ${total}`,
     longest: 'Longest outage',
     average: (duration: string) => `Average ${duration}`,
-    chartEmpty: 'The weekly chart will appear once records begin.',
+    chartEmpty: 'No outages to chart yet.',
     chartTitle: 'Hours without power per week',
     chartLabel: 'Hours without power per week. Use the arrow keys to move between weeks, or open the table below.',
     weekOf: (day: string) => `Week of ${day}`,
     off: 'off',
     outageCount: (n: number) => `${n} ${n === 1 ? 'outage' : 'outages'}`,
     soFar: ' (to date)',
+    partial: (day: string) => ` (from ${day})`,
     thisWeek: 'This week',
     weekCol: 'Week of',
     hoursCol: 'Hours without power',
     outagesCol: 'Outages',
     download: 'Download all outages (CSV)',
+    howTitle: 'How we measure',
+    how: [
+      'Outages shorter than about 3 minutes may not be recorded.',
+      'Planned outages are included.',
+      'A day counts if any part of it had an outage.',
+      'The figures cover only outages recorded at the measuring point.',
+    ],
   },
   admin: {
     back: 'Public page',
@@ -140,5 +191,7 @@ export const en = {
     idle: 'No outage in progress.',
     punchOut: 'Punch out',
     punchIn: 'Punch in',
+    punchedOut: (time: string) => `Punched out at ${time}`,
+    punchedIn: (time: string) => `Punched in at ${time}`,
   },
 } satisfies Messages;

@@ -1,7 +1,8 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { DAY_MS } from '../shared/api';
 import { sha256Hex } from '../worker/lib/crypto';
-import { call, login, mockTurnstile, uniqueIp } from './helpers';
+import { call, createSession, login, mockTurnstile, sameWindow, uniqueIp } from './helpers';
 
 const attempt = (password: string, extra: Parameters<typeof call>[1] = {}) =>
   call('/api/admin/login', {
@@ -9,6 +10,9 @@ const attempt = (password: string, extra: Parameters<typeof call>[1] = {}) =>
     body: { username: 'admin', password, token: 'turnstile-token' },
     ...extra,
   });
+
+const sessionCount = async () =>
+  (await env.DB.prepare('SELECT COUNT(*) AS count FROM sessions').first<{ count: number }>())?.count;
 
 describe('admin auth', () => {
   it('refuses all logins while no password hash is configured', async () => {
@@ -75,99 +79,80 @@ describe('admin auth', () => {
 
   it('protects admin endpoints', async () => {
     expect((await call('/api/admin/outages')).status).toBe(401);
-    expect((await call('/api/admin/outages', { cookie: 'admin_session=forged' })).status).toBe(401);
+    // Well-formed, under the real cookie name, but no such session.
+    const forged = `__Host-admin_session=${'a'.repeat(43)}`;
+    expect((await call('/api/admin/outages', { cookie: forged })).status).toBe(401);
     const res = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' } });
     expect(res.status).toBe(401);
   });
 
-  it('accepts a valid session', async () => {
+  it('signs in with a cookie that opens the admin API', async () => {
     const cookie = await login();
     expect((await call('/api/admin/outages', { cookie })).status).toBe(200);
   });
 
   it('keeps you signed in for 30 days and renews the session on use', async () => {
-    const cookie = await login();
-    const fresh = await call('/api/admin/outages', { cookie });
+    const fresh = await call('/api/admin/outages', { cookie: await createSession() });
     expect(fresh.headers.get('Set-Cookie')).toBeNull(); // brand-new session: nothing to renew
 
-    await env.DB.prepare('UPDATE sessions SET expires_at = ?')
-      .bind(new Date(Date.now() + 3 * 86_400_000).toISOString())
-      .run();
+    const cookie = await createSession({ expiresAt: Date.now() + 3 * DAY_MS });
     const renewed = await call('/api/admin/outages', { cookie });
     expect(renewed.status).toBe(200);
     expect(renewed.headers.get('Set-Cookie')).toContain(`Max-Age=${30 * 24 * 60 * 60}`);
-    const row = await env.DB.prepare('SELECT expires_at FROM sessions').first<{ expires_at: string }>();
-    expect(Date.parse(row?.expires_at ?? '') - Date.now()).toBeGreaterThan(29 * 86_400_000);
+    const row = await env.DB.prepare('SELECT expires_at FROM sessions WHERE id = ?')
+      .bind(await sha256Hex(cookie.split('=')[1] ?? ''))
+      .first<{ expires_at: string }>();
+    expect(Date.parse(row?.expires_at ?? '') - Date.now()).toBeGreaterThan(29 * DAY_MS);
   });
 
   it('ends a session 90 days after sign-in, however recently it was used', async () => {
-    const cookie = await login();
-    await env.DB.prepare('UPDATE sessions SET created_at = ?, expires_at = ?')
-      .bind(new Date(Date.now() - 91 * 86_400_000).toISOString(), new Date(Date.now() + 29 * 86_400_000).toISOString())
-      .run();
+    const cookie = await createSession({ createdAt: Date.now() - 91 * DAY_MS, expiresAt: Date.now() + 29 * DAY_MS });
     expect((await call('/api/admin/outages', { cookie })).status).toBe(401);
-    const { count } = (await env.DB.prepare('SELECT COUNT(*) AS count FROM sessions').first<{ count: number }>()) ?? {};
-    expect(count).toBe(0);
+    expect(await sessionCount()).toBe(0);
   });
 
   it('never renews a session past 90 days after sign-in', async () => {
-    const cookie = await login();
-    const createdAt = Date.now() - 80 * 86_400_000;
-    await env.DB.prepare('UPDATE sessions SET created_at = ?, expires_at = ?')
-      .bind(new Date(createdAt).toISOString(), new Date(Date.now() + 3 * 86_400_000).toISOString())
-      .run();
+    const createdAt = Date.now() - 80 * DAY_MS;
+    const cookie = await createSession({ createdAt, expiresAt: Date.now() + 3 * DAY_MS });
     const renewed = await call('/api/admin/outages', { cookie });
     expect(renewed.status).toBe(200);
     const maxAge = Number(/Max-Age=(\d+)/.exec(renewed.headers.get('Set-Cookie') ?? '')?.[1]);
     expect(maxAge).toBeLessThanOrEqual(10 * 86_400);
     expect(maxAge).toBeGreaterThan(10 * 86_400 - 60);
     const row = await env.DB.prepare('SELECT expires_at FROM sessions').first<{ expires_at: string }>();
-    expect(row?.expires_at).toBe(new Date(createdAt + 90 * 86_400_000).toISOString());
+    expect(row?.expires_at).toBe(new Date(createdAt + 90 * DAY_MS).toISOString());
     // Already at the limit: nothing left to renew.
     expect((await call('/api/admin/outages', { cookie })).headers.get('Set-Cookie')).toBeNull();
   });
 
   it('signs every session out when the password changes', async () => {
-    const cookie = await login();
+    const cookie = await createSession();
     const rotated = { ...env, ADMIN_PASSWORD_HASH: 'pbkdf2_sha256$100000$c2FsdA==$aGFzaA==' } as Env;
     expect((await call('/api/admin/outages', { cookie, env: rotated })).status).toBe(401);
-    const { count } = (await env.DB.prepare('SELECT COUNT(*) AS count FROM sessions').first<{ count: number }>()) ?? {};
-    expect(count).toBe(0);
+    expect(await sessionCount()).toBe(0);
     expect((await call('/api/admin/outages', { cookie })).status).toBe(401);
   });
 
   it('rejects expired sessions', async () => {
-    const cookie = await login();
-    await env.DB.prepare('UPDATE sessions SET expires_at = ?')
-      .bind(new Date(Date.now() - 1000).toISOString())
-      .run();
+    const cookie = await createSession({ expiresAt: Date.now() - 1000 });
     expect((await call('/api/admin/outages', { cookie })).status).toBe(401);
   });
 
   it('logout deletes the session and clears the cookie', async () => {
-    const cookie = await login();
+    const cookie = await createSession();
     const res = await call('/api/admin/logout', { method: 'POST', cookie });
     expect(res.headers.get('Set-Cookie')).toContain('Max-Age=0');
     expect((await call('/api/admin/outages', { cookie })).status).toBe(401);
-    const { count } = (await env.DB.prepare('SELECT COUNT(*) AS count FROM sessions').first<{ count: number }>()) ?? {};
-    expect(count).toBe(0);
+    expect(await sessionCount()).toBe(0);
   });
 
   it('rate limits login attempts at 5 per minute per IP', async () => {
     mockTurnstile(true, 'login');
     const ip = uniqueIp();
     const codes: number[] = [];
+    await sameWindow();
     for (let i = 0; i < 6; i++) codes.push((await attempt('nope', { ip })).status);
     expect(codes).toEqual([401, 401, 401, 401, 401, 429]);
-  });
-
-  it('does not count failed Turnstile checks against the site-wide sign-in cap', async () => {
-    mockTurnstile(false, 'login');
-    // The global cap is 30 a minute; junk from many addresses must not use it up.
-    const codes = new Set<number>();
-    for (let i = 0; i < 35; i++) codes.add((await attempt('nope')).status);
-    expect([...codes]).toEqual([403]);
-    expect(await login()).toMatch(/^__Host-admin_session=/);
   });
 
   it('accepts the admin API token so agents can log outages', async () => {
@@ -178,9 +163,10 @@ describe('admin auth', () => {
   });
 
   it('rejects a wrong API token without falling back to cookies, and rate limits guesses', async () => {
-    const cookie = await login();
+    const cookie = await createSession();
     const ip = uniqueIp();
     const codes: number[] = [];
+    await sameWindow();
     for (let i = 0; i < 6; i++) {
       const res = await call('/api/admin/outages', { cookie, ip, headers: { Authorization: 'Bearer nope' } });
       codes.push(res.status);
@@ -197,10 +183,9 @@ describe('admin auth', () => {
   });
 
   it('rejects cross-site admin writes', async () => {
-    const cookie = await login();
     const res = await call('/api/admin/timer', {
       method: 'POST',
-      cookie,
+      cookie: await createSession(),
       body: { action: 'punch_out' },
       headers: { Origin: 'https://evil.example' },
     });

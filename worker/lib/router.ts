@@ -20,7 +20,7 @@ export interface Route {
   handler: (ctx: RouteContext) => Promise<Response> | Response;
   /** Reject cross-site requests and non-JSON bodies (cookie-authenticated writes). */
   sameOrigin?: boolean;
-  /** Per-IP rate limit checked before anything else touches the request. */
+  /** Per-connection rate limit, checked before auth and the handler. */
   limiter?: 'STATUS_LIMITER' | 'CONFIRM_LIMITER' | 'LOGIN_LIMITER';
   /** Return a Response to refuse the request, or null to let it through (e.g. admin auth). */
   authorize?: (ctx: RouteContext) => Promise<Response | null>;
@@ -32,7 +32,7 @@ export interface Route {
    */
   edgeCache?: boolean | number;
   /** Edge-cached paths to purge after a successful response, because this write changes them. */
-  purges?: string[];
+  purges?: readonly string[];
 }
 
 /** Keyed by "METHOD /path", e.g. "GET /api/status". */
@@ -45,11 +45,11 @@ const BROWSER_CACHE_CONTROL = 'X-Browser-Cache-Control';
 const edgeCacheKey = (origin: string, path: string) => new Request(`${origin}${path}`);
 
 /**
- * Drops an edge-cached path. The Cache API is per datacentre, so this clears only the one running
+ * Drops edge-cached paths. The Cache API is per datacentre, so this clears only the one running
  * the Worker; other datacentres keep their copy until its TTL runs out.
  */
-export async function purgeEdgeCache(origin: string, path: string): Promise<void> {
-  await caches.default.delete(edgeCacheKey(origin, path));
+export async function purgeEdgeCache(origin: string, paths: readonly string[]): Promise<void> {
+  await Promise.all(paths.map((path) => caches.default.delete(edgeCacheKey(origin, path))));
 }
 
 /**
@@ -104,10 +104,7 @@ export async function dispatch(route: Route, request: Request, env: Env): Promis
       edgeCache && request.method === 'GET'
         ? await fromEdgeCache(ctx, route.handler, edgeCache)
         : await route.handler(ctx);
-    if (purges && response.ok) {
-      const { origin } = new URL(request.url);
-      await Promise.all(purges.map((path) => purgeEdgeCache(origin, path)));
-    }
+    if (purges && response.ok) await purgeEdgeCache(new URL(request.url).origin, purges);
   }
   if (route.cors) response.headers.set('Access-Control-Allow-Origin', '*');
   for (const [name, value] of ctx.headers) response.headers.append(name, value);

@@ -16,5 +16,3 @@ export const running = style({ color: vars.color.off });
 export const idle = style({ color: vars.color.muted });
 
 export const meta = style({ color: vars.color.muted, fontSize: '0.9375rem', minHeight: '1.5rem' });
-
-export const actions = style({ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' });

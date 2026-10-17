@@ -1,16 +1,22 @@
-import { getPowerStatus } from '../lib/grid';
+import { localePath } from '../../shared/locale';
+import { site } from '../../site.config';
 import type { RouteContext, Routes } from '../lib/router';
 
-const SITEMAP_PATHS = ['/', '/privacy'];
-
 function sitemap({ env }: RouteContext): Response {
-  const urls = SITEMAP_PATHS.map(
-    (path) =>
-      `  <url><loc>${env.SITE_URL}${path}</loc><changefreq>${path === '/' ? 'always' : 'yearly'}</changefreq></url>`,
-  ).join('\n');
+  // Each language page lists all of them, so a search engine can show the reader's language.
+  const alternates = [...site.locales.map((locale) => [locale, localePath(locale)]), ['x-default', '/']]
+    .map(
+      ([hreflang, path]) => `\n    <xhtml:link rel="alternate" hreflang="${hreflang}" href="${env.SITE_URL}${path}"/>`,
+    )
+    .join('');
+  const languagePages = site.locales.map(
+    (locale) =>
+      `  <url><loc>${env.SITE_URL}${localePath(locale)}</loc><changefreq>always</changefreq>${alternates}</url>`,
+  );
+  const urls = [...languagePages, `  <url><loc>${env.SITE_URL}/privacy</loc><changefreq>yearly</changefreq></url>`];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${urls.join('\n')}
 </urlset>
 `;
   return new Response(xml, {
@@ -30,10 +36,12 @@ Sitemap: ${env.SITE_URL}/sitemap.xml
   });
 }
 
-/** Social card that reflects the live status: serves one of the pre-rendered PNGs. */
-async function ogImage({ request, env, db }: RouteContext): Promise<Response> {
-  const status = await getPowerStatus(db, new Date());
-  const asset = await env.ASSETS.fetch(new URL(`/og/${status.toLowerCase()}.png`, request.url));
+/**
+ * The social card. Status-neutral on purpose: a shared link's preview outlives the moment, so it
+ * never claims ON or OFF. A Worker route so the public URL stays stable whatever the asset is.
+ */
+async function ogImage({ request, env }: RouteContext): Promise<Response> {
+  const asset = await env.ASSETS.fetch(new URL('/og/card.png', request.url));
   const headers = new Headers(asset.headers);
   headers.set('Cache-Control', 'public, max-age=60');
   return new Response(asset.body, { status: asset.status, headers });
@@ -42,10 +50,10 @@ async function ogImage({ request, env, db }: RouteContext): Promise<Response> {
 const pages: Routes = {
   '/sitemap.xml': { handler: sitemap },
   '/robots.txt': { handler: robots },
-  '/og.png': { handler: ogImage, limiter: 'STATUS_LIMITER', edgeCache: true },
+  // A static asset with no D1 work behind it, so it needs no limiter or edge cache.
+  '/og.png': { handler: ogImage },
 };
 
-/** Each page answers both GET and HEAD. */
 export const seoRoutes: Routes = Object.fromEntries(
   Object.entries(pages).flatMap(([path, route]) => [
     [`GET ${path}`, route],

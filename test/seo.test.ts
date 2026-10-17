@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
-import { call, setHeartbeat } from './helpers';
+import { call, insertOutage, setHeartbeat } from './helpers';
 
 describe('SEO routes', () => {
   it('serves robots.txt that hides the admin API and points at the sitemap', async () => {
@@ -13,33 +13,49 @@ describe('SEO routes', () => {
     expect(body).toContain('Sitemap: https://garsfontein.example/sitemap.xml');
   });
 
-  it('serves an XML sitemap with the home and privacy pages', async () => {
+  it('serves an XML sitemap with each language page and the privacy page', async () => {
     const res = await call('/sitemap.xml');
     expect(res.headers.get('Content-Type')).toContain('application/xml');
     const body = await res.text();
-    expect(body).toContain('<loc>https://garsfontein.example/</loc>');
-    expect(body).toContain('<loc>https://garsfontein.example/privacy</loc>');
+    const locs = [...body.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual([
+      'https://garsfontein.example/',
+      'https://garsfontein.example/en/',
+      'https://garsfontein.example/privacy',
+    ]);
     expect(body).not.toContain('privacy.html');
   });
 
-  it('serves the social card that matches the live status', async () => {
-    await setHeartbeat(5);
-    const fetch = vi.fn(async () => new Response('png', { headers: { 'Content-Type': 'image/png' } }));
-    const res = await call('/og.png', { env: { ...env, ASSETS: { fetch } as unknown as Fetcher } });
-    expect(String((fetch.mock.calls[0] as unknown[])[0])).toBe('https://garsfontein.example/og/on.png');
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=60');
-    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  it('links each language page to the others with hreflang', async () => {
+    const body = await (await call('/sitemap.xml')).text();
+    const alternates = [
+      '<xhtml:link rel="alternate" hreflang="af" href="https://garsfontein.example/"/>',
+      '<xhtml:link rel="alternate" hreflang="en" href="https://garsfontein.example/en/"/>',
+      '<xhtml:link rel="alternate" hreflang="x-default" href="https://garsfontein.example/"/>',
+    ];
+    const entries = body.split('<url>').slice(1);
+    for (const entry of entries.slice(0, 2)) for (const link of alternates) expect(entry).toContain(link);
+    expect(entries[2]).not.toContain('hreflang');
+    expect(body).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
   });
 
-  it('serves repeat social card requests from the edge cache, whatever the query string', async () => {
-    await setHeartbeat(5);
+  it('serves the one status-neutral social card, whatever the status', async () => {
     const fetch = vi.fn(async () => new Response('png', { headers: { 'Content-Type': 'image/png' } }));
     const assetsEnv = { ...env, ASSETS: { fetch } as unknown as Fetcher };
-    expect((await call('/og.png', { env: assetsEnv })).status).toBe(200);
-    const again = await call('/og.png?v=2', { env: assetsEnv });
-    expect(await again.text()).toBe('png');
-    expect(again.headers.get('X-Content-Type-Options')).toBe('nosniff');
-    expect(fetch).toHaveBeenCalledTimes(1);
+    await insertOutage({});
+    const res = await call('/og.png', { env: assetsEnv });
+    expect(new TextDecoder().decode(await res.arrayBuffer())).toBe('png');
+    expect(res.headers.get('Content-Type')).toBe('image/png');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=60');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    await setHeartbeat(5);
+    expect((await call('/og.png', { method: 'HEAD', env: assetsEnv })).status).toBe(200);
+    const urls = fetch.mock.calls.map((args) => String((args as unknown[])[0]));
+    expect(urls).toEqual(['https://garsfontein.example/og/card.png', 'https://garsfontein.example/og/card.png']);
+  });
+
+  it('leaves the feed out of the sitemap, which lists pages only', async () => {
+    expect(await (await call('/sitemap.xml')).text()).not.toContain('feed.xml');
   });
 
   it('returns JSON 404 for unknown API routes', async () => {

@@ -1,9 +1,23 @@
 import { z } from 'zod';
-import type { ConfirmRequest, ConfirmResponse, StatusResponse } from '../../shared/api';
+import type {
+  ConfirmRequest,
+  ConfirmResponse,
+  StatusResponse,
+  StillOffRequest,
+  StillOffResponse,
+} from '../../shared/api';
+import { CSV_PATH, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
 import { outageConfirmations } from '../db/schema';
 import { requireBearer } from '../lib/auth';
 import { sha256Hex } from '../lib/crypto';
-import { countConfirmations, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
+import {
+  countConfirmations,
+  countStillOffReports,
+  detectOutage,
+  getGridState,
+  recordHeartbeat,
+  recordStillOff,
+} from '../lib/grid';
 import { errors, json, parseBody } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
@@ -13,7 +27,7 @@ const confirmSchema = z.object({
   outageId: z.number().int().positive().optional(),
 }) satisfies z.ZodType<ConfirmRequest>;
 
-export const STATUS_PATH = '/api/status';
+const stillOffSchema = z.object({ token: z.string().min(1).max(2048) }) satisfies z.ZodType<StillOffRequest>;
 
 /**
  * Edge TTL for the status, which every open tab polls. Writes purge it (in the datacentre that
@@ -40,6 +54,9 @@ async function getStatus({ env, db }: RouteContext): Promise<Response> {
   return json(body);
 }
 
+/** Salted hash of the rate-limit key (IPv6 grouped by /64), so rotating addresses within a /64 counts once. */
+const clientFingerprint = (salt: string, limitKey: string) => sha256Hex(`${salt}:${limitKey}`);
+
 async function postConfirm(ctx: RouteContext): Promise<Response> {
   const { request, env, db, limitKey } = ctx;
   const parsed = await parseBody(request, confirmSchema);
@@ -50,16 +67,15 @@ async function postConfirm(ctx: RouteContext): Promise<Response> {
   if (refused) return refused;
 
   const { outage, opened } = await detectOutage(db, new Date());
-  // The route purges after a successful confirm; this covers the refusals below.
-  if (opened) await purgeEdgeCache(new URL(request.url).origin, STATUS_PATH);
+  // The route purges what a confirmation changes; an outage opened here changes every view, refused or not.
+  if (opened) await purgeEdgeCache(new URL(request.url).origin, OUTAGE_VIEWS);
   if (!outage) return errors.conflict('no_active_outage');
   // The visitor saw an outage that has since ended and another began: do not count them for it.
   if (parsed.data.outageId !== undefined && parsed.data.outageId !== outage.id) {
     return errors.conflict('outage_changed');
   }
 
-  // The rate-limit key (IPv6 grouped by /64), so rotating addresses within a /64 counts once.
-  const clientHash = await sha256Hex(`${env.IP_SALT}:${limitKey}`);
+  const clientHash = await clientFingerprint(env.IP_SALT, limitKey);
   let inserted: { id: number }[];
   try {
     inserted = await db
@@ -77,8 +93,36 @@ async function postConfirm(ctx: RouteContext): Promise<Response> {
   return json(body, 201);
 }
 
-async function postHeartbeat({ db }: RouteContext): Promise<Response> {
-  const closed = await recordHeartbeat(db, new Date());
+/**
+ * "Still off where you are?": only while the status is ON (while OFF the client offers confirm
+ * instead). Reports are counted for the status and never change it.
+ */
+async function postStillOff(ctx: RouteContext): Promise<Response> {
+  const { request, env, db, limitKey } = ctx;
+  const parsed = await parseBody(request, stillOffSchema);
+  if ('response' in parsed) return parsed.response;
+  if (!env.IP_SALT) return errors.internal();
+  const refused = await checkTurnstile(ctx, parsed.data.token, 'still_off');
+  if (refused) return refused;
+
+  // Same check as the status: an open outage, or a stale heartbeat (which this opens).
+  const { outage, opened } = await detectOutage(db, new Date());
+  if (opened) await purgeEdgeCache(new URL(request.url).origin, OUTAGE_VIEWS);
+  if (outage) return errors.conflict('outage_in_progress');
+
+  const now = new Date();
+  if (!(await recordStillOff(db, await clientFingerprint(env.IP_SALT, limitKey), now))) {
+    return errors.conflict('already_reported');
+  }
+  const body: StillOffResponse = { reports: await countStillOffReports(db, now) };
+  return json(body, 201);
+}
+
+async function postHeartbeat({ db, request }: RouteContext): Promise<Response> {
+  const { closed, changed } = await recordHeartbeat(db, new Date());
+  // The route purges the status (its live reading); the other views only when an outage changed,
+  // so a sensor posting every minute does not keep emptying them.
+  if (changed) await purgeEdgeCache(new URL(request.url).origin, OUTAGE_VIEWS);
   return json({ ok: true, closedOutages: closed });
 }
 
@@ -91,6 +135,13 @@ export const statusRoutes: Routes = {
   },
   'POST /api/confirm': {
     handler: postConfirm,
+    sameOrigin: true,
+    limiter: 'CONFIRM_LIMITER',
+    // The confirmation counts are in the status and the CSV.
+    purges: [STATUS_PATH, CSV_PATH],
+  },
+  'POST /api/still-off': {
+    handler: postStillOff,
     sameOrigin: true,
     limiter: 'CONFIRM_LIMITER',
     purges: [STATUS_PATH],

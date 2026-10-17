@@ -1,11 +1,19 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { type AdminOutagesResponse, MINUTE_MS } from '../shared/api';
-import { call, getStatus, insertConfirmation, insertOutage, login, openOutageCount, setHeartbeat } from './helpers';
+import {
+  call,
+  createSession,
+  getStatus,
+  insertConfirmation,
+  insertOutage,
+  openOutageCount,
+  setHeartbeat,
+} from './helpers';
 
 let cookie: string;
 beforeEach(async () => {
-  cookie = await login();
+  cookie = await createSession();
 });
 
 const post = (path: string, body: unknown) => call(path, { method: 'POST', body, cookie });

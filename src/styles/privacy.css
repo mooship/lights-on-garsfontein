@@ -31,13 +31,18 @@ main {
   padding: max(1.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
     max(3rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
+/* Afrikaans compounds ("Privaatheidskennisgewing") are longer than a phone is wide. */
+main {
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
 h1,
 h2 {
   font-family: var(--gg-font-display);
   line-height: 1.2;
 }
 h1 {
-  font-size: 2.25rem;
+  font-size: clamp(1.75rem, 8vw, 2.25rem);
   margin: 1rem 0 0.25rem;
 }
 h2 {
@@ -59,4 +64,43 @@ li + li {
   margin-top: 3rem;
   padding-top: 1rem;
   border-top: 1px solid var(--muted);
+}
+h3 {
+  font-size: 1.125rem;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.25rem;
+}
+h3 + p,
+h3 + ul {
+  margin-top: 0.25rem;
+}
+/* "Show email address" (src/privacy.ts); hidden until the script runs. */
+.contact > p {
+  margin: 0.5rem 0;
+}
+.contact-reveal {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.contact-reveal:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.contact-reveal:focus-visible,
+.contact a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.contact-reveal[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.7;
+}
+/* An email address has no break points, and is often wider than a phone. */
+.contact a {
+  overflow-wrap: anywhere;
 }

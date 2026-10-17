@@ -46,7 +46,7 @@ export async function checkTurnstile(
       if (solvedFor === action && hostname === new URL(env.SITE_URL).hostname) return null;
     }
   } catch {
-    // Treat an unreachable siteverify as a failed check.
+    // An unreachable siteverify fails closed.
   }
   return errors.forbidden('turnstile_failed');
 }

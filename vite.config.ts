@@ -1,10 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite';
+import { build, defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
+import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
+import { localePath } from './shared/locale.ts';
 import { type Locale, site } from './site.config.ts';
-import { DICTIONARIES } from './src/i18n/index.ts';
+import { HEAD } from './src/i18n/head.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
 
 const WORKER = 'http://localhost:8787';
@@ -39,58 +42,6 @@ function hashedFonts(): Plugin {
   };
 }
 
-const escapeHtml = (text: string) =>
-  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-type Mode = 'html' | 'json' | 'text';
-
-/** The value behind a placeholder name: `site.<path>` or `since.<locale>`. */
-function placeholder(name: string): string | readonly string[] {
-  const [scope, ...path] = name.split('.');
-  if (scope === 'since' && path.length === 1) {
-    const intl = (site.intlLocales as Record<string, string>)[path[0] ?? ''];
-    if (!intl) throw new Error(`site-config: %${name}% names a locale that is not in site.intlLocales`);
-    const format = { day: 'numeric', month: 'long', year: 'numeric', timeZone: site.timeZone } as const;
-    return new Intl.DateTimeFormat(intl, format).format(new Date(site.trackingSince));
-  }
-  const value =
-    scope === 'site'
-      ? path.reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], site)
-      : undefined;
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value;
-  throw new Error(`site-config: unknown placeholder %${name}%`);
-}
-
-/**
- * Fills %site.<path>% (a value from site.config.ts; a list is space-separated, or a JSON array
- * in JSON) and %since.<locale>% (site.trackingSince as a long date in that locale). Escaped for
- * where it lands; anything else that looks like one of these fails the build.
- */
-function fill(text: string, mode: Mode, file: string): string {
-  const out = text.replace(/%((?:site|since)\.[\w.-]+)%/g, (_match, name: string) => {
-    const value = placeholder(name);
-    if (mode === 'json') {
-      const json = Array.isArray(value) ? JSON.stringify(value) : JSON.stringify(value).slice(1, -1);
-      return json.replace(/</g, '\\u003c');
-    }
-    const plain = Array.isArray(value) ? value.join(' ') : (value as string);
-    return mode === 'html' ? escapeHtml(plain) : plain;
-  });
-  const leftover = /%(?:site|since)\.[\w.-]*%?/.exec(out);
-  if (leftover) throw new Error(`site-config: malformed placeholder ${leftover[0]} in ${file}`);
-  if (mode === 'json') {
-    try {
-      JSON.parse(out);
-    } catch (error) {
-      throw new Error(`site-config: ${file} is not valid JSON once filled (a list goes outside quotes)`, {
-        cause: error,
-      });
-    }
-  }
-  return out;
-}
-
 /** Files generated from templates/ at the site root. */
 const GENERATED = {
   '/site.webmanifest': { mode: 'json', type: 'application/manifest+json' },
@@ -102,11 +53,10 @@ const generated = (url: keyof typeof GENERATED) =>
 
 /**
  * Deployment identity from site.config.ts: fills the placeholders (see `fill`) in index.html
- * and privacy.html, with JSON escaping inside JSON-LD, adds the og:locale tags, and builds
- * /site.webmanifest and /llms.txt from templates/ (emitted in the build, served in dev).
+ * and privacy.html, with JSON escaping inside JSON-LD, and builds /site.webmanifest and
+ * /llms.txt from templates/ (emitted in the build, served in dev).
  */
 function siteConfig(): Plugin {
-  const ogLocale = (locale: Locale) => site.intlLocales[locale].replace('-', '_');
   const jsonLd = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/g;
   return {
     name: 'site-config',
@@ -115,14 +65,7 @@ function siteConfig(): Plugin {
       handler(html, { path }) {
         const parts = html.split(jsonLd);
         // split() with three groups: [html, open, json, close, html, ...]
-        const out = parts.map((part, i) => fill(part, i % 4 === 2 ? 'json' : 'html', path)).join('');
-        if (path !== '/index.html') return out;
-        const tags: HtmlTagDescriptor[] = LOCALES.map((locale, i) => ({
-          tag: 'meta',
-          attrs: { property: i === 0 ? 'og:locale' : 'og:locale:alternate', content: ogLocale(locale) },
-          injectTo: 'head',
-        }));
-        return { html: out, tags };
+        return parts.map((part, i) => fill(part, i % 4 === 2 ? 'json' : 'html', path)).join('');
       },
     },
     configureServer(server) {
@@ -141,77 +84,140 @@ function siteConfig(): Plugin {
   };
 }
 
-function message(dict: object, key: string): string {
-  const value = key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], dict);
-  if (typeof value !== 'string') throw new Error(`static-i18n: ${key} is not a string in the dictionaries`);
-  return escapeHtml(value);
+const ogLocale = (locale: Locale) => site.intlLocales[locale].replace('-', '_');
+
+/** index.html with its %page.<key>% placeholders filled for `locale`'s page. */
+function localePage(html: string, locale: Locale): string {
+  const head = (key: keyof (typeof HEAD)[Locale]) => fill(HEAD[locale][key], 'text', 'src/i18n/head.ts');
+  const url = (l: Locale) => escapeHtml(`${site.url}${localePath(l)}`);
+  const alternate = (hreflang: string, l: Locale) => `<link rel="alternate" hreflang="${hreflang}" href="${url(l)}" />`;
+  const values: Record<string, string> = {
+    lang: locale,
+    url: url(locale),
+    title: escapeHtml(head('title')),
+    description: escapeHtml(head('description')),
+    ogDescription: escapeHtml(head('ogDescription')),
+    imageAlt: escapeHtml(head('imageAlt')),
+    serviceDescription: jsonString(head('serviceDescription')),
+    alternates: [...LOCALES.map((l) => alternate(l, l)), alternate('x-default', DEFAULT_LOCALE)].join('\n    '),
+    ogLocales: [locale, ...LOCALES.filter((l) => l !== locale)]
+      .map((l, i) => `<meta property="og:locale${i ? ':alternate' : ''}" content="${ogLocale(l)}" />`)
+      .join('\n    '),
+  };
+  return html.replace(/%page\.(\w+)%/g, (match, key: string) => {
+    const value = values[key];
+    if (value === undefined) throw new Error(`locale-pages: unknown placeholder ${match} in index.html`);
+    return value;
+  });
 }
 
 /**
- * Fills the index.html loading shell from the dictionaries, once per locale in site.locales;
- * base.css shows the one matching <html lang>, which the boot script sets. On an empty element:
- * - data-i18n="key" fills it with a <span data-l> per locale.
- * - data-i18n-label="key" (an aria-label) repeats the whole element per locale instead,
- *   with data-i18n as its text.
- * - data-i18n-switch marks the language switch (src/components/LanguageToggle.tsx): each copy
- *   shows the next locale's code (with two, the other one), with lang set to that locale. With
- *   one locale there is no switch.
+ * One index.html per language page (shared/locale.ts): dist/index.html for the default locale and
+ * dist/<code>/index.html for each other, with that page's lang, head copy (src/i18n/head.ts),
+ * canonical and hreflang links. Each is a copy of the one built page, so they share every asset
+ * (Vite's URLs are absolute, /assets/…). The dev server fills the page for the URL it serves.
  */
-function staticI18n(): Plugin {
-  const marked = /<([a-z][\w-]*)(\s[^>]*?\bdata-i18n[^>]*)>\s*<\/\1>/g;
-  const attr = (attrs: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(attrs)?.[1];
+function localePages(): Plugin {
+  const pageLocale = (url = '/') => LOCALES.find((locale) => localePath(locale) === url.split('?')[0]);
   return {
-    name: 'static-i18n',
+    name: 'locale-pages',
     transformIndexHtml: {
       order: 'pre',
-      handler(html) {
-        const out = html.replace(marked, (_element, tag: string, attrs: string) => {
-          const text = attr(attrs, 'data-i18n');
-          const label = attr(attrs, 'data-i18n-label');
-          const isSwitch = /\sdata-i18n-switch\b/.test(attrs);
-          if (isSwitch && LOCALES.length === 1) return '';
-          const rest = attrs.replace(/\sdata-i18n(?:-label)?="[^"]*"|\sdata-i18n-switch\b/g, '');
-          const copies = LOCALES.map((locale, i) => {
-            const dict = DICTIONARIES[locale];
-            const next = LOCALES[(i + 1) % LOCALES.length] ?? locale;
-            return {
-              locale,
-              lang: isSwitch ? next : locale,
-              text: isSwitch ? next.toUpperCase() : text ? message(dict, text) : '',
-              label: label && message(dict, label),
-            };
-          });
-          if (label) {
-            return copies
-              .map(
-                (c) =>
-                  `<${tag}${rest} data-l="${c.locale}" lang="${c.lang}" aria-label="${c.label}">${c.text}</${tag}>`,
-              )
-              .join('');
-          }
-          const spans = copies.map((c) => `<span data-l="${c.locale}" lang="${c.lang}">${c.text}</span>`).join('');
-          return `<${tag}${rest}>${spans}</${tag}>`;
-        });
-        if (/\sdata-i18n[\w-]*[=\s>]/.test(out)) throw new Error('static-i18n: a data-i18n element is not empty');
-        return out;
+      handler(html, { path, originalUrl, server }) {
+        if (server && path === '/index.html') return localePage(html, pageLocale(originalUrl) ?? DEFAULT_LOCALE);
+      },
+    },
+    generateBundle: {
+      // After Vite has put the finished HTML in the bundle.
+      order: 'post',
+      handler(_options, bundle) {
+        const index = bundle['index.html'];
+        if (index?.type !== 'asset') throw new Error('locale-pages: index.html is not in the bundle');
+        const html = String(index.source);
+        for (const locale of LOCALES) {
+          const source = localePage(html, locale);
+          if (locale === DEFAULT_LOCALE) index.source = source;
+          else this.emitFile({ type: 'asset', fileName: `${localePath(locale).slice(1)}index.html`, source });
+        }
       },
     },
   };
 }
 
+const SW_SOURCE = resolve(import.meta.dirname, 'src/sw');
+
+/**
+ * Builds src/sw/sw.ts into dist/sw.js once the site is written, with the pages and assets to
+ * precache and a build id hashed from them and from src/sw/. A change to either changes the
+ * worker's bytes (which is what makes browsers install it) and its cache name. A separate build,
+ * because a service worker must be one classic script; inside the app's build it would share chunks.
+ */
+function serviceWorker(): Plugin {
+  let outDir = '';
+  const url = (fileName: string) => `/${fileName.replace(/(^|\/)index\.html$/, '$1').replace(/\.html$/, '')}`;
+  return {
+    name: 'service-worker',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async writeBundle(_options, bundle) {
+      const files = Object.values(bundle)
+        .filter(({ fileName }) => fileName.endsWith('.html') || fileName.startsWith('assets/'))
+        .sort((a, b) => a.fileName.localeCompare(b.fileName));
+      const hash = createHash('sha256');
+      for (const file of files)
+        hash.update(`${file.fileName}\0`).update(file.type === 'chunk' ? file.code : file.source);
+      for (const name of readdirSync(SW_SOURCE).sort()) {
+        hash.update(`src/sw/${name}\0`).update(readFileSync(resolve(SW_SOURCE, name)));
+      }
+      const pages = files.filter(({ fileName }) => fileName.endsWith('.html')).map(({ fileName }) => url(fileName));
+      // Every asset, lazy chunks included, so this build's pages never need the network for one.
+      const assets = files
+        .filter(({ fileName }) => fileName.startsWith('assets/'))
+        .map(({ fileName }) => url(fileName));
+      await build({
+        configFile: false,
+        logLevel: 'warn',
+        publicDir: false,
+        define: {
+          __BUILD_ID__: JSON.stringify(hash.digest('hex').slice(0, 16)),
+          __PAGES__: JSON.stringify(pages),
+          __ASSETS__: JSON.stringify(assets),
+        },
+        build: {
+          outDir,
+          emptyOutDir: false,
+          target: 'es2022',
+          lib: {
+            entry: resolve(SW_SOURCE, 'sw.ts'),
+            formats: ['iife'],
+            name: 'sw',
+            fileName: () => 'sw.js',
+          },
+        },
+      });
+    },
+  };
+}
+
+/**
+ * Fills the index.html loading shell from the dictionaries, once per locale in site.locales
+ * (fillStaticI18n in build/html.ts); base.css shows the one matching <html lang>: the page's own
+ * (localePages), or on /admin the stored one (the boot script).
+ */
+function staticI18n(): Plugin {
+  return { name: 'static-i18n', transformIndexHtml: { order: 'pre', handler: fillStaticI18n } };
+}
+
 /**
  * Replaces the marker in src/styles/base.css with the rules that show only the shell copy for
- * <html lang>, for every locale. The default locale shows unless lang is another configured one.
- * (A stylesheet, not an inline style: the CSP has style-src 'self'.)
+ * <html lang> (localeVisibilityCss in build/html.ts). A stylesheet, not an inline style: the CSP
+ * has style-src 'self'.
  */
 function localeVisibility(): Plugin {
   const MARKER = '/* @locale-visibility */';
-  const others = LOCALES.slice(1);
-  const selectors = [
-    ...others.map((locale) => `html[lang="${locale}"] [data-l="${DEFAULT_LOCALE}"]`),
-    ...others.map((locale) => `html:not([lang="${locale}"]) [data-l="${locale}"]`),
-  ];
-  const rules = selectors.length ? `${selectors.join(',\n')} {\n  display: none;\n}` : '';
+  const rules = localeVisibilityCss();
   return {
     name: 'locale-visibility',
     enforce: 'pre',
@@ -224,13 +230,23 @@ function localeVisibility(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [solid(), vanillaExtractPlugin(), localeVisibility(), siteConfig(), staticI18n(), hashedFonts()],
+  plugins: [
+    solid(),
+    vanillaExtractPlugin(),
+    localeVisibility(),
+    siteConfig(),
+    staticI18n(),
+    hashedFonts(),
+    localePages(),
+    serviceWorker(),
+  ],
   build: {
     target: 'es2022',
     outDir: 'dist',
     modulePreload: { polyfill: false },
     rolldownOptions: {
-      // privacy.html is served at /privacy (Workers assets html_handling).
+      // privacy.html is served at /privacy (Workers assets html_handling). The other language
+      // pages are copies of index.html (localePages).
       input: {
         index: resolve(import.meta.dirname, 'index.html'),
         privacy: resolve(import.meta.dirname, 'privacy.html'),
@@ -244,6 +260,7 @@ export default defineConfig({
       '/og.png': WORKER,
       '/sitemap.xml': WORKER,
       '/robots.txt': WORKER,
+      '/feed.xml': WORKER,
     },
   },
 });

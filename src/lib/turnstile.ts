@@ -1,7 +1,7 @@
 import type { TurnstileAction } from '../../shared/api';
 
-// Turnstile is loaded only when a visitor taps "My power is off too", so the
-// third-party script never weighs on page load.
+// Turnstile's script loads on first use, never with the page, so the third-party script never
+// weighs on page load.
 
 interface TurnstileApi {
   render(container: HTMLElement, options: Record<string, unknown>): string;

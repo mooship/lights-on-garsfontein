@@ -8,12 +8,22 @@ import { SiteBanner } from './components/Banner';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { LanguageToggle } from './components/LanguageToggle';
 import { OutageHistory } from './components/OutageHistory';
+import { Share } from './components/Share';
 import { HistorySkeleton, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
+import { SafetyLine, Scope } from './components/StatusNotes';
+import { StillOff } from './components/StillOff';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
-import { api } from './lib/api';
-import { formatDate, formatDuration, formatRelativeDay, formatTime, outageDurationMs } from './lib/format';
+import { api, type Status } from './lib/api';
+import {
+  formatDate,
+  formatDuration,
+  formatRelativeDay,
+  formatTime,
+  offlineLabel,
+  outageDurationMs,
+} from './lib/format';
 import { t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll } from './lib/poll';
@@ -25,11 +35,10 @@ const Admin = lazy(() => import('./admin/Admin'));
 const POLL_MS = 30_000;
 const STATS_POLL_MS = 5 * MINUTE_MS;
 
-/** Wraps a poll so it only runs while the tab is visible. */
 const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
 
 export interface InitialData {
-  status: Promise<StatusResponse>;
+  status: Promise<Status>;
   stats: Promise<StatsResponse>;
 }
 
@@ -39,14 +48,12 @@ const clockTime = (ms: number) => formatTime(new Date(ms).toISOString());
 const Masthead: Component<{ notice: boolean }> = (props) => (
   <>
     <header class="gg-masthead">
-      <div>
-        <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
-        <h1 class="gg-title">{site.brand.short}</h1>
-      </div>
+      <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
       <div class="gg-masthead-actions">
         <LanguageToggle />
         <ThemeToggle />
       </div>
+      <h1 class="gg-title">{site.brand.full}</h1>
     </header>
     <Show when={props.notice}>
       <p class="gg-notice">{t().masthead.notice}</p>
@@ -54,18 +61,28 @@ const Masthead: Component<{ notice: boolean }> = (props) => (
   </>
 );
 
-const Footer: Component<{ signIn: boolean }> = (props) => (
+/** `isPublic` adds sharing and the sign-in link, which the admin page doesn't need. */
+const Footer: Component<{ isPublic: boolean }> = (props) => (
   <footer class="gg-footer">
+    <Show when={props.isPublic}>
+      <Share />
+    </Show>
     <nav aria-label={t().footer.nav}>
       <a href="/privacy">{t().footer.privacy}</a>
       <a href="/api/outages.csv">{t().footer.csv}</a>
-      <Show when={props.signIn}>
+      <a href="/feed.xml" type="application/atom+xml">
+        {t().footer.feed}
+      </a>
+      <Show when={props.isPublic}>
         <a href="/admin" rel="nofollow">
           {t().footer.signIn}
         </a>
       </Show>
     </nav>
     <p>{t().footer.measured}</p>
+    <p>
+      {t().footer.licence} <a href={site.dataLicence.url}>{site.dataLicence.name}</a>
+    </p>
     <p>{t().footer.operator}</p>
   </footer>
 );
@@ -108,7 +125,6 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
     });
   });
 
-  // The last good data stays on screen through failed polls.
   const data = status.data;
   useStatusTab(data, minute);
   // The last poll failed, so the status shown may be out of date. (A tab back from the background
@@ -125,19 +141,26 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
           <Match when={data()}>
             {(s) => (
               <>
-                <StatusBadge status={s().status} since={s().since} now={now()} />
+                <StatusBadge status={s().status} monitored={s().monitored} since={s().since} now={now()} />
+                <Scope />
                 <div class="gg-status-detail">
                   <p>{statusDetail(s(), minute())}</p>
-                  <Show
-                    when={stale()}
+                  <Switch
                     fallback={<p class="gg-status-updated">{t().status.updated(clockTime(status.updatedAt()))}</p>}
                   >
-                    <p class={clsx('gg-status-updated', css.warning)} role="alert">
-                      {t().status.stale(clockTime(status.updatedAt()))}
-                    </p>
-                  </Show>
+                    {/* The service worker's last copy: labelled with when the server produced it, until a fresh one arrives. */}
+                    <Match when={s().fromCache}>
+                      <p class={clsx('gg-status-updated', css.warning)} role="alert">
+                        {offlineLabel(s().generatedAt, minute())}
+                      </p>
+                    </Match>
+                    <Match when={stale()}>
+                      <p class={clsx('gg-status-updated', css.warning)} role="alert">
+                        {t().status.stale(clockTime(status.updatedAt()))}
+                      </p>
+                    </Match>
+                  </Switch>
                 </div>
-                {/* Keyed on the outage so a new one starts with fresh state. */}
                 <Show when={s().status === 'OFF' && s().outage?.id} keyed>
                   {(id) => (
                     <ConfirmOutage
@@ -147,6 +170,10 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                     />
                   )}
                 </Show>
+                <Show when={s().status === 'ON'}>
+                  <StillOff reports={s().stillOffReports} siteKey={s().turnstileSiteKey} />
+                </Show>
+                <SafetyLine />
               </>
             )}
           </Match>
@@ -154,6 +181,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             <p class={css.error} role="alert">
               {t().status.unreachable}
             </p>
+            <SafetyLine />
           </Match>
           <Match when={true}>
             <StatusSkeleton />
@@ -234,11 +262,12 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
         >
           {(initial) => <PublicView initial={initial()} />}
         </Show>
+        {/* In the flow after the last card: index.html has nothing below it, so it shifts nothing. */}
+        <Show when={showBanner}>
+          <SiteBanner />
+        </Show>
       </main>
-      <Footer signIn={!!props.initial} />
-      <Show when={showBanner}>
-        <SiteBanner />
-      </Show>
+      <Footer isPublic={!!props.initial} />
     </div>
   );
 };
