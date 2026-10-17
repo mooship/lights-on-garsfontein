@@ -15,6 +15,13 @@
       "when": 1792233669266,
       "tag": "0001_planned",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792234314794,
+      "tag": "0002_start_time_index",
+      "breakpoints": true
     }
   ]
 }

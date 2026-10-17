@@ -5,7 +5,7 @@ import { sessions } from '../db/schema';
 import { randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
 import { clientIp, errors, isCrossOrigin, isRateLimited, json, parseBody } from '../lib/http';
 
-export const SESSION_COOKIE = 'admin_session';
+const SESSION_COOKIE = 'admin_session';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const ADMIN_USER_ID = 'admin';
 

@@ -1,3 +1,5 @@
+import { DAY_MS } from '../../shared/api';
+
 const TIME_ZONE = 'Africa/Johannesburg';
 
 /** Builds a formatter on first use: time-zone formatters are costly to create on slow phones. */
@@ -32,7 +34,7 @@ const sastDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-dig
 export function formatRelativeDay(iso: string, now: number): string {
   const day = sastDay(new Date(iso));
   if (day === sastDay(new Date(now))) return 'today';
-  if (day === sastDay(new Date(now - 86_400_000))) return 'yesterday';
+  if (day === sastDay(new Date(now - DAY_MS))) return 'yesterday';
   return formatDay(iso);
 }
 
@@ -46,6 +48,11 @@ export function formatDuration(ms: number): string {
   if (hours > 0) return `${hours} h ${minutes} min`;
   if (minutes > 0) return `${minutes} min`;
   return `${totalSeconds} s`;
+}
+
+/** How long an outage lasted; one still in progress runs until `now`. */
+export function outageDurationMs(outage: { startTime: string; endTime: string | null }, now: number): number {
+  return (outage.endTime ? Date.parse(outage.endTime) : now) - Date.parse(outage.startTime);
 }
 
 /** "01:02:03" stopwatch format. */

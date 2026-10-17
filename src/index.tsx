@@ -4,14 +4,14 @@ import { api } from './lib/api';
 import './styles/theme.css';
 import './styles/global.css';
 
-// Start the data requests before rendering so they overlap with hydration.
+// The public page starts its data requests before rendering so they overlap with hydration.
 const isAdmin = location.pathname.replace(/\/$/, '') === '/admin';
-const pending = <T,>(): Promise<T> => new Promise<T>(() => {});
-const initial: InitialData = isAdmin
-  ? { status: pending(), stats: pending() }
-  : { status: api.status(), stats: api.stats() };
-initial.status.catch(() => {});
-initial.stats.catch(() => {});
+let initial: InitialData | undefined;
+if (!isAdmin) {
+  initial = { status: api.status(), stats: api.stats() };
+  initial.status.catch(() => {});
+  initial.stats.catch(() => {});
+}
 
 const root = document.getElementById('root');
 if (root) {

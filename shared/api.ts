@@ -73,6 +73,9 @@ export interface StatsResponse {
   generatedAt: string;
 }
 
+export const HOUR_MS = 3_600_000;
+export const DAY_MS = 24 * HOUR_MS;
+
 /** Heartbeats older than this mean the grid is off. */
 export const HEARTBEAT_THRESHOLD_MS = 180_000;
 

@@ -3,7 +3,7 @@ import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
 import type { Component } from 'solid-js';
 import type { AdminOutage } from '../../shared/api';
-import { formatClock, formatDay, formatTime } from '../lib/format';
+import { formatClock, formatDay, formatTime, outageDurationMs } from '../lib/format';
 import { button } from '../styles/ui.css';
 import * as css from './PunchClock.css';
 
@@ -18,7 +18,7 @@ export interface PunchClockProps {
 
 /** Admin punch clock: punch out when the power goes off, punch in when it is back. */
 export const PunchClock: Component<PunchClockProps> = (props) => {
-  const elapsed = () => (props.outage ? props.now - Date.parse(props.outage.startTime) : 0);
+  const elapsed = () => (props.outage ? outageDurationMs(props.outage, props.now) : 0);
 
   return (
     <div class={css.root}>

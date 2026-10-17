@@ -1,7 +1,7 @@
 import { createDb } from '../db/client';
-import { getGridState } from '../lib/grid';
+import { getPowerStatus } from '../lib/grid';
 
-export const SITEMAP_PATHS = ['/', '/privacy.html'];
+const SITEMAP_PATHS = ['/', '/privacy.html'];
 
 function sitemap(env: Env): Response {
   const urls = SITEMAP_PATHS.map(
@@ -33,7 +33,7 @@ Sitemap: ${env.SITE_URL}/sitemap.xml
 
 /** Social card that reflects the live status: serves one of the pre-rendered PNGs. */
 async function ogImage(request: Request, env: Env): Promise<Response> {
-  const { status } = await getGridState(createDb(env.DB), new Date());
+  const status = await getPowerStatus(createDb(env.DB), new Date());
   const asset = await env.ASSETS.fetch(new URL(`/og/${status.toLowerCase()}.png`, request.url));
   const headers = new Headers(asset.headers);
   headers.set('Cache-Control', 'public, max-age=60');

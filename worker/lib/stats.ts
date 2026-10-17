@@ -1,12 +1,10 @@
-import type { WeekStats, WindowStats } from '../../shared/api';
+import { DAY_MS as DAY, HOUR_MS as HOUR, type WeekStats, type WindowStats } from '../../shared/api';
 
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 /** South Africa has no daylight saving: SAST is always UTC+2. */
 const SAST_OFFSET = 2 * HOUR;
 
-export interface Interval {
+interface Interval {
   start: number;
   end: number;
 }
@@ -108,5 +106,3 @@ export function weeklyStats(intervals: Interval[], now: number, trackingSince: n
   }
   return weeks;
 }
-
-export const DAY_MS = DAY;

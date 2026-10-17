@@ -5,10 +5,19 @@ import { type Component, createResource, createSignal, For, Show } from 'solid-j
 import type { AdminOutage } from '../../shared/api';
 import { PunchClock } from '../components/PunchClock';
 import { ApiError, api } from '../lib/api';
-import { formatDay, formatDuration, formatTime, toLocalInput } from '../lib/format';
+import { formatDay, formatDuration, formatTime, outageDurationMs, toLocalInput } from '../lib/format';
 import { useNow } from '../lib/now';
 import { button, errorText, input, label, smallButton } from '../styles/ui.css';
 import * as css from './Admin.css';
+
+/** Error line under a form or row; role="alert" so screen readers announce it. */
+const FormError: Component<{ message: string }> = (props) => (
+  <Show when={props.message}>
+    <p class={errorText} role="alert">
+      {props.message}
+    </p>
+  </Show>
+);
 
 const describeError = (error: unknown) =>
   error instanceof ApiError
@@ -47,11 +56,7 @@ const LoginForm: Component<{ onLoggedIn: () => void }> = (props) => {
           Password
           <input class={input} type="password" name="password" autocomplete="current-password" required />
         </label>
-        <Show when={error()}>
-          <p class={errorText} role="alert">
-            {error()}
-          </p>
-        </Show>
+        <FormError message={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
           Sign in
         </button>
@@ -71,7 +76,6 @@ const OutageRow: Component<{ outage: AdminOutage; now: number; onChange: () => v
       setError(describeError(e));
     }
   };
-  const end = () => (props.outage.endTime ? Date.parse(props.outage.endTime) : props.now);
 
   return (
     <li class={css.item}>
@@ -81,7 +85,7 @@ const OutageRow: Component<{ outage: AdminOutage; now: number; onChange: () => v
           {props.outage.endTime ? formatTime(props.outage.endTime) : 'ongoing'}
         </strong>
         <div class={css.itemMeta}>
-          {formatDuration(end() - Date.parse(props.outage.startTime))} · {props.outage.source} ·{' '}
+          {formatDuration(outageDurationMs(props.outage, props.now))} · {props.outage.source} ·{' '}
           {props.outage.confirmations} confirmed
           {props.outage.planned ? ' · planned' : ''}
           {props.outage.isFalsePositive ? ' · false positive' : ''}
@@ -122,9 +126,7 @@ const OutageRow: Component<{ outage: AdminOutage; now: number; onChange: () => v
           Delete
         </button>
       </div>
-      <Show when={error()}>
-        <p class={errorText}>{error()}</p>
-      </Show>
+      <FormError message={error()} />
     </li>
   );
 };
@@ -175,9 +177,7 @@ const LogOutageForm: Component<{ onLogged: () => void }> = (props) => {
         <label class={css.checkbox}>
           <input type="checkbox" name="planned" /> Planned (announced maintenance or upgrades)
         </label>
-        <Show when={error()}>
-          <p class={errorText}>{error()}</p>
-        </Show>
+        <FormError message={error()} />
         <button type="submit" class={button.primary}>
           <Plus size={18} aria-hidden="true" /> Log outage
         </button>
@@ -227,11 +227,7 @@ const Dashboard: Component<{ onLoggedOut: () => void }> = (props) => {
           onPunchOut={() => punch('punch_out')}
           onPunchIn={() => punch('punch_in')}
         />
-        <Show when={error()}>
-          <p class={errorText} role="alert">
-            {error()}
-          </p>
-        </Show>
+        <FormError message={error()} />
       </section>
 
       <LogOutageForm onLogged={refetch} />
@@ -265,7 +261,7 @@ const Admin: Component = () => {
   });
 
   return (
-    <Show when={session() !== undefined} fallback={<p class="gg-status-loading">Loading…</p>}>
+    <Show when={session() !== undefined} fallback={<p class="gg-status-note">Loading…</p>}>
       <Show when={session()} fallback={<LoginForm onLoggedIn={refetch} />}>
         <Dashboard onLoggedOut={refetch} />
       </Show>

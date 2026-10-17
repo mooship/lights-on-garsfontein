@@ -4,7 +4,7 @@ import { createDb } from '../db/client';
 import { outageConfirmations } from '../db/schema';
 import { safeEqual, sha256Hex } from '../lib/crypto';
 import { countConfirmations, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
-import { clientIp, errors, isCrossOrigin, isRateLimited, json, PUBLIC_CORS, parseBody } from '../lib/http';
+import { bearerToken, clientIp, errors, isCrossOrigin, isRateLimited, json, PUBLIC_CORS, parseBody } from '../lib/http';
 import { verifyTurnstile } from '../lib/turnstile';
 
 const confirmSchema = z.object({ token: z.string().min(1).max(2048) });
@@ -29,7 +29,7 @@ async function postConfirm(request: Request, env: Env): Promise<Response> {
   const parsed = await parseBody(request, confirmSchema);
   if ('response' in parsed) return parsed.response;
   if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip))) {
-    return json({ error: 'turnstile_failed' }, 403);
+    return errors.forbidden('turnstile_failed');
   }
 
   const db = createDb(env.DB);
@@ -49,8 +49,7 @@ async function postConfirm(request: Request, env: Env): Promise<Response> {
 }
 
 async function postHeartbeat(request: Request, env: Env): Promise<Response> {
-  const auth = request.headers.get('Authorization') ?? '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const token = bearerToken(request);
   // No sensor configured yet: refuse every heartbeat rather than compare against an unset secret.
   if (!env.HEARTBEAT_TOKEN || !token || !(await safeEqual(token, env.HEARTBEAT_TOKEN))) return errors.unauthorized();
   const closed = await recordHeartbeat(createDb(env.DB), new Date());

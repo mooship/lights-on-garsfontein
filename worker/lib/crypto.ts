@@ -1,7 +1,7 @@
 const encoder = new TextEncoder();
 
 // Cloudflare Workers caps PBKDF2 at 100k iterations.
-export const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_ITERATIONS = 100_000;
 
 function toBase64(bytes: Uint8Array): string {
   let binary = '';

@@ -1,6 +1,6 @@
 import { createDb } from './db/client';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
-import { errors, json } from './lib/http';
+import { errors } from './lib/http';
 import { handleAdminRoutes } from './routes/admin';
 import { handleAuthRoutes } from './routes/auth';
 import { handleHistoryRoutes } from './routes/history';
@@ -45,7 +45,7 @@ export default {
       return withSecurityHeaders(await route(request, env));
     } catch (error) {
       console.error('Unhandled error', error);
-      return withSecurityHeaders(json({ error: 'internal_error' }, 500));
+      return withSecurityHeaders(errors.internal());
     }
   },
 

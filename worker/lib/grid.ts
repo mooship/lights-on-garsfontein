@@ -1,30 +1,36 @@
-import { and, count, desc, eq, isNull, lt, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import { HEARTBEAT_THRESHOLD_MS, type OutageSummary, type PowerStatus } from '../../shared/api';
 import type { Db } from '../db/client';
 import { heartbeats, type Outage, outageConfirmations, outages, sessions } from '../db/schema';
 
 const RECENT_LIMIT = 5;
 
-export async function getHeartbeat(db: Db) {
+/** Open and not flagged as a false positive. */
+const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, 0));
+
+async function getHeartbeat(db: Db) {
   return db.query.heartbeats.findFirst({ where: eq(heartbeats.id, 1) });
 }
 
 /** The newest outage that is still open and not flagged as a false positive. */
 export async function getOpenOutage(db: Db): Promise<Outage | undefined> {
-  return db.query.outages.findFirst({
-    where: and(isNull(outages.endTime), eq(outages.isFalsePositive, 0)),
-    orderBy: desc(outages.startTime),
-  });
+  return db.query.outages.findFirst({ where: isOpen, orderBy: desc(outages.startTime) });
 }
 
-export function isStale(lastSeen: string, now: Date): boolean {
+function isStale(lastSeen: string, now: Date): boolean {
   return now.getTime() - Date.parse(lastSeen) > HEARTBEAT_THRESHOLD_MS;
 }
 
 /**
- * Outages with their confirmation counts in one JOIN. (Passing outage ids as parameters
- * would break past 100 outages: D1 allows at most 100 bound parameters per query.)
+ * Confirmations per outage as a correlated subquery, so it only touches the outages the outer
+ * query returns (covered by the unique (outage_id, client_hash) index). No bound parameter per
+ * outage either: D1 allows at most 100 per query.
  */
+const confirmationCount =
+  sql<number>`(select count(*) from ${outageConfirmations} where ${outageConfirmations.outageId} = ${outages.id})`.mapWith(
+    Number,
+  );
+
 export function outagesWithCounts(db: Db, where?: SQL) {
   return db
     .select({
@@ -34,12 +40,10 @@ export function outagesWithCounts(db: Db, where?: SQL) {
       source: outages.source,
       isFalsePositive: outages.isFalsePositive,
       isPlanned: outages.isPlanned,
-      confirmations: count(outageConfirmations.id),
+      confirmations: confirmationCount,
     })
     .from(outages)
-    .leftJoin(outageConfirmations, eq(outageConfirmations.outageId, outages.id))
-    .where(where)
-    .groupBy(outages.id);
+    .where(where);
 }
 
 export async function countConfirmations(db: Db, outageId: number): Promise<number> {
@@ -50,7 +54,8 @@ export async function countConfirmations(db: Db, outageId: number): Promise<numb
   return row?.total ?? 0;
 }
 
-function summarise(
+/** The public shape of an outage row. */
+export function summarise(
   outage: Pick<Outage, 'id' | 'startTime' | 'endTime' | 'isPlanned'>,
   confirmations: number,
 ): OutageSummary {
@@ -58,34 +63,32 @@ function summarise(
   return { id, startTime, endTime, confirmations, planned: isPlanned === 1 };
 }
 
+/** Until a sensor reports, the punch clock is the source of truth: no open outage means ON. */
+function powerState(openStart: string | undefined, lastSeen: string | undefined, now: Date) {
+  if (openStart) return { status: 'OFF' as PowerStatus, since: openStart };
+  // A stale heartbeat is OFF straight away; the cron job opens the record within a minute.
+  if (lastSeen && isStale(lastSeen, now)) return { status: 'OFF' as PowerStatus, since: lastSeen };
+  return { status: 'ON' as PowerStatus, since: null };
+}
+
+/** Just ON or OFF, for callers that do not need the history (e.g. the social card). */
+export async function getPowerStatus(db: Db, now: Date): Promise<PowerStatus> {
+  const [heartbeat, open] = await Promise.all([getHeartbeat(db), getOpenOutage(db)]);
+  return powerState(open?.startTime, heartbeat?.lastSeen, now).status;
+}
+
 export async function getGridState(db: Db, now: Date) {
-  const [heartbeat, open, recentRows] = await Promise.all([
+  const [heartbeat, [open], recentRows] = await Promise.all([
     getHeartbeat(db),
-    getOpenOutage(db),
+    outagesWithCounts(db, isOpen).orderBy(desc(outages.startTime)).limit(1),
     outagesWithCounts(db, eq(outages.isFalsePositive, 0)).orderBy(desc(outages.startTime)).limit(RECENT_LIMIT),
   ]);
-  const openConfirmations = open ? await countConfirmations(db, open.id) : 0;
-  const lastSeen = heartbeat?.lastSeen ?? null;
-
-  // Until a sensor reports, the admin's punch clock is the source of truth: no open outage means ON.
-  let status: PowerStatus;
-  let since: string | null;
-  if (open) {
-    status = 'OFF';
-    since = open.startTime;
-  } else if (lastSeen && isStale(lastSeen, now)) {
-    // The cron job opens a record within a minute; report OFF straight away.
-    status = 'OFF';
-    since = lastSeen;
-  } else {
-    status = 'ON';
-    since = recentRows.find((o) => o.endTime)?.endTime ?? null;
-  }
-
+  const state = powerState(open?.startTime, heartbeat?.lastSeen, now);
   return {
-    status,
-    since,
-    outage: open ? summarise(open, openConfirmations) : null,
+    status: state.status,
+    // When ON, the current state began when the last outage ended.
+    since: state.since ?? recentRows.find((o) => o.endTime)?.endTime ?? null,
+    outage: open ? summarise(open, open.confirmations) : null,
     recent: recentRows.map((o) => summarise(o, o.confirmations)),
   };
 }
@@ -95,9 +98,8 @@ export async function getGridState(db: Db, now: Date) {
  * Returns the open outage, if any. Safe to call repeatedly.
  */
 export async function detectOutage(db: Db, now: Date): Promise<Outage | undefined> {
-  const open = await getOpenOutage(db);
+  const [open, heartbeat] = await Promise.all([getOpenOutage(db), getHeartbeat(db)]);
   if (open) return open;
-  const heartbeat = await getHeartbeat(db);
   if (!heartbeat || !isStale(heartbeat.lastSeen, now)) return undefined;
   const [created] = await db.insert(outages).values({ startTime: heartbeat.lastSeen, source: 'sensor' }).returning();
   return created;

@@ -1,10 +1,10 @@
 import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
-import { type StatsResponse, TRACKING_SINCE } from '../../shared/api';
+import { DAY_MS, type StatsResponse, TRACKING_SINCE } from '../../shared/api';
 import { createDb } from '../db/client';
 import { outages } from '../db/schema';
 import { outagesWithCounts } from '../lib/grid';
 import { clientIp, errors, isRateLimited, json, PUBLIC_CORS } from '../lib/http';
-import { DAY_MS, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
+import { mergeOutages, weeklyStats, windowStats } from '../lib/stats';
 
 async function getStats(request: Request, env: Env): Promise<Response> {
   if (await isRateLimited(env.STATUS_LIMITER, clientIp(request))) return errors.rateLimited();
@@ -33,7 +33,8 @@ async function getStats(request: Request, env: Env): Promise<Response> {
     weeks: weeklyStats(intervals, now, since),
     generatedAt: new Date(now).toISOString(),
   };
-  return json(body, 200, PUBLIC_CORS);
+  // Changes only when an outage starts or ends, so a minute of caching is harmless.
+  return json(body, 200, { ...PUBLIC_CORS, 'Cache-Control': 'public, max-age=60' });
 }
 
 function csvField(value: string | number | null): string {

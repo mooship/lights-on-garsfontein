@@ -1,6 +1,6 @@
 import { type Component, For, Show } from 'solid-js';
 import type { OutageSummary } from '../../shared/api';
-import { formatDay, formatDuration, formatTime } from '../lib/format';
+import { formatDay, formatDuration, formatTime, outageDurationMs } from '../lib/format';
 import * as css from './OutageHistory.css';
 
 export interface OutageHistoryProps {
@@ -13,7 +13,6 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
     <ul class={css.list}>
       <For each={props.outages}>
         {(outage) => {
-          const end = () => (outage.endTime ? Date.parse(outage.endTime) : props.now);
           return (
             <li class={css.row}>
               <div>
@@ -24,7 +23,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
               </div>
               <div class={css.end}>
                 <div class={outage.endTime ? css.primary : `${css.primary} ${css.ongoing}`}>
-                  {formatDuration(end() - Date.parse(outage.startTime))}
+                  {formatDuration(outageDurationMs(outage, props.now))}
                 </div>
                 <div class={css.secondary}>
                   {[

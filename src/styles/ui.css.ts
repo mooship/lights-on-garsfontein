@@ -30,8 +30,6 @@ export const button = styleVariants({
 
 export const smallButton = style({ minHeight: '2.25rem', padding: '0 0.75rem', fontSize: '0.875rem' });
 
-export const numeric = style({ fontVariantNumeric: 'tabular-nums' });
-
 export const input = style({
   width: '100%',
   minHeight: '2.875rem',

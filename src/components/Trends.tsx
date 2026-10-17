@@ -3,11 +3,11 @@ import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
-import type { StatsResponse, WeekStats, WindowStats } from '../../shared/api';
+import { DAY_MS, type StatsResponse, type WeekStats, type WindowStats } from '../../shared/api';
 import { formatCalendarDay, formatDate, formatDuration, formatHours } from '../lib/format';
+import { AXIS_WIDTH } from './chart';
+import { TRENDS_TABLE_LABEL, TRENDS_TITLE } from './Skeletons';
 import * as css from './Trends.css';
-
-const DAY_MS = 86_400_000;
 
 export interface TrendsProps {
   stats: StatsResponse;
@@ -64,7 +64,6 @@ function niceMax(value: number): number {
 }
 
 const CHART_HEIGHT = 144;
-const AXIS_WIDTH = 32;
 const TOP_PAD = 6;
 
 const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
@@ -86,8 +85,9 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
     return { slot, barWidth };
   });
   const y = (hours: number) => TOP_PAD + (CHART_HEIGHT - TOP_PAD) * (1 - hours / max());
-  const activeWeek = () => props.weeks[Math.min(active(), props.weeks.length - 1)];
-  const isCurrent = (index: number) => index === props.weeks.length - 1;
+  // Clamped so a refresh with fewer weeks never points past the end.
+  const activeIndex = createMemo(() => Math.min(active(), props.weeks.length - 1));
+  const activeWeek = () => props.weeks[activeIndex()];
 
   const onKey: JSX.EventHandler<SVGSVGElement, KeyboardEvent> = (event) => {
     if (event.key === 'ArrowLeft') setActive((i) => Math.max(0, i - 1));
@@ -113,7 +113,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
               Week of {formatCalendarDay(w().weekStart)}:{' '}
               <span class={css.readoutValue}>{formatHours(w().hoursOff)}</span> off · {w().outages}{' '}
               {w().outages === 1 ? 'outage' : 'outages'}
-              {isCurrent(Math.min(active(), props.weeks.length - 1)) ? ' (so far)' : ''}
+              {activeIndex() === props.weeks.length - 1 ? ' (so far)' : ''}
             </>
           )}
         </Show>
@@ -207,19 +207,23 @@ export const Trends: Component<TrendsProps> = (props) => {
     <>
       <div class="gg-trends-body">
         <h2 id="trends-heading" class="gg-card-title">
-          By the numbers
+          {TRENDS_TITLE}
         </h2>
         <p class={css.subtitle}>{subtitle()}</p>
         <div class={css.tiles}>
           <Tile
             label="Hours without power"
             value={started() ? formatHours(s().hoursOff) : '—'}
-            delta={prev() ? delta(s().hoursOff, prev()?.hoursOff ?? 0, formatHours, true) : null}
+            delta={prev() ? delta(s().hoursOff, (prev() as WindowStats).hoursOff, formatHours, true) : null}
           />
           <Tile
             label="Outages"
             value={started() ? String(s().outages) : '—'}
-            delta={prev() && s().plannedOutages === 0 ? delta(s().outages, prev()?.outages ?? 0, String, true) : null}
+            delta={
+              prev() && s().plannedOutages === 0
+                ? delta(s().outages, (prev() as WindowStats).outages, String, true)
+                : null
+            }
             note={s().plannedOutages > 0 ? `${s().plannedOutages} planned` : undefined}
           />
           <Tile label="Days with an outage" value={started() ? `${s().daysWithOutage} of ${s().daysTracked}` : '—'} />
@@ -239,7 +243,7 @@ export const Trends: Component<TrendsProps> = (props) => {
         </Show>
       </div>
       <details class="gg-trends-details">
-        <summary>Show the weekly numbers</summary>
+        <summary>{TRENDS_TABLE_LABEL}</summary>
         <table class={css.table}>
           <thead>
             <tr>

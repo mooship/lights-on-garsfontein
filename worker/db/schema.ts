@@ -1,18 +1,23 @@
-import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const heartbeats = sqliteTable('heartbeats', {
   id: integer('id').primaryKey(),
   lastSeen: text('last_seen').notNull(),
 });
 
-export const outages = sqliteTable('outages', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  startTime: text('start_time').notNull(),
-  endTime: text('end_time'),
-  source: text('source', { enum: ['sensor', 'manual'] }).notNull(),
-  isFalsePositive: integer('is_false_positive').notNull().default(0),
-  isPlanned: integer('is_planned').notNull().default(0),
-});
+export const outages = sqliteTable(
+  'outages',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    startTime: text('start_time').notNull(),
+    endTime: text('end_time'),
+    source: text('source', { enum: ['sensor', 'manual'] }).notNull(),
+    isFalsePositive: integer('is_false_positive').notNull().default(0),
+    isPlanned: integer('is_planned').notNull().default(0),
+  },
+  // "Newest first" queries (status, admin list) read only the rows they return.
+  (table) => [index('outages_start_time_idx').on(table.startTime)],
+);
 
 export const outageConfirmations = sqliteTable(
   'outage_confirmations',

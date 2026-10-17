@@ -1,0 +1,1 @@
+CREATE INDEX `outages_start_time_idx` ON `outages` (`start_time`);

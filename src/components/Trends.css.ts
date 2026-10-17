@@ -1,5 +1,6 @@
 import { globalStyle, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
+import { AXIS_WIDTH } from './chart';
 
 // Two lines reserved: the subtitle wraps while it mentions when comparisons begin.
 export const subtitle = style({
@@ -88,7 +89,7 @@ export const xLabels = style({
   justifyContent: 'space-between',
   height: '1.25rem',
   paddingTop: '0.25rem',
-  paddingLeft: '32px', // AXIS_WIDTH in Trends.tsx
+  paddingLeft: `${AXIS_WIDTH}px`,
   fontSize: '0.75rem',
   color: vars.color.muted,
 });

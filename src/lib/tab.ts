@@ -1,10 +1,10 @@
-import { type Accessor, createEffect, createMemo, onCleanup } from 'solid-js';
+import { type Accessor, createEffect, onCleanup } from 'solid-js';
 import type { StatusResponse } from '../../shared/api';
 
 const MINUTE = 60_000;
 
 /** Tab-friendly duration: "3d 4h", "2h 14m", "5m". */
-export function compactDuration(ms: number): string {
+function compactDuration(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / MINUTE));
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
@@ -15,15 +15,14 @@ export function compactDuration(ms: number): string {
 
 /**
  * Puts the live status in the tab title and favicon so it reads from a background tab.
- * The state comes first because browsers truncate long titles from the end.
+ * The state comes first because browsers truncate long titles from the end. `minute` ticks once
+ * a minute: a title that changes every second is distracting.
  */
-export function useStatusTab(status: Accessor<StatusResponse | undefined>, now: Accessor<number>): void {
+export function useStatusTab(status: Accessor<StatusResponse | undefined>, minute: Accessor<number>): void {
   // Only the SVG icon swaps; favicon.ico stays as the fallback for browsers without SVG support.
   const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"][type="image/svg+xml"]');
   const originalTitle = document.title;
   const originalIcon = icon?.href;
-  // Minute granularity: a title that changes every second is distracting.
-  const minute = createMemo(() => Math.floor(now() / MINUTE) * MINUTE);
 
   createEffect(() => {
     const s = status();

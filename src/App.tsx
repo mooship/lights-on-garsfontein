@@ -1,9 +1,20 @@
-import { type Component, createResource, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
+import {
+  type Component,
+  createMemo,
+  createResource,
+  lazy,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Suspense,
+  Switch,
+} from 'solid-js';
 import { type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
 import * as css from './App.css';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { OutageHistory } from './components/OutageHistory';
-import { HistorySkeleton, STATUS_NOTE, StatusSkeleton, TrendsSkeleton } from './components/Skeletons';
+import { HistorySkeleton, STATUS_NOTE, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
@@ -33,7 +44,7 @@ function firstThen<T>(initial: Promise<T>, fetcher: () => Promise<T>): () => Pro
   };
 }
 
-export const Masthead: Component = () => (
+const Masthead: Component = () => (
   <>
     <header class="gg-masthead">
       <div>
@@ -71,7 +82,7 @@ function statusDetail(s: StatusResponse, now: number): string {
     return day === 'today' || day === 'yesterday' ? day : `on ${day}`;
   };
   if (s.status === 'OFF') {
-    const start = s.outage?.startTime ?? s.since;
+    const start = s.since;
     if (!start) return '';
     const when = `${formatTime(start)} ${on(start)}`;
     return s.outage?.planned ? `Planned work on the grid since ${when}.` : `Went off at ${when}.`;
@@ -83,6 +94,8 @@ function statusDetail(s: StatusResponse, now: number): string {
 
 const PublicView: Component<{ initial: InitialData }> = (props) => {
   const now = useNow(1000);
+  // Text that only changes by the minute (or day) re-renders once a minute, not every second.
+  const minute = createMemo(() => Math.floor(now() / 60_000) * 60_000);
   const [status, { refetch }] = createResource(firstThen(props.initial.status, api.status));
   const [stats, { refetch: refetchStats }] = createResource(firstThen(props.initial.stats, api.stats));
 
@@ -100,7 +113,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
 
   // `latest` keeps showing the previous data while a poll is in flight.
   const data = () => status.latest;
-  useStatusTab(data, now);
+  useStatusTab(data, minute);
 
   return (
     <>
@@ -113,7 +126,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             {(s) => (
               <>
                 <StatusBadge status={s().status} since={s().since} now={now()} />
-                <p class="gg-status-detail">{statusDetail(s(), now())}</p>
+                <p class="gg-status-detail">{statusDetail(s(), minute())}</p>
                 <Show when={s().status === 'OFF' && s().outage} fallback={<p class="gg-status-note">{STATUS_NOTE}</p>}>
                   {(outage) => <ConfirmOutage outage={outage()} siteKey={s().turnstileSiteKey} />}
                 </Show>
@@ -130,23 +143,8 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
       </section>
 
       <section class="gg-card" aria-labelledby="trends-heading">
-        <Show
-          when={stats.latest}
-          fallback={
-            <>
-              <div class="gg-trends-body">
-                <h2 id="trends-heading" class="gg-card-title">
-                  By the numbers
-                </h2>
-                <TrendsSkeleton />
-              </div>
-              <details class="gg-trends-details">
-                <summary>Show the weekly numbers</summary>
-              </details>
-            </>
-          }
-        >
-          {(s) => <Trends stats={s()} now={now()} />}
+        <Show when={stats.latest} fallback={<TrendsCardSkeleton />}>
+          {(s) => <Trends stats={s()} now={minute()} />}
         </Show>
       </section>
 
@@ -162,21 +160,26 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
   );
 };
 
-export const App: Component<{ initial: InitialData }> = (props) => {
+/** `initial` is the public page's prefetched data; without it, the admin page renders. */
+export const App: Component<{ initial?: InitialData }> = (props) => {
   onMount(() => {
     syncThemeColor();
     onCleanup(watchSystemTheme());
   });
-  const isAdmin = location.pathname.replace(/\/$/, '') === '/admin';
 
   return (
     <div class="gg-shell">
       <Masthead />
       <main class="gg-main">
-        <Show when={isAdmin} fallback={<PublicView initial={props.initial} />}>
-          <Suspense fallback={<p class="gg-status-note">Loading…</p>}>
-            <Admin />
-          </Suspense>
+        <Show
+          when={props.initial}
+          fallback={
+            <Suspense fallback={<p class="gg-status-note">Loading…</p>}>
+              <Admin />
+            </Suspense>
+          }
+        >
+          {(initial) => <PublicView initial={initial()} />}
         </Show>
       </main>
       <Footer />

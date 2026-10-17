@@ -14,11 +14,18 @@ export function json(data: unknown, status = 200, headers: HeadersInit = {}): Re
 export const errors = {
   badRequest: (details?: unknown) => json({ error: 'bad_request', details }, 400),
   unauthorized: () => json({ error: 'unauthorized' }, 401),
-  forbidden: () => json({ error: 'forbidden' }, 403),
+  forbidden: (error = 'forbidden') => json({ error }, 403),
   notFound: () => json({ error: 'not_found' }, 404),
   conflict: (error: string) => json({ error }, 409),
   rateLimited: () => json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' }),
+  internal: () => json({ error: 'internal_error' }, 500),
 };
+
+/** The token from `Authorization: Bearer <token>` ('' when empty), or null without a bearer header. */
+export function bearerToken(request: Request): string | null {
+  const auth = request.headers.get('Authorization');
+  return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+}
 
 export function clientIp(request: Request): string {
   return request.headers.get('CF-Connecting-IP') ?? '127.0.0.1';

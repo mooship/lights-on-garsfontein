@@ -4,6 +4,8 @@ import { type Component, For } from 'solid-js';
 // JavaScript runs, so keep the two in step: identical boxes mean zero layout shift.
 
 export const STATUS_NOTE = 'Power out at your place? Check in here and let neighbours know it’s not just them.';
+export const TRENDS_TITLE = 'By the numbers';
+export const TRENDS_TABLE_LABEL = 'Show the weekly numbers';
 
 export const StatusSkeleton: Component = () => (
   <>
@@ -22,14 +24,25 @@ export const StatusSkeleton: Component = () => (
   </>
 );
 
-export const TrendsSkeleton: Component = () => (
-  <div class="gg-skel-stack" aria-hidden="true">
-    <span class="gg-skel gg-skel-text gg-w-45" />
-    <div class="gg-skel-grid">
-      <For each={[1, 2, 3, 4]}>{() => <span class="gg-skel gg-skel-tile" />}</For>
+/** The whole trends card frame (same heading, id and details as Trends) with placeholder content. */
+export const TrendsCardSkeleton: Component = () => (
+  <>
+    <div class="gg-trends-body">
+      <h2 id="trends-heading" class="gg-card-title">
+        {TRENDS_TITLE}
+      </h2>
+      <div class="gg-skel-stack" aria-hidden="true">
+        <span class="gg-skel gg-skel-text gg-w-45" />
+        <div class="gg-skel-grid">
+          <For each={[1, 2, 3, 4]}>{() => <span class="gg-skel gg-skel-tile" />}</For>
+        </div>
+        <span class="gg-skel gg-skel-chart" />
+      </div>
     </div>
-    <span class="gg-skel gg-skel-chart" />
-  </div>
+    <details class="gg-trends-details">
+      <summary>{TRENDS_TABLE_LABEL}</summary>
+    </details>
+  </>
 );
 
 export const HistorySkeleton: Component = () => (

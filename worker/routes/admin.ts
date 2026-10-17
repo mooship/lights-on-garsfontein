@@ -4,8 +4,8 @@ import type { AdminOutagesResponse } from '../../shared/api';
 import { createDb } from '../db/client';
 import { outages } from '../db/schema';
 import { safeEqual } from '../lib/crypto';
-import { getOpenOutage, outagesWithCounts } from '../lib/grid';
-import { clientIp, errors, isCrossOrigin, isRateLimited, json, parseBody } from '../lib/http';
+import { getOpenOutage, outagesWithCounts, summarise } from '../lib/grid';
+import { bearerToken, clientIp, errors, isCrossOrigin, isRateLimited, json, parseBody } from '../lib/http';
 import { getSessionUser } from './auth';
 
 const isoDate = z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
@@ -32,9 +32,9 @@ const outageSchema = z.discriminatedUnion('action', [
 async function listOutages(env: Env): Promise<Response> {
   const rows = await outagesWithCounts(createDb(env.DB)).orderBy(desc(outages.startTime)).limit(50);
   const body: AdminOutagesResponse = {
-    outages: rows.map(({ isPlanned, ...r }) => ({
-      ...r,
-      planned: isPlanned === 1,
+    outages: rows.map((r) => ({
+      ...summarise(r, r.confirmations),
+      source: r.source,
       isFalsePositive: r.isFalsePositive === 1,
     })),
   };
@@ -115,10 +115,10 @@ async function mutateOutage(request: Request, env: Env): Promise<Response> {
  * Returns null when no bearer token was sent, so the session cookie is checked instead.
  */
 async function checkApiToken(request: Request, env: Env): Promise<boolean | null> {
-  const auth = request.headers.get('Authorization');
-  if (!auth?.startsWith('Bearer ')) return null;
+  const token = bearerToken(request);
+  if (token === null) return null;
   if (!env.ADMIN_API_TOKEN) return false;
-  return safeEqual(auth.slice(7), env.ADMIN_API_TOKEN);
+  return safeEqual(token, env.ADMIN_API_TOKEN);
 }
 
 export async function handleAdminRoutes(request: Request, env: Env, url: URL): Promise<Response | null> {
