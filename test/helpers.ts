@@ -1,8 +1,10 @@
 import { env } from 'cloudflare:test';
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
+import type { StatusResponse, TurnstileAction } from '../shared/api';
 import worker from '../worker/index';
 
-export const ORIGIN = 'https://garsfontein.example';
+/** The test SITE_URL (set once in vitest.config.ts). */
+export const ORIGIN = env.SITE_URL;
 
 let ipCounter = 0;
 /** A fresh client IP so rate-limit buckets never leak between tests. */
@@ -36,8 +38,8 @@ export async function call(path: string, options: CallOptions = {}): Promise<Res
 /** Stubs the Turnstile siteverify call: a token solved on our host for `action`. */
 export function mockTurnstile(
   success: boolean,
-  action: 'confirm' | 'login' = 'confirm',
-  hostname = 'garsfontein.example',
+  action: TurnstileAction = 'confirm',
+  hostname = new URL(ORIGIN).hostname,
 ) {
   const realFetch = globalThis.fetch;
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -47,6 +49,21 @@ export function mockTurnstile(
   });
   vi.stubGlobal('fetch', spy);
   return spy;
+}
+
+export async function getStatus(): Promise<StatusResponse> {
+  const res = await call('/api/status');
+  expect(res.status).toBe(200);
+  return res.json();
+}
+
+export async function insertConfirmation(
+  outageId: number,
+  { createdAt = new Date().toISOString(), clientHash = 'fingerprint' } = {},
+): Promise<void> {
+  await env.DB.prepare('INSERT INTO outage_confirmations (outage_id, created_at, client_hash) VALUES (?, ?, ?)')
+    .bind(outageId, createdAt, clientHash)
+    .run();
 }
 
 export async function setHeartbeat(secondsAgo: number): Promise<string> {

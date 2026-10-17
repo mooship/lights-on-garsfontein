@@ -73,8 +73,17 @@ export interface StatsResponse {
   generatedAt: string;
 }
 
-export const HOUR_MS = 3_600_000;
+export const MINUTE_MS = 60_000;
+export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
+
+/** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
+export type TurnstileAction = 'confirm' | 'login';
+
+/** How long an outage lasted; one still in progress runs until `now`. */
+export function outageDurationMs(outage: { startTime: string; endTime: string | null }, now: number): number {
+  return (outage.endTime ? Date.parse(outage.endTime) : now) - Date.parse(outage.startTime);
+}
 
 /** Heartbeats older than this mean the grid is off. */
 export const HEARTBEAT_THRESHOLD_MS = 180_000;

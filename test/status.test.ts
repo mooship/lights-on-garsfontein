@@ -1,13 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import type { StatusResponse } from '../shared/api';
-import { call, insertOutage, setHeartbeat, uniqueIp } from './helpers';
-
-async function status(): Promise<StatusResponse> {
-  const res = await call('/api/status');
-  expect(res.status).toBe(200);
-  return res.json();
-}
+import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../shared/api';
+import { call, insertOutage, setHeartbeat, getStatus as status, uniqueIp } from './helpers';
 
 describe('GET /api/status', () => {
   it('is ON in manual mode before any sensor heartbeat arrives', async () => {
@@ -34,8 +28,8 @@ describe('GET /api/status', () => {
     expect((await status()).status).toBe('ON');
   });
 
-  it('is OFF once the heartbeat is older than 180 seconds', async () => {
-    const lastSeen = await setHeartbeat(181);
+  it(`is OFF once the heartbeat is older than ${HEARTBEAT_THRESHOLD_MS / 1000} seconds`, async () => {
+    const lastSeen = await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 1);
     const body = await status();
     expect(body.status).toBe('OFF');
     expect(body.since).toBe(lastSeen);
@@ -43,7 +37,7 @@ describe('GET /api/status', () => {
 
   it('is OFF while an outage is open, even with a fresh heartbeat', async () => {
     await setHeartbeat(10);
-    const startTime = new Date(Date.now() - 60_000).toISOString();
+    const startTime = new Date(Date.now() - MINUTE_MS).toISOString();
     const id = await insertOutage({ startTime, source: 'manual' });
     const body = await status();
     expect(body.status).toBe('OFF');

@@ -77,6 +77,15 @@ describe('POST /api/confirm', () => {
     expect(codes).toEqual([201, 409, 409, 409, 409, 429]);
   });
 
+  it('accepts Cloudflare test secrets without action/host checks, but not their failures', async () => {
+    await insertOutage({});
+    const testEnv = { ...env, TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA' } as Env;
+    mockTurnstile(true, 'login', 'example.com');
+    expect((await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: testEnv })).status).toBe(201);
+    mockTurnstile(false);
+    expect((await call('/api/confirm', { method: 'POST', body: { token: 'x' }, env: testEnv })).status).toBe(403);
+  });
+
   it('rejects cross-site requests', async () => {
     mockTurnstile(true);
     const res = await call('/api/confirm', {

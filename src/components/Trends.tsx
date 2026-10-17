@@ -3,7 +3,7 @@ import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
-import { DAY_MS, type StatsResponse, type WeekStats, type WindowStats } from '../../shared/api';
+import { DAY_MS, HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
 import { formatCalendarDay, formatDate, formatDuration, formatHours } from '../lib/format';
 import { AXIS_WIDTH } from './chart';
 import { TRENDS_TABLE_LABEL, TRENDS_TITLE } from './Skeletons';
@@ -21,7 +21,14 @@ interface Delta {
   direction: 'up' | 'down' | 'flat';
 }
 
-function delta(current: number, previous: number, format: (n: number) => string, upIsBad: boolean): Delta {
+/** The change on the previous period, or null when there is nothing to compare with yet. */
+function delta(
+  current: number,
+  previous: number | undefined,
+  format: (n: number) => string,
+  upIsBad: boolean,
+): Delta | null {
+  if (previous === undefined) return null;
   const diff = Math.round((current - previous) * 10) / 10;
   if (diff === 0) return { text: 'Same as the 30 days before', tone: 'same', direction: 'flat' };
   const up = diff > 0;
@@ -192,7 +199,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[] }> = (props) => {
 export const Trends: Component<TrendsProps> = (props) => {
   const since = () => Date.parse(props.stats.trackingSince);
   const started = () => props.now >= since();
-  const s = (): WindowStats => props.stats.last30;
+  const s = () => props.stats.last30;
   const prev = () => props.stats.previous30;
   // Comparing 30 days with the 30 before needs 60 days of records.
   const firstComparison = () => formatDate(new Date(since() + 60 * DAY_MS).toISOString());
@@ -214,25 +221,25 @@ export const Trends: Component<TrendsProps> = (props) => {
           <Tile
             label="Without power"
             value={started() ? formatHours(s().hoursOff) : '—'}
-            delta={prev() ? delta(s().hoursOff, (prev() as WindowStats).hoursOff, formatHours, true) : null}
+            delta={delta(s().hoursOff, prev()?.hoursOff, formatHours, true)}
           />
           <Tile
             label="Outages"
             value={started() ? String(s().outages) : '—'}
-            delta={
-              prev() && s().plannedOutages === 0
-                ? delta(s().outages, (prev() as WindowStats).outages, String, true)
-                : null
-            }
+            delta={s().plannedOutages === 0 ? delta(s().outages, prev()?.outages, String, true) : null}
             note={s().plannedOutages > 0 ? `${s().plannedOutages} planned` : undefined}
           />
           <Tile label="Days affected" value={started() ? `${s().daysWithOutage} of ${s().daysTracked}` : '—'} />
           <Tile
             label="Longest outage"
             value={
-              s().outages === 0 ? '—' : s().longestMinutes > 0 ? formatDuration(s().longestMinutes * 60_000) : '< 1 min'
+              s().outages === 0
+                ? '—'
+                : s().longestMinutes > 0
+                  ? formatDuration(s().longestMinutes * MINUTE_MS)
+                  : '< 1 min'
             }
-            note={s().outages > 1 ? `Average ${formatDuration((s().hoursOff / s().outages) * 3_600_000)}` : undefined}
+            note={s().outages > 1 ? `Average ${formatDuration((s().hoursOff / s().outages) * HOUR_MS)}` : undefined}
           />
         </div>
         <Show

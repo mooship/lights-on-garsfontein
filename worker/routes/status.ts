@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import type { ConfirmResponse, StatusResponse } from '../../shared/api';
 import { outageConfirmations } from '../db/schema';
-import { safeEqual, sha256Hex } from '../lib/crypto';
+import { requireBearer } from '../lib/auth';
+import { sha256Hex } from '../lib/crypto';
 import { countConfirmations, detectOutage, getGridState, recordHeartbeat } from '../lib/grid';
-import { bearerToken, errors, isRateLimited, json, parseBody } from '../lib/http';
+import { errors, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
-import { verifyTurnstile } from '../lib/turnstile';
+import { checkTurnstile } from '../lib/turnstile';
 
 const confirmSchema = z.object({ token: z.string().min(1).max(2048) });
 
@@ -19,15 +20,14 @@ async function getStatus({ env, db }: RouteContext): Promise<Response> {
   return json(body);
 }
 
-async function postConfirm({ request, env, db, ip }: RouteContext): Promise<Response> {
+async function postConfirm(ctx: RouteContext): Promise<Response> {
+  const { request, env, db, ip } = ctx;
   const parsed = await parseBody(request, confirmSchema);
   if ('response' in parsed) return parsed.response;
   // Without the salt the stored fingerprints would be trivially reversible.
   if (!env.IP_SALT) return errors.internal();
-  const expected = { action: 'confirm' as const, hostname: new URL(env.SITE_URL).hostname };
-  if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip, expected))) {
-    return errors.forbidden('turnstile_failed');
-  }
+  const refused = await checkTurnstile(ctx, parsed.data.token, 'confirm');
+  if (refused) return refused;
 
   const outage = await detectOutage(db, new Date());
   if (!outage) return errors.conflict('no_active_outage');
@@ -44,14 +44,7 @@ async function postConfirm({ request, env, db, ip }: RouteContext): Promise<Resp
   return json(body, 201);
 }
 
-async function postHeartbeat({ request, env, db, limitKey }: RouteContext): Promise<Response> {
-  const token = bearerToken(request);
-  // No sensor configured yet: refuse every heartbeat rather than compare against an unset secret.
-  if (!env.HEARTBEAT_TOKEN || !token || !(await safeEqual(token, env.HEARTBEAT_TOKEN))) {
-    // Wrong tokens share the login rate limit, so they cannot be brute-forced.
-    if (await isRateLimited(env.LOGIN_LIMITER, limitKey)) return errors.rateLimited();
-    return errors.unauthorized();
-  }
+async function postHeartbeat({ db }: RouteContext): Promise<Response> {
   const closed = await recordHeartbeat(db, new Date());
   return json({ ok: true, closedOutages: closed });
 }
@@ -59,5 +52,6 @@ async function postHeartbeat({ request, env, db, limitKey }: RouteContext): Prom
 export const statusRoutes: Routes = {
   'GET /api/status': { handler: getStatus, limiter: 'STATUS_LIMITER', cors: true },
   'POST /api/confirm': { handler: postConfirm, sameOrigin: true, limiter: 'CONFIRM_LIMITER' },
-  'POST /api/heartbeat': { handler: postHeartbeat },
+  // Until HEARTBEAT_TOKEN is set (no sensor yet), every heartbeat is refused.
+  'POST /api/heartbeat': { handler: postHeartbeat, authorize: requireBearer((env) => env.HEARTBEAT_TOKEN) },
 };

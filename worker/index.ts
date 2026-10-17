@@ -52,6 +52,8 @@ export default {
   async scheduled(controller, env) {
     const db = createDb(env.DB);
     const now = new Date(controller.scheduledTime);
-    await Promise.all([detectOutage(db, now), purgeExpiredSessions(db, now), purgeOldFingerprints(db, now)]);
+    const housekeeping =
+      now.getUTCMinutes() === 0 ? [purgeExpiredSessions(db, now), purgeOldFingerprints(db, now)] : [];
+    await Promise.all([detectOutage(db, now), ...housekeeping]);
   },
 } satisfies ExportedHandler<Env>;

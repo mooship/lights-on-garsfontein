@@ -9,8 +9,9 @@ function currentTheme(): Theme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
-const [themeSignal, setThemeSignal] = createSignal<Theme>(currentTheme());
-export const theme = themeSignal;
+const [theme, setThemeSignal] = createSignal<Theme>(currentTheme());
+
+export { theme };
 
 // Matches the page background in each theme (see styles/theme.css.ts).
 const THEME_COLORS: Record<Theme, string> = { light: '#F6F4EF', dark: '#121312' };

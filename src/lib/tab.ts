@@ -1,7 +1,5 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
-import type { StatusResponse } from '../../shared/api';
-
-const MINUTE = 60_000;
+import { MINUTE_MS as MINUTE, type StatusResponse } from '../../shared/api';
 
 /** Tab-friendly duration: "3d 4h", "2h 14m", "5m". */
 function compactDuration(ms: number): string {

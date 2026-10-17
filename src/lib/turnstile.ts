@@ -1,3 +1,5 @@
+import type { TurnstileAction } from '../../shared/api';
+
 // Turnstile is loaded only when a visitor taps "My power is off too", so the
 // third-party script never weighs on page load.
 
@@ -34,7 +36,7 @@ function loadTurnstile(): Promise<TurnstileApi> {
 export async function getTurnstileToken(
   container: HTMLElement,
   siteKey: string,
-  action: 'confirm' | 'login',
+  action: TurnstileAction,
 ): Promise<string> {
   const turnstile = await loadTurnstile();
   return new Promise<string>((resolve, reject) => {

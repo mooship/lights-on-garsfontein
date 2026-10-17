@@ -45,10 +45,12 @@ export const tileDelta = style({
   textOverflow: 'ellipsis',
 });
 
+const deltaIconBase = style({ flex: 'none' });
+
 export const deltaIcon = styleVariants({
-  worse: { color: vars.color.off, flex: 'none' },
-  better: { color: vars.color.on, flex: 'none' },
-  same: { color: vars.color.muted, flex: 'none' },
+  worse: [deltaIconBase, { color: vars.color.off }],
+  better: [deltaIconBase, { color: vars.color.on }],
+  same: [deltaIconBase, { color: vars.color.muted }],
 });
 
 export const chartBlock = style({ marginTop: '1.25rem' });

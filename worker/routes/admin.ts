@@ -2,9 +2,10 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AdminOutagesResponse } from '../../shared/api';
 import { outages } from '../db/schema';
+import { refuseBadToken } from '../lib/auth';
 import { safeEqual } from '../lib/crypto';
 import { getOpenOutage, outagesWithCounts, summarise } from '../lib/grid';
-import { bearerToken, errors, isCrossOrigin, isRateLimited, json, parseBody } from '../lib/http';
+import { bearerToken, errors, isCrossOrigin, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { getSessionUser } from './auth';
 
@@ -120,13 +121,10 @@ async function checkApiToken(request: Request, env: Env): Promise<boolean | null
 }
 
 /** Admin auth: a valid API token, or a session cookie on a same-origin request. */
-async function authorizeAdmin({ request, env, db, limitKey }: RouteContext): Promise<Response | null> {
+async function authorizeAdmin(ctx: RouteContext): Promise<Response | null> {
+  const { request, env, db } = ctx;
   const token = await checkApiToken(request, env);
-  if (token === false) {
-    // Wrong tokens share the login rate limit, so they cannot be brute-forced.
-    if (await isRateLimited(env.LOGIN_LIMITER, limitKey)) return errors.rateLimited();
-    return errors.unauthorized();
-  }
+  if (token === false) return refuseBadToken(ctx);
   if (token === null) {
     if (request.method !== 'GET' && isCrossOrigin(request)) return errors.forbidden();
     if (!(await getSessionUser(request, db))) return errors.unauthorized();

@@ -1,5 +1,7 @@
 import { DAY_MS } from '../../shared/api';
 
+export { outageDurationMs } from '../../shared/api';
+
 const TIME_ZONE = 'Africa/Johannesburg';
 
 /** Builds a formatter on first use: time-zone formatters are costly to create on slow phones. */
@@ -50,21 +52,16 @@ export function formatDuration(ms: number): string {
   return `${totalSeconds} s`;
 }
 
-/** How long an outage lasted; one still in progress runs until `now`. */
-export function outageDurationMs(outage: { startTime: string; endTime: string | null }, now: number): number {
-  return (outage.endTime ? Date.parse(outage.endTime) : now) - Date.parse(outage.startTime);
-}
+const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** "01:02:03" stopwatch format. */
 export function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`;
+  return `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
 }
 
 /** Converts an ISO string to the value a datetime-local input expects (browser time zone). */
 export function toLocalInput(iso: string): string {
   const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }

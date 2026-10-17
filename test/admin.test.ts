@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { AdminOutagesResponse, StatusResponse } from '../shared/api';
-import { call, insertOutage, login, setHeartbeat } from './helpers';
+import type { AdminOutagesResponse } from '../shared/api';
+import { call, getStatus, insertConfirmation, insertOutage, login, setHeartbeat } from './helpers';
 
 let cookie: string;
 beforeEach(async () => {
@@ -9,7 +9,7 @@ beforeEach(async () => {
 });
 
 const post = (path: string, body: unknown) => call(path, { method: 'POST', body, cookie });
-const currentStatus = async () => ((await (await call('/api/status')).json()) as StatusResponse).status;
+const currentStatus = async () => (await getStatus()).status;
 
 describe('POST /api/admin/timer (punch clock)', () => {
   it('punch out opens a manual outage and punch in closes it', async () => {
@@ -84,9 +84,7 @@ describe('/api/admin/outages', () => {
 
   it('deletes an outage and its confirmations', async () => {
     const id = await insertOutage({});
-    await env.DB.prepare('INSERT INTO outage_confirmations (outage_id, created_at, client_hash) VALUES (?, ?, ?)')
-      .bind(id, new Date().toISOString(), 'abc')
-      .run();
+    await insertConfirmation(id);
     expect((await post('/api/admin/outages', { action: 'delete', id })).status).toBe(200);
     const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outage_confirmations').first<{ n: number }>()) ?? {};
     expect(n).toBe(0);
@@ -100,7 +98,7 @@ describe('/api/admin/outages', () => {
       isPlanned: true,
     });
     const { outage } = (await created.json()) as { outage: { id: number } };
-    const status = (await (await call('/api/status')).json()) as StatusResponse;
+    const status = await getStatus();
     expect(status.recent[0]).toMatchObject({ id: outage.id, planned: true });
 
     await post('/api/admin/outages', { action: 'update', id: outage.id, isPlanned: false });

@@ -1,4 +1,4 @@
-import { DAY_MS as DAY, HOUR_MS as HOUR, type WeekStats, type WindowStats } from '../../shared/api';
+import { DAY_MS as DAY, HOUR_MS as HOUR, MINUTE_MS, type WeekStats, type WindowStats } from '../../shared/api';
 
 const WEEK = 7 * DAY;
 /** South Africa has no daylight saving: SAST is always UTC+2. */
@@ -72,7 +72,7 @@ export function windowStats(
     hoursOff: round1(offMs / HOUR),
     outages,
     availability: tracked > 0 ? Math.round((1 - offMs / tracked) * 10_000) / 10_000 : null,
-    longestMinutes: Math.round(longest / 60_000),
+    longestMinutes: Math.round(longest / MINUTE_MS),
     daysTracked,
     daysWithOutage,
     plannedOutages: planned.filter((i) => overlap(i, start, to) > 0).length,

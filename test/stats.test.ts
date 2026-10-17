@@ -1,10 +1,9 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { type StatsResponse, TRACKING_SINCE } from '../shared/api';
+import { HOUR_MS as H, type StatsResponse, TRACKING_SINCE } from '../shared/api';
 import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
 import { call, insertOutage, uniqueIp } from './helpers';
 
-const H = 3_600_000;
 const t = (iso: string) => Date.parse(iso);
 
 describe('mergeOutages', () => {
@@ -140,7 +139,7 @@ describe('GET /api/outages.csv', () => {
     const insert = env.DB.prepare('INSERT INTO outages (start_time, end_time, source) VALUES (?, ?, ?)');
     await env.DB.batch(
       Array.from({ length: 120 }, (_, i) => {
-        const start = new Date(Date.UTC(2026, 9, 18) + i * 3_600_000);
+        const start = new Date(Date.UTC(2026, 9, 18) + i * H);
         return insert.bind(start.toISOString(), new Date(start.getTime() + 600_000).toISOString(), 'manual');
       }),
     );

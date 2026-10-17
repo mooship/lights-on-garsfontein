@@ -1,8 +1,8 @@
 import clsx from 'clsx';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
-import { type Component, createResource, createSignal, For, Show } from 'solid-js';
-import type { AdminOutage, AdminOutagesResponse } from '../../shared/api';
+import { type Component, createMemo, createResource, createSignal, For, Show } from 'solid-js';
+import { type AdminOutage, type AdminOutagesResponse, MINUTE_MS } from '../../shared/api';
 import { PunchClock } from '../components/PunchClock';
 import { ApiError, api } from '../lib/api';
 import { formatDay, formatDuration, formatTime, outageDurationMs, toLocalInput } from '../lib/format';
@@ -195,6 +195,7 @@ const LogOutageForm: Component<{ onLogged: () => void }> = (props) => {
 
 const Dashboard: Component<{ initial: AdminOutagesResponse; onLoggedOut: () => void }> = (props) => {
   const now = useNow(1000);
+  const minute = createMemo(() => Math.floor(now() / MINUTE_MS) * MINUTE_MS);
   // Starts from the list the session check already fetched; changes refresh it.
   const [outages, setOutages] = createSignal(props.initial);
   const [loading, setLoading] = createSignal(false);
@@ -253,7 +254,7 @@ const Dashboard: Component<{ initial: AdminOutagesResponse; onLoggedOut: () => v
         <h2 class="gg-card-title">Outages</h2>
         <Show when={outages().outages.length > 0} fallback={<p>No outages yet.</p>}>
           <ul class={css.table}>
-            <For each={outages().outages}>{(o) => <OutageRow outage={o} now={now()} onChange={refetch} />}</For>
+            <For each={outages().outages}>{(o) => <OutageRow outage={o} now={minute()} onChange={refetch} />}</For>
           </ul>
         </Show>
       </section>

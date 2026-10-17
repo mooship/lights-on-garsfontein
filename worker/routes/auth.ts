@@ -5,7 +5,7 @@ import { sessions } from '../db/schema';
 import { randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
 import { errors, isRateLimited, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
-import { verifyTurnstile } from '../lib/turnstile';
+import { checkTurnstile } from '../lib/turnstile';
 
 // __Host- prefix: the browser only accepts it from this exact host (no sibling-subdomain cookie tossing).
 const SESSION_COOKIE = '__Host-admin_session';
@@ -41,17 +41,16 @@ export async function getSessionUser(request: Request, db: Db): Promise<string |
   return session?.userId ?? null;
 }
 
-async function login({ request, env, db, ip }: RouteContext): Promise<Response> {
+async function login(ctx: RouteContext): Promise<Response> {
+  const { request, env, db } = ctx;
   const parsed = await parseBody(request, loginSchema);
   if ('response' in parsed) return parsed.response;
   // A site-wide cap on top of the per-connection limit, so spreading guesses over many
   // addresses does not help either.
   if (await isRateLimited(env.LOGIN_GLOBAL_LIMITER, 'login')) return errors.rateLimited();
   // Turnstile keeps bots off the sign-in form; scripts use ADMIN_API_TOKEN instead.
-  const expected = { action: 'login' as const, hostname: new URL(env.SITE_URL).hostname };
-  if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip, expected))) {
-    return errors.forbidden('turnstile_failed');
-  }
+  const refused = await checkTurnstile(ctx, parsed.data.token, 'login');
+  if (refused) return refused;
   if (!env.ADMIN_PASSWORD_HASH || !(await verifyPassword(parsed.data.password, env.ADMIN_PASSWORD_HASH))) {
     return errors.unauthorized();
   }

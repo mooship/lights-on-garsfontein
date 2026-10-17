@@ -64,11 +64,15 @@ export function summarise(
 }
 
 /** Until a sensor reports, the punch clock is the source of truth: no open outage means ON. */
-function powerState(openStart: string | undefined, lastSeen: string | undefined, now: Date) {
-  if (openStart) return { status: 'OFF' as PowerStatus, since: openStart };
+function powerState(
+  openStart: string | undefined,
+  lastSeen: string | undefined,
+  now: Date,
+): { status: PowerStatus; since: string | null } {
+  if (openStart) return { status: 'OFF', since: openStart };
   // A stale heartbeat is OFF straight away; the cron job opens the record within a minute.
-  if (lastSeen && isStale(lastSeen, now)) return { status: 'OFF' as PowerStatus, since: lastSeen };
-  return { status: 'ON' as PowerStatus, since: null };
+  if (lastSeen && isStale(lastSeen, now)) return { status: 'OFF', since: lastSeen };
+  return { status: 'ON', since: null };
 }
 
 /** Just ON or OFF, for callers that do not need the history (e.g. the social card). */

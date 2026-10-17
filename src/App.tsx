@@ -10,7 +10,7 @@ import {
   Suspense,
   Switch,
 } from 'solid-js';
-import { type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
+import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
 import * as css from './App.css';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { OutageHistory } from './components/OutageHistory';
@@ -27,7 +27,10 @@ import { syncThemeColor, watchSystemTheme } from './lib/theme';
 const Admin = lazy(() => import('./admin/Admin'));
 
 const POLL_MS = 30_000;
-const STATS_POLL_MS = 5 * 60_000;
+const STATS_POLL_MS = 5 * MINUTE_MS;
+
+/** Wraps a poll so it only runs while the tab is visible. */
+const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
 
 export interface InitialData {
   status: Promise<StatusResponse>;
@@ -105,14 +108,14 @@ function statusDetail(s: StatusResponse, now: number): string {
 const PublicView: Component<{ initial: InitialData }> = (props) => {
   const now = useNow(1000);
   // Text that only changes by the minute (or day) re-renders once a minute, not every second.
-  const minute = createMemo(() => Math.floor(now() / 60_000) * 60_000);
+  const minute = createMemo(() => Math.floor(now() / MINUTE_MS) * MINUTE_MS);
   const [status, { refetch }] = createResource(firstThen(props.initial.status, api.status));
   const [stats, { refetch: refetchStats }] = createResource(firstThen(props.initial.stats, api.stats));
 
   onMount(() => {
-    const timer = setInterval(() => document.visibilityState === 'visible' && refetch(), POLL_MS);
-    const statsTimer = setInterval(() => document.visibilityState === 'visible' && refetchStats(), STATS_POLL_MS);
-    const onVisible = () => document.visibilityState === 'visible' && refetch();
+    const timer = setInterval(whenVisible(refetch), POLL_MS);
+    const statsTimer = setInterval(whenVisible(refetchStats), STATS_POLL_MS);
+    const onVisible = whenVisible(refetch);
     document.addEventListener('visibilitychange', onVisible);
     onCleanup(() => {
       clearInterval(timer);
@@ -158,7 +161,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
         </Show>
       </section>
 
-      <section class="gg-card gg-history-card" aria-labelledby="history-heading">
+      <section class="gg-card" aria-labelledby="history-heading">
         <h2 id="history-heading" class="gg-card-title">
           Recent outages
         </h2>

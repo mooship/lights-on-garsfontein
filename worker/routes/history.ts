@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
-import { DAY_MS, type StatsResponse, TRACKING_SINCE } from '../../shared/api';
+import { DAY_MS, MINUTE_MS, outageDurationMs, type StatsResponse, TRACKING_SINCE } from '../../shared/api';
 import { outages } from '../db/schema';
 import { outagesWithCounts } from '../lib/grid';
 import { json } from '../lib/http';
@@ -48,7 +48,7 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   const lines = [
     'id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations',
     ...rows.map((r) => {
-      const minutes = r.endTime ? Math.round((Date.parse(r.endTime) - Date.parse(r.startTime)) / 60_000) : null;
+      const minutes = r.endTime ? Math.round(outageDurationMs(r, 0) / MINUTE_MS) : null;
       return [r.id, r.startTime, r.endTime, minutes, r.isPlanned ? 'yes' : 'no', r.confirmations]
         .map(csvField)
         .join(',');

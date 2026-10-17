@@ -1,10 +1,14 @@
 import { createScheduledController, env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { DAY_MS, HOUR_MS } from '../shared/api';
 import worker from '../worker/index';
-import { insertOutage, setHeartbeat } from './helpers';
+import { insertConfirmation, insertOutage, setHeartbeat } from './helpers';
 
-const runCron = () =>
-  worker.scheduled(createScheduledController({ scheduledTime: Date.now(), cron: '* * * * *' }), env);
+const runCron = (scheduledTime = Date.now()) =>
+  worker.scheduled(createScheduledController({ scheduledTime, cron: '* * * * *' }), env);
+
+/** Housekeeping runs at minute 0; use the current hour's start so cutoffs stay relative to now. */
+const topOfHour = () => Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
 
 const outages = async () =>
   (
@@ -46,22 +50,29 @@ describe('scheduled outage detection', () => {
     await env.DB.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?), (?, ?, ?)')
       .bind('old', 'admin', '2000-01-01T00:00:00.000Z', 'new', 'admin', '2999-01-01T00:00:00.000Z')
       .run();
-    await runCron();
+    await runCron(topOfHour());
     const rows = await env.DB.prepare('SELECT id FROM sessions').all<{ id: string }>();
     expect(rows.results.map((r) => r.id)).toEqual(['new']);
+  });
+});
+
+describe('housekeeping schedule', () => {
+  it('skips the purges outside minute 0', async () => {
+    await env.DB.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)')
+      .bind('old', 'admin', '2000-01-01T00:00:00.000Z')
+      .run();
+    await runCron(topOfHour() + 5 * 60_000);
+    const rows = await env.DB.prepare('SELECT id FROM sessions').all<{ id: string }>();
+    expect(rows.results).toHaveLength(1);
   });
 });
 
 describe('confirmation fingerprints', () => {
   it('are replaced after 30 days while the count stays', async () => {
     const id = await insertOutage({});
-    const old = new Date(Date.now() - 31 * 86_400_000).toISOString();
-    await env.DB.prepare(
-      'INSERT INTO outage_confirmations (outage_id, created_at, client_hash) VALUES (?, ?, ?), (?, ?, ?)',
-    )
-      .bind(id, old, 'aaa', id, new Date().toISOString(), 'bbb')
-      .run();
-    await runCron();
+    await insertConfirmation(id, { createdAt: new Date(Date.now() - 31 * DAY_MS).toISOString(), clientHash: 'aaa' });
+    await insertConfirmation(id, { clientHash: 'bbb' });
+    await runCron(topOfHour());
     const rows = await env.DB.prepare('SELECT client_hash FROM outage_confirmations ORDER BY id').all<{
       client_hash: string;
     }>();

@@ -42,7 +42,7 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
           type="button"
           class={button.off}
           disabled={props.busy || props.outage !== null}
-          onClick={() => props.onPunchOut()}
+          onClick={props.onPunchOut}
         >
           <ZapOff size={18} aria-hidden="true" />
           Punch out
@@ -51,7 +51,7 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
           type="button"
           class={button.on}
           disabled={props.busy || props.outage === null}
-          onClick={() => props.onPunchIn()}
+          onClick={props.onPunchIn}
         >
           <Zap size={18} aria-hidden="true" />
           Punch in
