@@ -85,9 +85,9 @@ globalStyle('.gg-card', {
   padding: '1.25rem',
 });
 
-// Fixed height so loading, ON and OFF states occupy the same box (zero layout shift).
+// Sized to its content: the loading skeleton matches the ON state; the OFF state's
+// "me too" button makes the card taller.
 globalStyle('.gg-status-card', {
-  height: '16rem',
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',

@@ -14,12 +14,12 @@ import { type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shar
 import * as css from './App.css';
 import { ConfirmOutage } from './components/ConfirmOutage';
 import { OutageHistory } from './components/OutageHistory';
-import { HistorySkeleton, STATUS_NOTE, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
+import { HistorySkeleton, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api } from './lib/api';
-import { formatDate, formatRelativeDay, formatTime } from './lib/format';
+import { formatDate, formatDuration, formatRelativeDay, formatTime, outageDurationMs } from './lib/format';
 import { useNow } from './lib/now';
 import { useStatusTab } from './lib/tab';
 import { syncThemeColor, watchSystemTheme } from './lib/theme';
@@ -89,7 +89,8 @@ function statusDetail(s: StatusResponse, now: number): string {
   }
   const last = s.recent.find((o) => o.endTime);
   if (!last?.endTime) return `No outages since tracking began on ${formatDate(TRACKING_SINCE)}.`;
-  return `Last outage: ${formatTime(last.startTime)} to ${formatTime(last.endTime)} ${on(last.startTime)}.`;
+  const lasted = formatDuration(outageDurationMs(last, now));
+  return `Last outage: ${formatTime(last.startTime)} to ${formatTime(last.endTime)} ${on(last.startTime)} (${lasted}).`;
 }
 
 const PublicView: Component<{ initial: InitialData }> = (props) => {
@@ -127,7 +128,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
               <>
                 <StatusBadge status={s().status} since={s().since} now={now()} />
                 <p class="gg-status-detail">{statusDetail(s(), minute())}</p>
-                <Show when={s().status === 'OFF' && s().outage} fallback={<p class="gg-status-note">{STATUS_NOTE}</p>}>
+                <Show when={s().status === 'OFF' && s().outage}>
                   {(outage) => <ConfirmOutage outage={outage()} siteKey={s().turnstileSiteKey} />}
                 </Show>
               </>
