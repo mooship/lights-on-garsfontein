@@ -44,18 +44,17 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
-    "@cloudflare/vitest-plugin": "^1.4.0",
+    "@cloudflare/vitest-plugin": "^1.4.4",
     "@playwright/test": "^1.64.0",
     "@types/node": "^24.19.2",
     "@vanilla-extract/css": "^1.21.3",
     "@vanilla-extract/vite-plugin": "^5.2.6",
     "drizzle-kit": "^0.31.11",
-    "fontaine": "^1.0.1",
     "lefthook": "^2.2.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vite-plugin-solid": "^2.11.14",
     "vitest": "^4.1.11",
-    "wrangler": "^4.149.0"
+    "wrangler": "^4.151.1"
   }
 }
