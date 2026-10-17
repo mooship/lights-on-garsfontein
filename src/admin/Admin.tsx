@@ -7,6 +7,7 @@ import { PunchClock } from '../components/PunchClock';
 import { ApiError, api } from '../lib/api';
 import { formatDay, formatDuration, formatTime, outageDurationMs, toLocalInput } from '../lib/format';
 import { useNow } from '../lib/now';
+import { getTurnstileToken } from '../lib/turnstile';
 import { button, errorText, input, label, smallButton } from '../styles/ui.css';
 import * as css from './Admin.css';
 
@@ -24,12 +25,14 @@ const describeError = (error: unknown) =>
     ? ({
         unauthorized: 'Wrong password.',
         rate_limited: 'Too many attempts. Wait a minute and try again.',
+        turnstile_failed: 'The bot check failed. Please try again.',
         outage_already_open: 'An outage is already open.',
         no_open_outage: 'There is no open outage to close.',
       }[error.code] ?? `Request failed (${error.code}).`)
     : 'Network error.';
 
 const LoginForm: Component<{ onLoggedIn: () => void }> = (props) => {
+  let widget!: HTMLDivElement;
   const [error, setError] = createSignal('');
   const [busy, setBusy] = createSignal(false);
 
@@ -39,7 +42,10 @@ const LoginForm: Component<{ onLoggedIn: () => void }> = (props) => {
     setBusy(true);
     setError('');
     try {
-      await api.login(String(password ?? ''));
+      // The public status response carries the Turnstile site key.
+      const { turnstileSiteKey } = await api.status();
+      const token = await getTurnstileToken(widget, turnstileSiteKey);
+      await api.login(String(password ?? ''), token);
       props.onLoggedIn();
     } catch (e) {
       setError(describeError(e));
@@ -56,9 +62,10 @@ const LoginForm: Component<{ onLoggedIn: () => void }> = (props) => {
           Password
           <input class={input} type="password" name="password" autocomplete="current-password" required />
         </label>
+        <div ref={widget} />
         <FormError message={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
-          Sign in
+          {busy() ? 'Checking…' : 'Sign in'}
         </button>
       </form>
     </section>

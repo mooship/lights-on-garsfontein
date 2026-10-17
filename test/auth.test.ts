@@ -1,26 +1,37 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { sha256Hex } from '../worker/lib/crypto';
-import { call, login, uniqueIp } from './helpers';
+import { call, login, mockTurnstile, uniqueIp } from './helpers';
+
+const attempt = (password: string, extra: Parameters<typeof call>[1] = {}) =>
+  call('/api/admin/login', { method: 'POST', body: { password, token: 'turnstile-token' }, ...extra });
 
 describe('admin auth', () => {
   it('refuses all logins while no password hash is configured', async () => {
-    const res = await call('/api/admin/login', {
-      method: 'POST',
-      body: { password: 'test-password' },
-      env: { ...env, ADMIN_PASSWORD_HASH: '' } as Env,
-    });
+    mockTurnstile(true);
+    const res = await attempt('test-password', { env: { ...env, ADMIN_PASSWORD_HASH: '' } as Env });
     expect(res.status).toBe(401);
   });
 
+  it('requires a passing Turnstile check before checking the password', async () => {
+    mockTurnstile(false);
+    const res = await attempt('test-password');
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'turnstile_failed' });
+    const noToken = await call('/api/admin/login', { method: 'POST', body: { password: 'test-password' } });
+    expect(noToken.status).toBe(400);
+  });
+
   it('rejects a wrong password', async () => {
-    const res = await call('/api/admin/login', { method: 'POST', body: { password: 'wrong' } });
+    mockTurnstile(true);
+    const res = await attempt('wrong');
     expect(res.status).toBe(401);
     expect(res.headers.get('Set-Cookie')).toBeNull();
   });
 
   it('sets a hardened session cookie and stores only its hash', async () => {
-    const res = await call('/api/admin/login', { method: 'POST', body: { password: 'test-password' } });
+    mockTurnstile(true);
+    const res = await attempt('test-password');
     expect(res.status).toBe(200);
     const cookie = res.headers.get('Set-Cookie') ?? '';
     expect(cookie).toMatch(/^admin_session=[\w-]{43};/);
@@ -62,11 +73,10 @@ describe('admin auth', () => {
   });
 
   it('rate limits login attempts at 5 per minute per IP', async () => {
+    mockTurnstile(true);
     const ip = uniqueIp();
     const codes: number[] = [];
-    for (let i = 0; i < 6; i++) {
-      codes.push((await call('/api/admin/login', { method: 'POST', body: { password: 'nope' }, ip })).status);
-    }
+    for (let i = 0; i < 6; i++) codes.push((await attempt('nope', { ip })).status);
     expect(codes).toEqual([401, 401, 401, 401, 401, 429]);
   });
 

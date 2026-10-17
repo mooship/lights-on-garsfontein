@@ -5,12 +5,13 @@ import { sessions } from '../db/schema';
 import { randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
 import { errors, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
+import { verifyTurnstile } from '../lib/turnstile';
 
 const SESSION_COOKIE = 'admin_session';
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 const ADMIN_USER_ID = 'admin';
 
-const loginSchema = z.object({ password: z.string().min(1).max(256) });
+const loginSchema = z.object({ password: z.string().min(1).max(256), token: z.string().min(1).max(2048) });
 
 function sessionCookie(value: string, maxAge: number): string {
   return `${SESSION_COOKIE}=${value}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
@@ -37,9 +38,13 @@ export async function getSessionUser(request: Request, db: Db): Promise<string |
   return session?.userId ?? null;
 }
 
-async function login({ request, env, db }: RouteContext): Promise<Response> {
+async function login({ request, env, db, ip }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, loginSchema);
   if ('response' in parsed) return parsed.response;
+  // Turnstile keeps bots off the sign-in form; scripts use ADMIN_API_TOKEN instead.
+  if (!(await verifyTurnstile(env.TURNSTILE_SECRET_KEY, parsed.data.token, ip))) {
+    return errors.forbidden('turnstile_failed');
+  }
   if (!env.ADMIN_PASSWORD_HASH || !(await verifyPassword(parsed.data.password, env.ADMIN_PASSWORD_HASH))) {
     return errors.unauthorized();
   }
