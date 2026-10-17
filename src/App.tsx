@@ -15,7 +15,7 @@ import { SafetyLine, Scope } from './components/StatusNotes';
 import { StillOff } from './components/StillOff';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
-import { api } from './lib/api';
+import { api, type Status } from './lib/api';
 import { formatDate, formatDuration, formatRelativeDay, formatTime, outageDurationMs } from './lib/format';
 import { t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
@@ -32,7 +32,7 @@ const STATS_POLL_MS = 5 * MINUTE_MS;
 const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
 
 export interface InitialData {
-  status: Promise<StatusResponse>;
+  status: Promise<Status>;
   stats: Promise<StatsResponse>;
 }
 
@@ -80,6 +80,12 @@ const Footer: Component<{ isPublic: boolean }> = (props) => (
     <p>{t().footer.operator}</p>
   </footer>
 );
+
+/** "No connection · status as at 20:11", with the day when the copy is not from today. */
+function offlineLabel(iso: string, now: number): string {
+  const day = formatRelativeDay(iso, now);
+  return t().status.offline(formatTime(iso), day === t().day.today ? undefined : day);
+}
 
 /** One line of context under the badge: when it went off, or when the last outage was. */
 function statusDetail(s: StatusResponse, now: number): string {
@@ -140,14 +146,21 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <Scope />
                 <div class="gg-status-detail">
                   <p>{statusDetail(s(), minute())}</p>
-                  <Show
-                    when={stale()}
+                  <Switch
                     fallback={<p class="gg-status-updated">{t().status.updated(clockTime(status.updatedAt()))}</p>}
                   >
-                    <p class={clsx('gg-status-updated', css.warning)} role="alert">
-                      {t().status.stale(clockTime(status.updatedAt()))}
-                    </p>
-                  </Show>
+                    {/* The service worker's last copy: labelled with when the server produced it, until a fresh one arrives. */}
+                    <Match when={s().fromCache}>
+                      <p class={clsx('gg-status-updated', css.warning)} role="alert">
+                        {offlineLabel(s().generatedAt, minute())}
+                      </p>
+                    </Match>
+                    <Match when={stale()}>
+                      <p class={clsx('gg-status-updated', css.warning)} role="alert">
+                        {t().status.stale(clockTime(status.updatedAt()))}
+                      </p>
+                    </Match>
+                  </Switch>
                 </div>
                 {/* Keyed on the outage so a new one starts with fresh state. */}
                 <Show when={s().status === 'OFF' && s().outage?.id} keyed>

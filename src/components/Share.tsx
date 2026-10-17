@@ -4,18 +4,20 @@ import MessageCircle from 'lucide-solid/icons/message-circle';
 import Send from 'lucide-solid/icons/send';
 import Share2 from 'lucide-solid/icons/share-2';
 import { type Component, createSignal, Show } from 'solid-js';
+import { localePath } from '../../shared/locale';
 import { site } from '../../site.config';
-import { t } from '../lib/i18n';
+import { locale, t } from '../lib/i18n';
 import { button } from '../styles/ui.css';
 import * as css from './Share.css';
 
-const SHARE_URL = `${site.url}/`;
+/** The page in the language being read, so whoever opens the link gets that language too. */
+const shareUrl = () => `${site.url}${localePath(locale())}`;
 
 const encode = encodeURIComponent;
 
 /** The two most used messaging apps here; Signal has no web share link, but the system sheet covers it. */
-export const whatsappHref = (text: string) => `https://wa.me/?text=${encode(`${text} ${SHARE_URL}`)}`;
-export const telegramHref = (text: string) => `https://t.me/share/url?url=${encode(SHARE_URL)}&text=${encode(text)}`;
+const whatsappHref = (text: string, url: string) => `https://wa.me/?text=${encode(`${text} ${url}`)}`;
+const telegramHref = (text: string, url: string) => `https://t.me/share/url?url=${encode(url)}&text=${encode(text)}`;
 
 /**
  * "Share with neighbours": the system share sheet where there is one (phones), plus direct WhatsApp
@@ -34,7 +36,7 @@ export const Share: Component = () => {
   async function copy() {
     setResult(null);
     try {
-      await navigator.clipboard.writeText(SHARE_URL);
+      await navigator.clipboard.writeText(shareUrl());
       setResult('copied');
     } catch {
       setResult('copyFailed');
@@ -44,7 +46,7 @@ export const Share: Component = () => {
   async function share() {
     setResult(null);
     try {
-      await navigator.share({ title: site.brand.full, text: t().share.text, url: SHARE_URL });
+      await navigator.share({ title: site.brand.full, text: t().share.text, url: shareUrl() });
     } catch (error) {
       // Closing the share sheet is not a failure; anything else falls back to copying.
       if (!(error instanceof DOMException && error.name === 'AbortError')) await copy();
@@ -70,7 +72,7 @@ export const Share: Component = () => {
         </Show>
         <a
           class={clsx(button.ghost, css.link)}
-          href={whatsappHref(t().share.text)}
+          href={whatsappHref(t().share.text, shareUrl())}
           aria-label={`${t().share.whatsapp} ${t().share.newTab}`}
           {...external}
         >
@@ -78,7 +80,7 @@ export const Share: Component = () => {
         </a>
         <a
           class={clsx(button.ghost, css.link)}
-          href={telegramHref(t().share.text)}
+          href={telegramHref(t().share.text, shareUrl())}
           aria-label={`${t().share.telegram} ${t().share.newTab}`}
           {...external}
         >

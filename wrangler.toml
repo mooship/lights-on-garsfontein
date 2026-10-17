@@ -71,4 +71,44 @@ persist = true
 enabled = true
 
 # Secrets (set with `wrangler secret put <NAME>`, see README):
-# ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY
+# ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY, CONTACT_EMAIL
+
+# The Playwright suite only (`wrangler dev --env e2e`, playwright.config.ts); never deployed. The
+# suite loads the page far more often than a reader, so the status limit is out of its way; the
+# confirmation limit stays low enough for its one rate-limit test to reach. Bindings are not
+# inherited by an environment, so each is repeated here. It must never reach production: no route,
+# no workers.dev URL, no crons, and a local-only database id.
+[env.e2e]
+workers_dev = false
+routes = []
+triggers = { crons = [] }
+
+[env.e2e.vars]
+SITE_URL = "http://localhost:8787"
+TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+
+[[env.e2e.d1_databases]]
+binding = "DB"
+database_name = "e2e-local"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "drizzle"
+
+[[env.e2e.ratelimits]]
+name = "STATUS_LIMITER"
+namespace_id = "4511"
+simple = { limit = 10000, period = 60 }
+
+[[env.e2e.ratelimits]]
+name = "CONFIRM_LIMITER"
+namespace_id = "4512"
+simple = { limit = 10, period = 60 }
+
+[[env.e2e.ratelimits]]
+name = "LOGIN_LIMITER"
+namespace_id = "4513"
+simple = { limit = 5, period = 60 }
+
+[[env.e2e.ratelimits]]
+name = "LOGIN_GLOBAL_LIMITER"
+namespace_id = "4514"
+simple = { limit = 30, period = 60 }

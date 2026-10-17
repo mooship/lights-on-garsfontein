@@ -10,8 +10,8 @@ An ultra-local service: it exists only to show the state of the electricity supp
 
 To report a fault, use the official channel: %site.faultReporting.url% (this site does not pass reports on).
 
-Site: %site.url%/
-The site is in Afrikaans by default, with an option to switch to English. The API and this file are in English.
+Site: %site.url%/ (Afrikaans) and %site.url%/en/ (English)
+The site is in Afrikaans by default, with the same pages in English. The API and this file are in English.
 Outage data (CSV, API and feed): %site.dataLicence.name% (%site.dataLicence.url%), provided as is, with no warranty of accuracy. Please credit "%site.brand.full%" and link to the site.
 Source code (MIT): %site.repo%
 

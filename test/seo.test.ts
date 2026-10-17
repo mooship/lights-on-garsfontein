@@ -13,13 +13,30 @@ describe('SEO routes', () => {
     expect(body).toContain('Sitemap: https://garsfontein.example/sitemap.xml');
   });
 
-  it('serves an XML sitemap with the home and privacy pages', async () => {
+  it('serves an XML sitemap with each language page and the privacy page', async () => {
     const res = await call('/sitemap.xml');
     expect(res.headers.get('Content-Type')).toContain('application/xml');
     const body = await res.text();
-    expect(body).toContain('<loc>https://garsfontein.example/</loc>');
-    expect(body).toContain('<loc>https://garsfontein.example/privacy</loc>');
+    const locs = [...body.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual([
+      'https://garsfontein.example/',
+      'https://garsfontein.example/en/',
+      'https://garsfontein.example/privacy',
+    ]);
     expect(body).not.toContain('privacy.html');
+  });
+
+  it('links each language page to the others with hreflang', async () => {
+    const body = await (await call('/sitemap.xml')).text();
+    const alternates = [
+      '<xhtml:link rel="alternate" hreflang="af" href="https://garsfontein.example/"/>',
+      '<xhtml:link rel="alternate" hreflang="en" href="https://garsfontein.example/en/"/>',
+      '<xhtml:link rel="alternate" hreflang="x-default" href="https://garsfontein.example/"/>',
+    ];
+    const entries = body.split('<url>').slice(1);
+    for (const entry of entries.slice(0, 2)) for (const link of alternates) expect(entry).toContain(link);
+    expect(entries[2]).not.toContain('hreflang');
+    expect(body).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
   });
 
   it('serves the one status-neutral social card, whatever the status', async () => {

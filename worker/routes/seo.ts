@@ -1,15 +1,22 @@
+import { localePath } from '../../shared/locale';
+import { site } from '../../site.config';
 import type { RouteContext, Routes } from '../lib/router';
 
-const SITEMAP_PATHS = ['/', '/privacy'];
-
 function sitemap({ env }: RouteContext): Response {
-  const urls = SITEMAP_PATHS.map(
-    (path) =>
-      `  <url><loc>${env.SITE_URL}${path}</loc><changefreq>${path === '/' ? 'always' : 'yearly'}</changefreq></url>`,
-  ).join('\n');
+  // Each language page lists all of them, so a search engine can show the reader's language.
+  const alternates = [...site.locales.map((locale) => [locale, localePath(locale)]), ['x-default', '/']]
+    .map(
+      ([hreflang, path]) => `\n    <xhtml:link rel="alternate" hreflang="${hreflang}" href="${env.SITE_URL}${path}"/>`,
+    )
+    .join('');
+  const languagePages = site.locales.map(
+    (locale) =>
+      `  <url><loc>${env.SITE_URL}${localePath(locale)}</loc><changefreq>always</changefreq>${alternates}</url>`,
+  );
+  const urls = [...languagePages, `  <url><loc>${env.SITE_URL}/privacy</loc><changefreq>yearly</changefreq></url>`];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${urls.join('\n')}
 </urlset>
 `;
   return new Response(xml, {

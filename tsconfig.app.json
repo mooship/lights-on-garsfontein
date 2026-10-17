@@ -6,5 +6,7 @@
     "jsxImportSource": "solid-js",
     "types": ["vite/client"]
   },
-  "include": ["src", "shared"]
+  "include": ["src", "shared"],
+  // The service worker has its own globals (tsconfig.sw.json).
+  "exclude": ["src/sw/sw.ts"]
 }

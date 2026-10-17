@@ -1,9 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite';
+import { build, defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
+import { localePath } from './shared/locale.ts';
 import { type Locale, site } from './site.config.ts';
+import { HEAD } from './src/i18n/head.ts';
 import { DICTIONARIES } from './src/i18n/index.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
 
@@ -42,6 +45,9 @@ function hashedFonts(): Plugin {
 const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/** `text` as the inside of a JSON string, with < escaped so it cannot close a <script>. */
+const jsonString = (text: string) => JSON.stringify(text).slice(1, -1).replace(/</g, '\\u003c');
+
 type Mode = 'html' | 'json' | 'text';
 
 /** The value behind a placeholder name: `site.<path>` or `since.<locale>`. */
@@ -71,8 +77,7 @@ function fill(text: string, mode: Mode, file: string): string {
   const out = text.replace(/%((?:site|since)\.[\w.-]+)%/g, (_match, name: string) => {
     const value = placeholder(name);
     if (mode === 'json') {
-      const json = Array.isArray(value) ? JSON.stringify(value) : JSON.stringify(value).slice(1, -1);
-      return json.replace(/</g, '\\u003c');
+      return Array.isArray(value) ? JSON.stringify(value).replace(/</g, '\\u003c') : jsonString(value as string);
     }
     const plain = Array.isArray(value) ? value.join(' ') : (value as string);
     return mode === 'html' ? escapeHtml(plain) : plain;
@@ -102,11 +107,10 @@ const generated = (url: keyof typeof GENERATED) =>
 
 /**
  * Deployment identity from site.config.ts: fills the placeholders (see `fill`) in index.html
- * and privacy.html, with JSON escaping inside JSON-LD, adds the og:locale tags, and builds
- * /site.webmanifest and /llms.txt from templates/ (emitted in the build, served in dev).
+ * and privacy.html, with JSON escaping inside JSON-LD, and builds /site.webmanifest and
+ * /llms.txt from templates/ (emitted in the build, served in dev).
  */
 function siteConfig(): Plugin {
-  const ogLocale = (locale: Locale) => site.intlLocales[locale].replace('-', '_');
   const jsonLd = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/g;
   return {
     name: 'site-config',
@@ -115,14 +119,7 @@ function siteConfig(): Plugin {
       handler(html, { path }) {
         const parts = html.split(jsonLd);
         // split() with three groups: [html, open, json, close, html, ...]
-        const out = parts.map((part, i) => fill(part, i % 4 === 2 ? 'json' : 'html', path)).join('');
-        if (path !== '/index.html') return out;
-        const tags: HtmlTagDescriptor[] = LOCALES.map((locale, i) => ({
-          tag: 'meta',
-          attrs: { property: i === 0 ? 'og:locale' : 'og:locale:alternate', content: ogLocale(locale) },
-          injectTo: 'head',
-        }));
-        return { html: out, tags };
+        return parts.map((part, i) => fill(part, i % 4 === 2 ? 'json' : 'html', path)).join('');
       },
     },
     configureServer(server) {
@@ -137,6 +134,124 @@ function siteConfig(): Plugin {
       for (const url of Object.keys(GENERATED) as (keyof typeof GENERATED)[]) {
         this.emitFile({ type: 'asset', fileName: url.slice(1), source: generated(url) });
       }
+    },
+  };
+}
+
+const ogLocale = (locale: Locale) => site.intlLocales[locale].replace('-', '_');
+
+/** index.html with its %page.<key>% placeholders filled for `locale`'s page. */
+function localePage(html: string, locale: Locale): string {
+  const head = (key: keyof (typeof HEAD)[Locale]) => fill(HEAD[locale][key], 'text', 'src/i18n/head.ts');
+  const url = (l: Locale) => escapeHtml(`${site.url}${localePath(l)}`);
+  const alternate = (hreflang: string, l: Locale) => `<link rel="alternate" hreflang="${hreflang}" href="${url(l)}" />`;
+  const values: Record<string, string> = {
+    lang: locale,
+    url: url(locale),
+    title: escapeHtml(head('title')),
+    description: escapeHtml(head('description')),
+    ogDescription: escapeHtml(head('ogDescription')),
+    imageAlt: escapeHtml(head('imageAlt')),
+    serviceDescription: jsonString(head('serviceDescription')),
+    alternates: [...LOCALES.map((l) => alternate(l, l)), alternate('x-default', DEFAULT_LOCALE)].join('\n    '),
+    ogLocales: [locale, ...LOCALES.filter((l) => l !== locale)]
+      .map((l, i) => `<meta property="og:locale${i ? ':alternate' : ''}" content="${ogLocale(l)}" />`)
+      .join('\n    '),
+  };
+  return html.replace(/%page\.(\w+)%/g, (match, key: string) => {
+    const value = values[key];
+    if (value === undefined) throw new Error(`locale-pages: unknown placeholder ${match} in index.html`);
+    return value;
+  });
+}
+
+/**
+ * One index.html per language page (shared/locale.ts): dist/index.html for the default locale and
+ * dist/<code>/index.html for each other, with that page's lang, head copy (src/i18n/head.ts),
+ * canonical and hreflang links. Each is a copy of the one built page, so they share every asset
+ * (Vite's URLs are absolute, /assets/…). The dev server fills the page for the URL it serves.
+ */
+function localePages(): Plugin {
+  const pageLocale = (url = '/') => LOCALES.find((locale) => localePath(locale) === url.split('?')[0]);
+  return {
+    name: 'locale-pages',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html, { path, originalUrl, server }) {
+        if (server && path === '/index.html') return localePage(html, pageLocale(originalUrl) ?? DEFAULT_LOCALE);
+      },
+    },
+    generateBundle: {
+      // After Vite has put the finished HTML in the bundle.
+      order: 'post',
+      handler(_options, bundle) {
+        const index = bundle['index.html'];
+        if (index?.type !== 'asset') throw new Error('locale-pages: index.html is not in the bundle');
+        const html = String(index.source);
+        for (const locale of LOCALES) {
+          const source = localePage(html, locale);
+          if (locale === DEFAULT_LOCALE) index.source = source;
+          else this.emitFile({ type: 'asset', fileName: `${localePath(locale).slice(1)}index.html`, source });
+        }
+      },
+    },
+  };
+}
+
+/**
+ * Builds src/sw/sw.ts into dist/sw.js once the site is written, with the pages and assets to
+ * precache and a build id hashed from their names and contents and from src/sw/. Any change to
+ * the shell or the worker so changes the worker's bytes, which is what makes browsers install
+ * the new one, and its cache name. A build of its own, because a service worker must be one
+ * classic script: as part of the app's build it would share chunks with it.
+ */
+const SW_SOURCE = resolve(import.meta.dirname, 'src/sw');
+
+function serviceWorker(): Plugin {
+  let outDir = '';
+  const url = (fileName: string) => `/${fileName.replace(/(^|\/)index\.html$/, '$1').replace(/\.html$/, '')}`;
+  return {
+    name: 'service-worker',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async writeBundle(_options, bundle) {
+      const files = Object.values(bundle)
+        .filter(({ fileName }) => fileName.endsWith('.html') || fileName.startsWith('assets/'))
+        .sort((a, b) => a.fileName.localeCompare(b.fileName));
+      const hash = createHash('sha256');
+      for (const file of files)
+        hash.update(`${file.fileName}\0`).update(file.type === 'chunk' ? file.code : file.source);
+      for (const name of readdirSync(SW_SOURCE).sort()) {
+        hash.update(`src/sw/${name}\0`).update(readFileSync(resolve(SW_SOURCE, name)));
+      }
+      const pages = files.filter(({ fileName }) => fileName.endsWith('.html')).map(({ fileName }) => url(fileName));
+      // Every asset, lazy chunks included, so this build's pages never need the network for one.
+      const assets = files
+        .filter(({ fileName }) => fileName.startsWith('assets/'))
+        .map(({ fileName }) => url(fileName));
+      await build({
+        configFile: false,
+        logLevel: 'warn',
+        publicDir: false,
+        define: {
+          __BUILD_ID__: JSON.stringify(hash.digest('hex').slice(0, 16)),
+          __PAGES__: JSON.stringify(pages),
+          __ASSETS__: JSON.stringify(assets),
+        },
+        build: {
+          outDir,
+          emptyOutDir: false,
+          target: 'es2022',
+          lib: {
+            entry: resolve(SW_SOURCE, 'sw.ts'),
+            formats: ['iife'],
+            name: 'sw',
+            fileName: () => 'sw.js',
+          },
+        },
+      });
     },
   };
 }
@@ -163,7 +278,8 @@ function messageArgs(names: string | undefined): string[] {
 
 /**
  * Fills the index.html loading shell from the dictionaries, once per locale in site.locales;
- * base.css shows the one matching <html lang>, which the boot script sets. On an empty element:
+ * base.css shows the one matching <html lang>: the page's own (localePages), or on /admin the stored one
+ * (the boot script). On an empty element:
  * - data-i18n="key" fills it with a <span data-l> per locale.
  * - data-i18n-label="key" (an aria-label) repeats the whole element per locale instead,
  *   with data-i18n as its text.
@@ -241,13 +357,23 @@ function localeVisibility(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [solid(), vanillaExtractPlugin(), localeVisibility(), siteConfig(), staticI18n(), hashedFonts()],
+  plugins: [
+    solid(),
+    vanillaExtractPlugin(),
+    localeVisibility(),
+    siteConfig(),
+    staticI18n(),
+    hashedFonts(),
+    localePages(),
+    serviceWorker(),
+  ],
   build: {
     target: 'es2022',
     outDir: 'dist',
     modulePreload: { polyfill: false },
     rolldownOptions: {
-      // privacy.html is served at /privacy (Workers assets html_handling).
+      // privacy.html is served at /privacy (Workers assets html_handling). The other language
+      // pages are copies of index.html (localePages).
       input: {
         index: resolve(import.meta.dirname, 'index.html'),
         privacy: resolve(import.meta.dirname, 'privacy.html'),

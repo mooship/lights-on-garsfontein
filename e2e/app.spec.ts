@@ -1,9 +1,12 @@
-import { type APIRequestContext, test as base, type Cookie, expect, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { test as base, type Cookie, expect, type Page } from '@playwright/test';
 import { DAY_MS } from '../shared/api';
+import { localePath } from '../shared/locale';
 import { type Locale, site } from '../site.config';
 import { activeBanners, BANNERS, type Banner } from '../src/banners';
 import { en } from '../src/i18n/en';
 import { zoned } from '../src/lib/zone';
+import { cacheName, STATUS_CACHE } from '../src/sw/strategy';
 
 const DEFAULT_LOCALE = site.locales[0];
 const BRAND = site.brand.short;
@@ -58,19 +61,6 @@ async function readLayoutShift(page: Page): Promise<number> {
 
 // Tests share one local database and run in order.
 test.describe.configure({ mode: 'serial' });
-
-/**
- * The public API allows 60 requests a minute per client (STATUS_LIMITER), and the suite loads the
- * page more often than that. Before a test that needs a clean load, wait out a spent window.
- */
-async function waitForStatusQuota(request: APIRequestContext) {
-  await expect
-    .poll(async () => (await request.get('/api/status')).status(), { intervals: [5_000], timeout: 75_000 })
-    .toBe(200);
-}
-
-// Leave the quota for the specs that run after this one.
-test.afterAll(async ({ request }) => waitForStatusQuota(request));
 
 const ADMIN_USERNAME = 'admin'; // matches .dev.vars.example
 const ADMIN_PASSWORD = 'test-password';
@@ -140,7 +130,7 @@ test.describe('language', () => {
     await context.close();
   });
 
-  test('switches to English at once and remembers it', async ({ browser }) => {
+  test('switches to English at once, moves to /en/ and remembers it', async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('/');
@@ -149,6 +139,7 @@ test.describe('language', () => {
     await expect(page.getByRole('button', { name: 'Switch to English' })).toHaveText('English');
 
     await page.getByRole('button', { name: 'Switch to English' }).click();
+    await expect(page).toHaveURL(/\/en\/$/);
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('status')).toContainText('No outage reported');
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
@@ -160,8 +151,93 @@ test.describe('language', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('status')).toContainText('No outage reported');
     expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('en');
+
+    await page.getByRole('button', { name: 'Skakel oor na Afrikaans' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('status')).toContainText('Geen onderbreking aangemeld nie');
+    expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('af');
+
+    // Back returns to the English URL, and the language follows it.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/en\/$/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('status')).toContainText('No outage reported');
     await context.close();
   });
+
+  test('opens / at /en/ for a visitor who chose English, before the app renders', async ({ page }) => {
+    const statusFetchedFrom: string[] = [];
+    page.on('request', (r) => r.url().endsWith('/api/status') && statusFetchedFrom.push(r.frame().url()));
+    await page.goto('/?from=share');
+    await expect(page).toHaveURL(/\/en\/\?from=share$/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('status')).toContainText('No outage reported');
+    // Only /en/ asked for the status: the Afrikaans page never started the app.
+    expect(statusFetchedFrom.map((url) => new URL(url).pathname)).toEqual(['/en/']);
+  });
+
+  test.describe('with Afrikaans stored', () => {
+    test.use({ appLocale: 'af' });
+
+    test('/en/ is in English and becomes the stored choice', async ({ page }) => {
+      await page.goto('/en/');
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+      await expect(page.getByRole('status')).toContainText('No outage reported');
+      expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('en');
+    });
+  });
+
+  test('/en redirects to /en/', async ({ request }) => {
+    const res = await request.get('/en', { maxRedirects: 0 });
+    expect([301, 307, 308]).toContain(res.status());
+    expect(res.headers().location).toBe('/en/');
+  });
+
+  const HEADS: Record<Locale, { title: string; description: RegExp; ogDescription: RegExp; statistics: string }> = {
+    af: {
+      title: `Is die krag af in Garsfontein? · ${site.brand.full}`,
+      description: /^Is die krag af in Garsfontein, Pretoria\? Kragstatus/,
+      ogDescription: /^Kragstatus soos laas gemeet/,
+      statistics: 'Statistiek',
+    },
+    en: {
+      title: `Is the power off in Garsfontein? · ${site.brand.full}`,
+      description: /^Is the power off in Garsfontein, Pretoria\? Power outage status/,
+      ogDescription: /^Power status as last measured/,
+      statistics: 'Statistics',
+    },
+  };
+
+  for (const locale of site.locales) {
+    const path = localePath(locale);
+
+    test(`${path} is the ${locale} page before any script runs`, async ({ browser }) => {
+      const context = await browser.newContext({ javaScriptEnabled: false });
+      const page = await context.newPage();
+      await page.goto(path);
+      const head = HEADS[locale];
+      const meta = (selector: string) => page.locator(`meta[${selector}]`);
+      await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      await expect(page).toHaveTitle(head.title);
+      await expect(meta('name="description"')).toHaveAttribute('content', head.description);
+      await expect(meta('property="og:title"')).toHaveAttribute('content', head.title);
+      await expect(meta('property="og:description"')).toHaveAttribute('content', head.ogDescription);
+      await expect(meta('property="og:url"')).toHaveAttribute('content', `${site.url}${path}`);
+      await expect(meta('property="og:locale"')).toHaveAttribute('content', site.intlLocales[locale].replace('-', '_'));
+      await expect(meta('property="og:locale:alternate"')).toHaveCount(site.locales.length - 1);
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${site.url}${path}`);
+      const alternates = await page
+        .locator('link[rel="alternate"][hreflang]')
+        .evaluateAll((links) => links.map((link) => [link.getAttribute('hreflang'), link.getAttribute('href')]));
+      expect(alternates).toEqual([
+        ...site.locales.map((l) => [l, `${site.url}${localePath(l)}`]),
+        ['x-default', `${site.url}/`],
+      ]);
+      // The shell carries every language; the page's lang alone picks which one shows.
+      await expect(page.getByRole('heading', { name: head.statistics })).toBeVisible();
+      await context.close();
+    });
+  }
 
   test('shows the loading shell in the stored language before the app loads', async ({ browser }) => {
     const context = await browser.newContext();
@@ -173,6 +249,7 @@ test.describe('language', () => {
 
     await withLocale(page, 'en');
     await page.reload();
+    await expect(page).toHaveURL(/\/en\/$/); // the boot script redirects without the app
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent outages' })).toBeVisible();
@@ -252,7 +329,7 @@ test.describe('public page', () => {
 
       test(`has zero cumulative layout shift while loading (${locale})`, async ({ page }) => {
         await trackLayoutShift(page);
-        await page.goto('/');
+        await page.goto(localePath(locale));
         await expect(page.locator('html')).toHaveAttribute('lang', locale);
         expect(await readLayoutShift(page)).toBe(0);
       });
@@ -289,7 +366,10 @@ test.describe('public page', () => {
 
   test('serves the SEO manifests', async ({ request }) => {
     expect(await (await request.get('/robots.txt')).text()).toContain('Disallow: /api/admin/');
-    expect(await (await request.get('/sitemap.xml')).text()).toContain('/privacy</loc>');
+    const sitemap = await (await request.get('/sitemap.xml')).text();
+    // The origin is the Worker's SITE_URL, which is local here.
+    const locs = [...sitemap.matchAll(/<loc>https?:\/\/[^/]+([^<]*)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual(['/', '/en/', '/privacy']);
     const og = await request.get('/og.png');
     expect(og.headers()['content-type']).toBe('image/png');
   });
@@ -388,7 +468,8 @@ test.describe('still off where you are', () => {
 });
 
 test.describe('share', () => {
-  const SHARE_URL = `${site.url}/`;
+  // The page being shared: English readers are on /en/.
+  const SHARE_URL = `${site.url}/en/`;
   const TEXT = 'Is the power off in Garsfontein? Check here:';
 
   test('links WhatsApp and Telegram with the text and link encoded, in a new tab', async ({ page }) => {
@@ -434,6 +515,24 @@ test.describe('share', () => {
   });
 });
 
+test.describe('privacy contact', () => {
+  // Before the confirmation test: /api/contact shares CONFIRM_LIMITER, which that test spends.
+  test('reveals the contact email after Turnstile', async ({ page }) => {
+    // playwright.config.ts passes the .dev.vars.example placeholder to wrangler dev.
+    const { readFileSync } = await import('node:fs');
+    const email = /^CONTACT_EMAIL="([^"\s]+)"/m.exec(readFileSync('.dev.vars.example', 'utf8'))?.[1];
+    if (!email) throw new Error('.dev.vars.example has no CONTACT_EMAIL');
+    await page.goto('/privacy');
+    const en = page.locator('#en');
+    await en.getByRole('button', { name: 'Show email address' }).click();
+    const mail = en.getByRole('link', { name: email });
+    await expect(mail).toHaveAttribute('href', `mailto:${email}`);
+    await expect(mail).toBeFocused();
+    await expect(en.getByRole('button', { name: 'Show email address' })).toHaveCount(0);
+    await expect(en.getByRole('link', { name: 'open an issue on GitHub' })).toBeVisible();
+  });
+});
+
 test.describe('community confirmation', () => {
   test('confirms once, then rate limits', async ({ page, request }) => {
     await login(page);
@@ -446,10 +545,11 @@ test.describe('community confirmation', () => {
       await expect(page.getByTestId('confirm-outage')).toHaveText('Confirmation recorded', { timeout: 20_000 });
       await expect(page.getByText('1 community confirmation.')).toBeVisible();
 
-      // Same client again: one confirmation per outage, then 5 requests a minute. The limiter counts in
-      // fixed one-minute windows, so a window boundary can reset the count: post until the first 429.
+      // Same client again: one confirmation per outage, then CONFIRM_LIMITER's 10 requests a minute
+      // (the e2e environment in wrangler.toml). The limiter counts in fixed one-minute windows, so a
+      // window boundary can reset the count: post until the first 429.
       const codes: number[] = [];
-      while (codes.length < 12 && !codes.includes(429)) {
+      while (codes.length < 25 && !codes.includes(429)) {
         codes.push((await request.post('/api/confirm', { data: { token: 'XXXX.DUMMY.TOKEN' } })).status());
       }
       expect(codes).toContain(429);
@@ -541,11 +641,7 @@ test.describe('site banner', () => {
     expect(await page.evaluate((id) => localStorage.getItem(`banner-dismissed:${id}`), VOTE)).toBe('1');
   });
 
-  test('sits in the page flow after the cards, causing no layout shift and covering nothing', async ({
-    page,
-    request,
-  }) => {
-    await waitForStatusQuota(request);
+  test('sits in the page flow after the cards, causing no layout shift and covering nothing', async ({ page }) => {
     await page.clock.setFixedTime(DURING);
     await trackLayoutShift(page);
     await page.goto('/');
@@ -567,7 +663,7 @@ test.describe('narrow screens', () => {
   test.use({ viewport: { width: 320, height: 640 } });
 
   for (const locale of site.locales) {
-    for (const path of ['/', '/privacy', '/admin']) {
+    for (const path of ['/', '/en/', '/privacy', '/admin']) {
       test(`${path} has no horizontal scroll at 320px (${locale})`, async ({ page }) => {
         await withLocale(page, locale);
         await page.goto(path);
@@ -582,19 +678,169 @@ test.describe('narrow screens', () => {
   }
 });
 
-test.describe('privacy contact', () => {
-  test('reveals the contact email after Turnstile', async ({ page }) => {
-    // playwright.config.ts passes the .dev.vars.example placeholder to wrangler dev.
-    const { readFileSync } = await import('node:fs');
-    const email = /^CONTACT_EMAIL="([^"\s]+)"/m.exec(readFileSync('.dev.vars.example', 'utf8'))?.[1];
-    if (!email) throw new Error('.dev.vars.example has no CONTACT_EMAIL');
+test.describe('offline', () => {
+  // Every other test blocks service workers (playwright.config.ts).
+  test.use({ serviceWorkers: 'allow', appLocale: 'af' });
+
+  /** Opens `path` through the service worker, with the status it fetched stored for offline use. */
+  async function throughServiceWorker(page: Page, path: string) {
+    await page.goto(path);
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await page.reload(); // the first load came before the worker; this one goes through it
+    await expect(page.getByRole('status')).toBeVisible();
+    await expect.poll(() => cachedGeneratedAt(page)).not.toBeNull();
+  }
+
+  /** When the server produced the worker's copy of the status, or null without one. */
+  const cachedGeneratedAt = (page: Page) =>
+    page.evaluate(async () => {
+      const copy = await caches.match('/api/status');
+      return copy ? ((await copy.json()) as { generatedAt: string }).generatedAt : null;
+    });
+
+  /** Makes the page poll the status now. */
+  const poll = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
+  const cachedPaths = (page: Page) =>
+    page.evaluate(async () => {
+      const paths: string[] = [];
+      for (const name of await caches.keys()) {
+        for (const request of await (await caches.open(name)).keys()) paths.push(new URL(request.url).pathname);
+      }
+      return paths;
+    });
+
+  test('registers the worker only after the page has loaded', async ({ page }) => {
+    const order: string[] = [];
+    page.on('load', () => order.push('load'));
+    page.context().on('serviceworker', () => order.push('worker'));
+    await page.goto('/');
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    expect(order).toEqual(['load', 'worker']);
+  });
+
+  test('shows / and /en/ from the cache, labelled with the age of the status, until the network is back', async ({
+    page,
+    context,
+  }) => {
+    await throughServiceWorker(page, '/');
+    await expect(page.getByText(/^Bygewerk om \d\d:\d\d$/)).toBeVisible();
+    // This build's shell, named after the build id in sw.js, and the status copy beside it.
+    const keys = (await page.evaluate(() => caches.keys())).sort();
+    expect(keys).toEqual([STATUS_CACHE, expect.stringMatching(`^${cacheName('')}`)].sort());
+    const buildId = keys.find((key) => key !== STATUS_CACHE)?.slice(cacheName('').length);
+    expect(readFileSync('dist/sw.js', 'utf8')).toContain(`\`${buildId}\``);
+
+    await context.setOffline(true);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'af');
+    await expect(page.getByRole('status')).toContainText('Geen onderbreking aangemeld nie');
+    await expect(page.getByRole('alert')).toHaveText(/^Geen verbinding · status soos om \d\d:\d\d$/);
+    await expect(page.getByText(/^Bygewerk om/)).toHaveCount(0); // never presented as current
+
+    await page.goto('/en/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('status')).toContainText('No outage reported');
+    await expect(page.getByRole('alert')).toHaveText(/^No connection · status as at \d\d:\d\d$/);
+
+    // A copy from another day says which day.
+    await page.evaluate(async (status) => {
+      const copy = (await caches.match('/api/status')) as Response;
+      const body = { ...(await copy.json()), generatedAt: new Date(Date.now() - 86_400_000).toISOString() };
+      await (await caches.open(status)).put('/api/status', new Response(JSON.stringify(body), copy));
+    }, STATUS_CACHE);
+    await page.reload();
+    await expect(page.getByRole('alert')).toHaveText(/^No connection · status as at \d\d:\d\d yesterday$/);
+
+    await context.setOffline(false);
+    await poll(page);
+    await expect(page.getByText(/^Updated \d\d:\d\d$/)).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('labels the copy while the network is slow or failing, and keeps a late reply', async ({ page, context }) => {
+    await throughServiceWorker(page, '/en/');
+    // context.route sees the worker's own requests, so this slows the network under it. The late
+    // reply is stamped, because the Worker's edge cache would repeat the last generatedAt.
+    const stamp = new Date(Date.now() - 60_000).toISOString();
+    await context.route('**/api/status', async (route) => {
+      const response = await route.fetch();
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      await route.fulfill({ response, json: { ...(await response.json()), generatedAt: stamp } });
+    });
+    await poll(page);
+    await expect(page.getByRole('alert')).toHaveText(/^No connection · status as at \d\d:\d\d$/, { timeout: 4_500 });
+    await expect.poll(() => cachedGeneratedAt(page), { timeout: 10_000 }).toBe(stamp); // kept for next time
+
+    await context.unroute('**/api/status');
+    await context.route('**/api/status', (route) => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
+    await poll(page);
+    await expect(page.getByRole('alert')).toHaveText(/^No connection · status as at \d\d:\d\d$/);
+
+    await context.unroute('**/api/status');
+    await poll(page);
+    await expect(page.getByText(/^Updated \d\d:\d\d$/)).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('never stores pages at runtime: offline is always this build’s own copy', async ({ page, context }) => {
+    await throughServiceWorker(page, '/en/');
+    // Another deploy's page, as a navigation might fetch mid-deploy. Without navigation preload,
+    // which context.route cannot see, the worker's own fetch brings it.
+    await page.evaluate(async () => (await navigator.serviceWorker.ready).navigationPreload.disable());
+    const enPage = (url: URL) => url.pathname === '/en/';
+    await context.route(enPage, async (route) => {
+      const response = await route.fetch();
+      const body = (await response.text()).replace('</head>', '<meta name="e2e-build" content="next" /></head>');
+      await route.fulfill({ response, body });
+    });
+    await page.reload();
+    await expect(page.locator('meta[name="e2e-build"]')).toHaveCount(1);
+
+    await context.unroute(enPage);
+    await context.setOffline(true);
+    await page.reload();
+    await expect(page.getByRole('status')).toContainText('No outage reported');
+    await expect(page.locator('meta[name="e2e-build"]')).toHaveCount(0);
+  });
+
+  test('keeps /admin, writes and the rest of the API out of the cache', async ({ page, context }) => {
+    await throughServiceWorker(page, '/');
+    await page.goto('/admin');
+    await expect(page.getByRole('button', { name: /Teken in|Sign in/ })).toBeVisible();
     await page.goto('/privacy');
-    const en = page.locator('#en');
-    await en.getByRole('button', { name: 'Show email address' }).click();
-    const mail = en.getByRole('link', { name: email });
-    await expect(mail).toHaveAttribute('href', `mailto:${email}`);
-    await expect(mail).toBeFocused();
-    await expect(en.getByRole('button', { name: 'Show email address' })).toHaveCount(0);
-    await expect(en.getByRole('link', { name: 'open an issue on GitHub' })).toBeVisible();
+    await page.goto('/');
+    await expect(page.getByRole('status')).toBeVisible();
+
+    const paths = await cachedPaths(page);
+    expect(paths).toEqual(expect.arrayContaining(['/', '/en/', '/privacy', '/api/status']));
+    const shell = new Set(['/', '/en/', '/privacy', '/api/status']);
+    expect(paths.filter((path) => !shell.has(path) && !path.startsWith('/assets/'))).toEqual([]);
+
+    // Writes and the admin API pass straight through; the status is answered by the worker.
+    const fetched = async (path: string, init?: { method: string }) => {
+      const [response] = await Promise.all([
+        page.waitForResponse((r) => new URL(r.url()).pathname === path),
+        page.evaluate(([p, i]) => fetch(p, i).then((r) => r.status), [path, init] as const),
+      ]);
+      return response.fromServiceWorker();
+    };
+    expect(await fetched('/api/admin/logout', { method: 'POST' })).toBe(false);
+    expect(await fetched('/api/admin/outages')).toBe(false);
+    expect(await fetched('/api/status')).toBe(true);
+
+    await context.setOffline(true);
+    await expect(page.goto('/admin')).rejects.toThrow();
+  });
+
+  test('a load through the worker has zero layout shift', async ({ page }) => {
+    await throughServiceWorker(page, '/en/');
+    await trackLayoutShift(page);
+    await page.reload();
+    expect(await readLayoutShift(page)).toBe(0);
   });
 });

@@ -1,5 +1,5 @@
 import { type Component, Show } from 'solid-js';
-import { DEFAULT_LOCALE, LOCALES, locale, setLocale, t } from '../lib/i18n';
+import { DEFAULT_LOCALE, LOCALES, locale, switchLocale, t } from '../lib/i18n';
 
 /**
  * Shows the next language's name (with two, simply the other one; with more, it cycles in
@@ -17,7 +17,7 @@ export const LanguageToggle: Component = () => {
         lang={next()}
         aria-label={t().lang.switchTo}
         title={t().lang.switchTo}
-        onClick={() => setLocale(next())}
+        onClick={() => switchLocale(next())}
       >
         {t().lang.next}
       </button>

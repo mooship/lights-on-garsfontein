@@ -22,12 +22,12 @@ describe('Content-Security-Policy', () => {
   });
 
   it('keeps the boot scripts static, so the source hash is the built one', () => {
-    // vite.config.ts fills %site.…% and %since.…% placeholders; the locale list reaches the
-    // script through <html data-locales> instead.
+    // vite.config.ts fills %site.…%, %since.…% and %page.…% placeholders; the page's language and
+    // the locale list reach the script through <html lang> and <html data-locales> instead.
     for (const html of [index, privacy]) {
-      for (const script of inlineScripts(html)) expect(script).not.toMatch(/%(?:site|since)\./);
+      for (const script of inlineScripts(html)) expect(script).not.toMatch(/%(?:site|since|page)\./);
     }
-    expect(index).toMatch(/<html lang="%site\.locales\.0%" data-locales="%site\.locales%">/);
+    expect(index).toMatch(/<html lang="%page\.lang%" data-locales="%site\.locales%">/);
   });
 
   it('only allows Turnstile and Cloudflare Web Analytics as third parties', () => {
