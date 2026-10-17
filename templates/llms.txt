@@ -17,7 +17,7 @@ Source code (MIT): %site.repo%
 
 ## Endpoints
 
-All public endpoints are free to use and allow any origin (CORS). They share a limit of 60 requests a minute per connection, with IPv6 addresses counted per /64. Please poll no more than once every 30 seconds.
+All public endpoints are free to use; the JSON API, the CSV and the feed allow any origin (CORS). They share a limit of 60 requests a minute per connection, with IPv6 addresses counted per /64. Please poll no more than once every 30 seconds.
 
 - [Status (JSON)](%site.url%/api/status): the status as last recorded at the measuring point
 - [Statistics (JSON)](%site.url%/api/stats): for the last 7, 30 and 365 days, hours without power, number of outages (and how many were planned), days with an outage, share of time with power, and the longest outage; the previous 30 days for comparison; and weekly totals. Only time since records began is counted.

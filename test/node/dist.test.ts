@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { localePath } from '../../shared/locale';
 import { site } from '../../site.config';
 
-// Checks on the output of `npm run build`, so it is skipped until dist/ exists (CI builds first).
+// Checks on the output of `npm run build`. Only in CI (which builds first) or with CHECK_DIST=1, so a
+// stale local dist/ cannot fail a push.
 const DIST = resolve(import.meta.dirname, '../../dist');
 const read = (file: string) => readFileSync(resolve(DIST, file), 'utf8');
 const exists = (file: string) => existsSync(resolve(DIST, file));
@@ -42,7 +43,7 @@ async function precached(): Promise<string[]> {
 const fileFor = (url: string) =>
   url.endsWith('/') ? `${url.slice(1)}index.html` : url.startsWith('/assets/') ? url.slice(1) : `${url.slice(1)}.html`;
 
-describe.skipIf(!exists('index.html'))('the built site', () => {
+describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () => {
   it('allows every inline script by a hash in _headers', () => {
     // The build's copy of public/_headers, so a build older than the source cannot fail this.
     const headers = read('_headers');
