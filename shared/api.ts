@@ -11,6 +11,10 @@ export type PowerStatus = 'ON' | 'OFF';
 export const OUTAGE_SOURCES = ['sensor', 'manual'] as const;
 export type OutageSource = (typeof OUTAGE_SOURCES)[number];
 
+/** Who marked an outage as a false positive: the sensor, reporting it had power throughout, or the admin. */
+export const DISMISSED_BY = ['sensor', 'admin'] as const;
+export type DismissedBy = (typeof DISMISSED_BY)[number];
+
 /** All times in the public API are ISO 8601 in UTC; clients convert to the local zone. */
 export interface OutageSummary {
   /** Stable for the life of the record; also the CSV `id` and the feed entry's `#outage-<id>`. */
@@ -26,6 +30,8 @@ export interface AdminOutage extends OutageSummary {
   source: OutageSource;
   /** Dismissed by an admin: left out of every public view, the status, statistics, CSV and feed. */
   isFalsePositive: boolean;
+  /** Who marked it as a false positive; null when it is not one, or when that was not recorded. */
+  dismissedBy: DismissedBy | null;
 }
 
 export interface StatusResponse {

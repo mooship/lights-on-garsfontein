@@ -45,6 +45,8 @@ export const admin = {
   source: { sensor: 'sensor', manual: 'manual' },
   plannedTag: ' · planned',
   falsePositiveTag: ' · false positive',
+  // The sensor reconnected and reported it had power throughout: a lost connection, not an outage.
+  dismissedBySensorTag: ' · false positive (the sensor had power throughout)',
   closeNow: 'Close now',
   falsePositive: 'False positive',
   planned: 'Planned',

@@ -64,6 +64,13 @@
       "when": 1792326875364,
       "tag": "0008_real_phantom_reporter",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792346540441,
+      "tag": "0009_loose_human_torch",
+      "breakpoints": true
     }
   ]
 }

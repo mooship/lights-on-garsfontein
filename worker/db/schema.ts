@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { OUTAGE_SOURCES } from '../../shared/api';
+import { DISMISSED_BY, OUTAGE_SOURCES } from '../../shared/api';
 
 /**
  * The sensor's last report. One row (id 1), so one sensor per instance: a second sensor needs its
@@ -26,6 +26,8 @@ export const outages = sqliteTable(
     source: text('source', { enum: OUTAGE_SOURCES }).notNull(),
     isFalsePositive: integer('is_false_positive', { mode: 'boolean' }).notNull().default(sql`0`),
     isPlanned: integer('is_planned', { mode: 'boolean' }).notNull().default(sql`0`),
+    /** Set with isFalsePositive; null when not one, or for one dismissed before this was recorded. */
+    dismissedBy: text('dismissed_by', { enum: DISMISSED_BY }),
   },
   (table) => [
     // "Newest first" queries (status, admin list) read only the rows they return.

@@ -155,6 +155,7 @@ export async function recordHeartbeat(
       source: sql<OutageSource>`'sensor'`.as('source'),
       isFalsePositive: sql<boolean>`0`.as('is_false_positive'),
       isPlanned: sql<boolean>`0`.as('is_planned'),
+      dismissedBy: sql<null>`null`.as('dismissed_by'),
     })
     .from(heartbeats)
     .where(
@@ -168,7 +169,7 @@ export async function recordHeartbeat(
   // Before the close below, which would otherwise end these as real outages.
   const dismissed = db
     .update(outages)
-    .set({ endTime: iso, isFalsePositive: true })
+    .set({ endTime: iso, isFalsePositive: true, dismissedBy: 'sensor' })
     .where(and(anyOpen, eq(outages.source, 'sensor'), gte(outages.startTime, poweredSince)))
     .returning({ id: outages.id });
   // A manual outage logged while the sensor had power is still the admin's record: it ends now.

@@ -138,7 +138,11 @@ const OutageRow: Component<{
         <div class={css.itemMeta}>
           {formatDuration(outageDurationMs(props.outage, props.now))} · {admin.source[props.outage.source]}
           {props.outage.planned ? admin.plannedTag : ''}
-          {props.outage.isFalsePositive ? admin.falsePositiveTag : ''}
+          {props.outage.dismissedBy === 'sensor'
+            ? admin.dismissedBySensorTag
+            : props.outage.isFalsePositive
+              ? admin.falsePositiveTag
+              : ''}
         </div>
       </div>
       <div class={css.actions}>
