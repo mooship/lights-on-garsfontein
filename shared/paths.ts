@@ -18,6 +18,7 @@ export const SITEMAP_PATH = '/sitemap.xml';
 export const ROBOTS_PATH = '/robots.txt';
 export const OG_IMAGE_PATH = '/og.png';
 
+/** The boot script in index.html repeats this as a literal (it must stay static); change both together. */
 export const ADMIN_PAGE_PATH = '/admin';
 export const PRIVACY_PAGE_PATH = '/privacy';
 

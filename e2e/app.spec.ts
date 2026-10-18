@@ -17,6 +17,7 @@ import {
   STATUS_PATH,
 } from '../shared/paths';
 import { type Locale, site } from '../site.config';
+import { admin } from '../src/admin/copy';
 import { BANNERS } from '../src/banners';
 import { DICTIONARIES } from '../src/i18n';
 import { af } from '../src/i18n/af';
@@ -56,13 +57,13 @@ let sessionCookies: Cookie[] = [];
 async function login(page: Page) {
   if (sessionCookies.length) await page.context().addCookies(sessionCookies);
   await page.goto(ADMIN_PAGE_PATH);
-  const dashboard = page.getByRole('heading', { name: en.admin.punchClock });
-  const password = page.getByLabel(en.admin.password);
+  const dashboard = page.getByRole('heading', { name: admin.punchClock });
+  const password = page.getByLabel(admin.password);
   await expect(dashboard.or(password)).toBeVisible();
   if (await dashboard.isVisible()) return; // session cookie still valid
-  await page.getByLabel(en.admin.username).fill(ADMIN_USERNAME);
+  await page.getByLabel(admin.username).fill(ADMIN_USERNAME);
   await password.fill(ADMIN_PASSWORD);
-  await page.getByRole('button', { name: en.admin.signIn }).click();
+  await page.getByRole('button', { name: admin.signIn }).click();
   await expect(dashboard).toBeVisible();
   sessionCookies = (await page.context().cookies()).filter((c) => c.name === SESSION_COOKIE);
 }
@@ -174,6 +175,29 @@ test.describe('language', () => {
       await expect(page.locator('html')).toHaveAttribute('lang', 'en');
       await expect(page.getByRole('status')).toContainText(en.status.NONE);
       expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEYS.locale)).toBe('en');
+    });
+
+    test('/admin is in English, without a switch, and leaves the stored choice alone', async ({ page }) => {
+      await page.goto(ADMIN_PAGE_PATH);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+      await expect(page.getByRole('heading', { name: admin.signInTitle })).toBeVisible();
+      await expect(page.getByRole('button', { name: admin.signIn })).toBeVisible();
+      await expect(page.getByRole('link', { name: en.footer.privacy })).toBeVisible();
+      await expect(page.locator('.gg-lang-button')).toHaveCount(0);
+      await login(page);
+      await expect(page.getByRole('heading', { name: admin.punchClock })).toBeVisible();
+
+      await page.goto('/');
+      await expect(page.locator('html')).toHaveAttribute('lang', 'af');
+      await expect(page.getByRole('status')).toContainText(af.status.NONE);
+      expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEYS.locale)).toBe('af');
+    });
+
+    test('/admin shows the English loading shell before the app loads', async ({ page }) => {
+      await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
+      await page.goto(ADMIN_PAGE_PATH);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+      await expectShellIn(page, 'en');
     });
   });
 
@@ -335,7 +359,7 @@ test.describe('public page', () => {
     ['/', (page) => page.getByRole('status')],
     ['/en/', (page) => page.getByRole('status')],
     [PRIVACY_PAGE_PATH, (page) => page.getByRole('heading', { level: 1 }).first()],
-    [ADMIN_PAGE_PATH, (page) => page.getByLabel(en.admin.password)],
+    [ADMIN_PAGE_PATH, (page) => page.getByLabel(admin.password)],
   ];
   for (const [path, loaded] of PAGES) {
     test(`${path} loads without CSP violations or console errors`, async ({ page }) => {
@@ -389,10 +413,10 @@ test.describe('admin', () => {
 
   test('rejects a wrong password', async ({ page }) => {
     await page.goto(ADMIN_PAGE_PATH);
-    await page.getByLabel(en.admin.username).fill(ADMIN_USERNAME);
-    await page.getByLabel(en.admin.password).fill('not-the-password');
-    await page.getByRole('button', { name: en.admin.signIn }).click();
-    await expect(page.getByRole('alert')).toHaveText(en.admin.errors.unauthorized);
+    await page.getByLabel(admin.username).fill(ADMIN_USERNAME);
+    await page.getByLabel(admin.password).fill('not-the-password');
+    await page.getByRole('button', { name: admin.signIn }).click();
+    await expect(page.getByRole('alert')).toHaveText(admin.errors.unauthorized);
   });
 
   test('sets an HttpOnly, Strict session cookie', async ({ page, context }) => {
@@ -403,11 +427,11 @@ test.describe('admin', () => {
 
   test('punch clock drives the public status', async ({ page }) => {
     await login(page);
-    await expect(page.getByRole('button', { name: en.admin.punchIn })).toHaveCount(0); // only the action that applies
-    await page.getByRole('button', { name: en.admin.punchOut }).click();
+    await expect(page.getByRole('button', { name: admin.punchIn })).toHaveCount(0); // only the action that applies
+    await page.getByRole('button', { name: admin.punchOut }).click();
     await expect(page.getByTestId('punch-clock')).not.toHaveText('00:00:00');
-    await expect(page.getByRole('status').filter({ hasText: withTime(en.admin.punchedOut(AT)) })).toBeVisible();
-    await expect(page.getByRole('button', { name: en.admin.punchOut })).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: withTime(admin.punchedOut(AT)) })).toBeVisible();
+    await expect(page.getByRole('button', { name: admin.punchOut })).toHaveCount(0);
 
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText(en.status.OFF);
@@ -419,9 +443,9 @@ test.describe('admin', () => {
     await page.getByRole('button', { name: af.lang.switchTo }).click();
 
     await login(page);
-    await page.getByRole('button', { name: en.admin.punchIn }).click();
+    await page.getByRole('button', { name: admin.punchIn }).click();
     await expect(page.getByTestId('punch-clock')).toHaveText('00:00:00');
-    await expect(page.getByRole('status').filter({ hasText: withTime(en.admin.punchedIn(AT)) })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: withTime(admin.punchedIn(AT)) })).toBeVisible();
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
     await expect(page).toHaveTitle(NEUTRAL_TITLE);
@@ -429,10 +453,10 @@ test.describe('admin', () => {
 
   test('logs a past outage', async ({ page }) => {
     await login(page);
-    await page.getByLabel(en.admin.started).fill('2026-10-01T18:00');
-    await page.getByLabel(en.admin.ended).fill('2026-10-01T20:30');
-    await page.getByRole('button', { name: en.admin.log }).click();
-    await expect(page.getByText(`2 ${en.units.h} 30 ${en.units.min} · ${en.admin.source.manual}`)).toBeVisible();
+    await page.getByLabel(admin.started).fill('2026-10-01T18:00');
+    await page.getByLabel(admin.ended).fill('2026-10-01T20:30');
+    await page.getByRole('button', { name: admin.log }).click();
+    await expect(page.getByText(`2 ${en.units.h} 30 ${en.units.min} · ${admin.source.manual}`)).toBeVisible();
   });
 });
 
@@ -502,8 +526,8 @@ test.describe('privacy contact', () => {
 test.describe('admin session', () => {
   test('sign out ends the session', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: en.admin.signOut }).click();
-    await expect(page.getByLabel(en.admin.password)).toBeVisible();
+    await page.getByRole('button', { name: admin.signOut }).click();
+    await expect(page.getByLabel(admin.password)).toBeVisible();
   });
 });
 
@@ -747,7 +771,7 @@ test.describe('offline', () => {
   test('keeps /admin, writes and the rest of the API out of the cache', async ({ page, context }) => {
     await throughServiceWorker(page, '/');
     await page.goto(ADMIN_PAGE_PATH);
-    await expect(page.getByRole('button', { name: af.admin.signIn })).toBeVisible();
+    await expect(page.getByRole('button', { name: admin.signIn })).toBeVisible();
     await page.goto(PRIVACY_PAGE_PATH);
     await page.goto('/');
     await expect(page.getByRole('status')).toBeVisible();

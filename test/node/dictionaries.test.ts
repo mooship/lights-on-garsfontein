@@ -6,7 +6,7 @@ import { HEAD } from '../../src/i18n/head';
 import { DICTIONARIES } from '../../src/i18n/index';
 
 // Public copy never says how an outage was recorded: residents should not weigh a reading by its
-// source. Only the admin pages name the source.
+// source. Only the admin page names it, and its copy is outside the dictionaries (src/admin/copy.ts).
 const RECORDING_METHOD = /sensor|by hand|manual|voeler|handmatig|met die hand/i;
 
 /** Every string in `node`, with message functions called on sample arguments, keyed by path. */
@@ -21,8 +21,7 @@ function strings(node: unknown, path: string): [string, string][] {
 describe('public copy', () => {
   for (const locale of site.locales) {
     it(`never says how an outage was recorded (${locale})`, () => {
-      const { admin: _admin, ...publicCopy } = DICTIONARIES[locale];
-      const all = [...strings(publicCopy, locale), ...strings(HEAD[locale], `head.${locale}`)];
+      const all = [...strings(DICTIONARIES[locale], locale), ...strings(HEAD[locale], `head.${locale}`)];
       expect(all.length).toBeGreaterThan(100);
       expect(all.filter(([, text]) => RECORDING_METHOD.test(text))).toEqual([]);
     });

@@ -35,18 +35,20 @@ export interface InitialData {
 
 const clockTime = (ms: number) => formatTime(new Date(ms).toISOString());
 
-/** The disclaimer is for the public page; the admin view doesn't need it. */
-const Masthead: Component<{ notice: boolean }> = (props) => (
+/** The disclaimer and the language switch are for the public page; the admin page is always in English. */
+const Masthead: Component<{ isPublic: boolean }> = (props) => (
   <>
     <header class="gg-masthead">
       <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
       <div class="gg-masthead-actions">
-        <LanguageToggle />
+        <Show when={props.isPublic}>
+          <LanguageToggle />
+        </Show>
         <ThemeToggle />
       </div>
       <h1 class="gg-title">{site.brand.full}</h1>
     </header>
-    <Show when={props.notice}>
+    <Show when={props.isPublic}>
       <p class="gg-notice">{t().masthead.notice}</p>
     </Show>
   </>
@@ -219,7 +221,7 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
 
   return (
     <div class="gg-shell">
-      <Masthead notice={!!props.initial} />
+      <Masthead isPublic={!!props.initial} />
       {/* tabindex lets the banner hand focus here once it closes. */}
       <main class="gg-main" tabindex="-1">
         <Show

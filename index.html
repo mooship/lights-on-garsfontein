@@ -1,24 +1,30 @@
 <!doctype html>
 <!-- The values in percent signs come from site.config.ts (siteConfig in vite.config.ts); the
      %page.…% ones differ per language page and come from src/i18n/head.ts (localePages). Keep them
-     out of the inline script: its CSP hash is in public/_headers. -->
+     out of the inline script: its CSP hash is in public/_headers. The script spells out
+     ADMIN_PAGE_PATH (shared/paths.ts) and the admin page's language (src/admin/copy.ts) as literals;
+     change them together. -->
 <html lang="%page.lang%" data-locales="%site.locales%">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <script>
       (function() {
+        var h = document.documentElement;
+        // The admin page is always in English and never touches the stored choice; set before
+        // anything that reads storage, which can throw.
+        var admin = /^\/admin\/?$/.test(location.pathname);
+        if (admin) h.lang = 'en';
         try {
-          var h = document.documentElement;
           var s = localStorage.getItem('theme');
           var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
           h.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
           // Language pages (shared/locale.ts) carry their own lang and the URL wins there; / forwards
-          // a visitor who chose another language before anything renders. /admin shows the stored choice.
+          // a visitor who chose another language before anything renders. Other pages show the stored choice.
           var all = h.getAttribute('data-locales').split(' ');
           var l = localStorage.getItem('locale');
           var home = function(c) { return c === all[0] ? '/' : '/' + c + '/'; };
-          if (!l || all.indexOf(l) < 0) return;
+          if (admin || !l || all.indexOf(l) < 0) return;
           if (location.pathname !== home(h.lang)) h.lang = l;
           else if (h.lang === all[0] && l !== all[0]) {
             h.lang = l;

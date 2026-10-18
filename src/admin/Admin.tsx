@@ -12,7 +12,6 @@ import {
 } from '../../shared/api';
 import { ERROR } from '../../shared/errors';
 import { PunchClock } from '../components/PunchClock';
-import type { AdminErrorCode } from '../i18n/af';
 import { ApiError, api } from '../lib/api';
 import { formatDay, formatDuration, formatTime, fromLocalInput, toLocalInput } from '../lib/format';
 import { t } from '../lib/i18n';
@@ -20,17 +19,17 @@ import { useMinute, useNow } from '../lib/now';
 import { getTurnstileToken, loadTurnstile } from '../lib/turnstile';
 import { button, errorText, input, label, plainList } from '../styles/ui.css';
 import * as css from './Admin.css';
+import { type AdminErrorCode, admin } from './copy';
 
 const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401;
 
 /** The message for an ApiError or an error code; anything else is a network failure. */
 function describeError(error: unknown): string {
   const code = error instanceof ApiError ? error.code : typeof error === 'string' ? error : null;
-  if (code === null) return t().admin.network;
-  return (t().admin.errors as Record<string, string | undefined>)[code] ?? t().admin.requestFailed(code);
+  if (code === null) return admin.network;
+  return (admin.errors as Record<string, string | undefined>)[code] ?? admin.requestFailed(code);
 }
 
-/** Forms keep the raw error and it is described here, so the message follows a language switch. */
 const FormError: Component<{ error: unknown }> = (props) => (
   <Show when={props.error !== undefined}>
     <p class={errorText} role="alert">
@@ -84,12 +83,12 @@ const LoginForm: Component<{ notice?: AdminErrorCode; focus: boolean; onLoggedIn
   return (
     <section class="gg-card">
       <h2 ref={heading} class="gg-card-title" tabindex="-1">
-        {t().admin.signInTitle}
+        {admin.signInTitle}
       </h2>
       {/* Named form, ids and autocomplete hints so password managers recognise and fill it. */}
       <form class={css.stack} onSubmit={submit} id="admin-sign-in" name="admin-sign-in">
         <label class={label}>
-          {t().admin.username}
+          {admin.username}
           <input
             class={input}
             type="text"
@@ -102,13 +101,13 @@ const LoginForm: Component<{ notice?: AdminErrorCode; focus: boolean; onLoggedIn
           />
         </label>
         <label class={label}>
-          {t().admin.password}
+          {admin.password}
           <input class={input} type="password" id="password" name="password" autocomplete="current-password" required />
         </label>
         <div ref={widget} />
         <FormError error={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
-          {busy() ? t().admin.checking : t().admin.signIn}
+          {busy() ? admin.checking : admin.signIn}
         </button>
       </form>
     </section>
@@ -134,12 +133,12 @@ const OutageRow: Component<{
       <div classList={{ [css.flagged]: props.outage.isFalsePositive }}>
         <strong id={titleId()}>
           {formatDay(props.outage.startTime)}, {formatTime(props.outage.startTime)} –{' '}
-          {props.outage.endTime ? formatTime(props.outage.endTime) : t().admin.ongoing}
+          {props.outage.endTime ? formatTime(props.outage.endTime) : admin.ongoing}
         </strong>
         <div class={css.itemMeta}>
-          {formatDuration(outageDurationMs(props.outage, props.now))} · {t().admin.source[props.outage.source]}
-          {props.outage.planned ? t().admin.plannedTag : ''}
-          {props.outage.isFalsePositive ? t().admin.falsePositiveTag : ''}
+          {formatDuration(outageDurationMs(props.outage, props.now))} · {admin.source[props.outage.source]}
+          {props.outage.planned ? admin.plannedTag : ''}
+          {props.outage.isFalsePositive ? admin.falsePositiveTag : ''}
         </div>
       </div>
       <div class={css.actions}>
@@ -151,7 +150,7 @@ const OutageRow: Component<{
             disabled={busy()}
             onClick={() => run(() => api.updateOutage(props.outage.id, { endTime: new Date().toISOString() }))}
           >
-            {t().admin.closeNow}
+            {admin.closeNow}
           </button>
         </Show>
         <button
@@ -164,7 +163,7 @@ const OutageRow: Component<{
             run(() => api.updateOutage(props.outage.id, { isFalsePositive: !props.outage.isFalsePositive }))
           }
         >
-          {t().admin.falsePositive}
+          {admin.falsePositive}
         </button>
         <button
           type="button"
@@ -174,16 +173,16 @@ const OutageRow: Component<{
           disabled={busy()}
           onClick={() => run(() => api.updateOutage(props.outage.id, { isPlanned: !props.outage.planned }))}
         >
-          {t().admin.planned}
+          {admin.planned}
         </button>
         <button
           type="button"
           class={button.ghost}
           aria-describedby={titleId()}
           disabled={busy()}
-          onClick={() => confirm(t().admin.deleteConfirm) && run(() => api.deleteOutage(props.outage.id))}
+          onClick={() => confirm(admin.deleteConfirm) && run(() => api.deleteOutage(props.outage.id))}
         >
-          {t().admin.delete}
+          {admin.delete}
         </button>
       </div>
       <FormError error={error()} />
@@ -213,11 +212,11 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
 
   return (
     <section class="gg-card">
-      <h2 class="gg-card-title">{t().admin.logTitle}</h2>
+      <h2 class="gg-card-title">{admin.logTitle}</h2>
       <form class={css.stack} onSubmit={submit}>
         <div class={css.formRow}>
           <label class={label}>
-            {t().admin.started}
+            {admin.started}
             <input
               class={input}
               type="datetime-local"
@@ -227,19 +226,19 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
             />
           </label>
           <label class={label}>
-            {t().admin.ended}
+            {admin.ended}
             <input class={input} type="datetime-local" name="end" />
           </label>
         </div>
         <label class={css.checkbox}>
-          <input type="checkbox" name="planned" /> {t().admin.plannedHint}
+          <input type="checkbox" name="planned" /> {admin.plannedHint}
         </label>
         <FormError error={error()} />
         <button type="submit" class={button.primary} disabled={busy()}>
-          <Plus size={18} aria-hidden="true" /> {busy() ? t().admin.saving : t().admin.log}
+          <Plus size={18} aria-hidden="true" /> {busy() ? admin.saving : admin.log}
         </button>
         <p class={css.saved} role="status">
-          {saved() ? t().admin.logged : ''}
+          {saved() ? admin.logged : ''}
         </p>
       </form>
     </section>
@@ -266,7 +265,6 @@ const Dashboard: Component<{
       setLoading(false);
     }
   };
-  // The last punch and its time, announced; kept as data so it follows a language switch.
   const [punched, setPunched] = createSignal<{ action: TimerAction; at: string } | null>(null);
   const open = () => outages().outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
   const onError: OnError = (e, show) => (isUnauthorized(e) ? props.onLoggedOut('session_expired') : show(e));
@@ -291,10 +289,10 @@ const Dashboard: Component<{
       <section class="gg-card">
         <div class={css.header}>
           <h2 ref={heading} class="gg-card-title" tabindex="-1">
-            {t().admin.punchClock}
+            {admin.punchClock}
           </h2>
           <button type="button" class={button.ghost} onClick={logout}>
-            <LogOut size={16} aria-hidden="true" /> {t().admin.signOut}
+            <LogOut size={16} aria-hidden="true" /> {admin.signOut}
           </button>
         </div>
         <PunchClock
@@ -310,7 +308,7 @@ const Dashboard: Component<{
             const p = punched();
             if (!p) return '';
             const time = formatTime(p.at);
-            return p.action === TIMER_ACTION.punchOut ? t().admin.punchedOut(time) : t().admin.punchedIn(time);
+            return p.action === TIMER_ACTION.punchOut ? admin.punchedOut(time) : admin.punchedIn(time);
           })()}
         </p>
       </section>
@@ -318,8 +316,8 @@ const Dashboard: Component<{
       <LogOutageForm onLogged={refetch} onError={onError} />
 
       <section class="gg-card">
-        <h2 class="gg-card-title">{t().admin.outages}</h2>
-        <Show when={outages().outages.length > 0} fallback={<p>{t().admin.noOutages}</p>}>
+        <h2 class="gg-card-title">{admin.outages}</h2>
+        <Show when={outages().outages.length > 0} fallback={<p>{admin.noOutages}</p>}>
           <ul class={plainList}>
             <For each={outages().outages}>
               {(o) => <OutageRow outage={o} now={minute()} onChange={refetch} onError={onError} />}
@@ -354,7 +352,7 @@ const Admin: Component = () => {
   return (
     <>
       <a class={css.backLink} href="/">
-        <ArrowLeft size={16} aria-hidden="true" /> {t().admin.back}
+        <ArrowLeft size={16} aria-hidden="true" /> {admin.back}
       </a>
       <Switch
         fallback={
@@ -366,10 +364,10 @@ const Admin: Component = () => {
         <Match when={session.error}>
           <section class={`gg-card ${css.stack}`}>
             <p class={errorText} role="alert">
-              {t().admin.unreachable}
+              {admin.unreachable}
             </p>
             <button type="button" class={button.ghost} disabled={session.loading} onClick={() => refetch()}>
-              {t().admin.retry}
+              {admin.retry}
             </button>
           </section>
         </Match>

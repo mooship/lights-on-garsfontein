@@ -1,6 +1,6 @@
 /**
- * The `error` field of every API error response. A new code needs a message in `admin.errors` in
- * both dictionaries, or a place in `Unexplained` (src/i18n/af.ts) if the admin page never meets it.
+ * The `error` field of every API error response. A new code needs a message in `admin.errors`
+ * (src/admin/copy.ts), or a place in `Unexplained` there if the admin page never meets it.
  */
 export const ERROR = {
   badRequest: 'bad_request',

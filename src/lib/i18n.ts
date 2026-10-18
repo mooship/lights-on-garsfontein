@@ -9,7 +9,8 @@ export type { Locale };
 const isLocale = (value: string | null): value is Locale => LOCALES.includes(value as Locale);
 
 // The boot script in index.html has already chosen: the page's own language on a language page,
-// the stored choice elsewhere (/admin). The browser language is not consulted.
+// English on /admin (src/admin/copy.ts), the stored choice elsewhere, without storing anything.
+// The browser language is not consulted.
 const lang = document.documentElement.lang;
 const initial = isLocale(lang) ? lang : DEFAULT_LOCALE;
 const [locale, setLocaleSignal] = createSignal<Locale>(initial);
@@ -35,7 +36,7 @@ function setLocale(next: Locale): void {
 
 /**
  * The language switch. On a language's page the URL moves to the other page too, in place: the
- * shell already holds every language, so there is nothing to reload. Elsewhere (/admin) only the
+ * shell already holds every language, so there is nothing to reload. Elsewhere only the
  * language changes.
  */
 export function switchLocale(next: Locale): void {

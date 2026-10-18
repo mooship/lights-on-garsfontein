@@ -202,7 +202,7 @@ function serviceWorker(): Plugin {
 /**
  * Fills the index.html loading shell from the dictionaries, once per locale in site.locales
  * (fillStaticI18n in build/html.ts); base.css shows the one matching <html lang>: the page's own
- * (localePages), or on /admin the stored one (the boot script).
+ * (localePages), or on /admin English (the boot script).
  */
 function staticI18n(): Plugin {
   return { name: 'static-i18n', transformIndexHtml: { order: 'pre', handler: fillStaticI18n } };

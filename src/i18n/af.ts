@@ -1,21 +1,6 @@
 // Afrikaans is the default and the source of truth: en.ts must match this shape.
 // Public copy never says how an outage was recorded (no "sensor" or "met die hand").
 
-import type { ERROR, ErrorCode } from '../../shared/errors.ts';
-
-/**
- * API error codes without a message of their own, shown as `requestFailed(code)`: refusals the
- * app's own requests never trigger, the contact form's code, and server faults.
- */
-type Unexplained =
-  | typeof ERROR.forbidden
-  | typeof ERROR.unsupportedMediaType
-  | typeof ERROR.notConfigured
-  | typeof ERROR.internal;
-
-/** Every other API error code, and the admin page's own `session_expired`, needs a message. */
-export type AdminErrorCode = Exclude<ErrorCode, Unexplained> | 'session_expired';
-
 export const af = {
   // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
   lang: { switchTo: 'Switch to English', next: 'English' },
@@ -135,57 +120,6 @@ export const af = {
       '’n Dag tel as daar op enige tydstip daardie dag ’n onderbreking was.',
       'Die syfers dek net onderbrekings wat by die meetpunt aangeteken is.',
     ],
-  },
-  admin: {
-    back: 'Openbare bladsy',
-    unreachable: 'Kan nie die bediener bereik nie.',
-    retry: 'Probeer weer',
-    errors: {
-      unauthorized: 'Verkeerde gebruikersnaam of wagwoord.',
-      rate_limited: 'Te veel pogings. Wag asseblief ’n minuut en probeer weer.',
-      turnstile_failed: 'Die sekuriteitskontrole het misluk. Probeer asseblief weer.',
-      outage_already_open: 'Daar is reeds ’n onderbreking oop.',
-      no_open_outage: 'Daar is geen oop onderbreking om toe te maak nie.',
-      end_before_start: 'Die einde moet ná die begin wees.',
-      invalid_json: 'Die versoek kon nie gelees word nie. Herlaai die bladsy en probeer weer.',
-      bad_request: 'Kyk na die tye en probeer weer. Tye kan nie in die toekoms wees nie.',
-      not_found: 'Daardie onderbreking bestaan nie meer nie. Herlaai die bladsy.',
-      session_expired: 'Jou sessie het verval. Teken asseblief weer in.',
-    } satisfies Record<AdminErrorCode, string>,
-    requestFailed: (code: string) => `Die versoek het misluk (${code}).`,
-    network: 'Netwerkfout.',
-    signInTitle: 'Teken in as administrateur',
-    username: 'Gebruikersnaam',
-    password: 'Wagwoord',
-    checking: 'Kontroleer tans…',
-    signIn: 'Teken in',
-    signOut: 'Teken uit',
-    ongoing: 'aan die gang',
-    source: { sensor: 'sensor', manual: 'handmatig' },
-    plannedTag: ' · beplan',
-    falsePositiveTag: ' · vals alarm',
-    closeNow: 'Maak nou toe',
-    falsePositive: 'Vals alarm',
-    planned: 'Beplan',
-    delete: 'Skrap',
-    deleteConfirm: 'Skrap hierdie onderbreking?',
-    logged: 'Onderbreking aangeteken.',
-    logTitle: 'Teken ’n vorige onderbreking aan',
-    started: 'Begin',
-    ended: 'Einde',
-    plannedHint: 'Beplan (vooraf aangekondig, bv. onderhoud of opgraderings)',
-    saving: 'Stoor tans…',
-    log: 'Teken onderbreking aan',
-    punchClock: 'Prikklok',
-    outages: 'Onderbrekings',
-    noOutages: 'Geen onderbrekings aangeteken nie.',
-    duration: 'Duur van die onderbreking',
-    offSince: (day: string, time: string, source: string) => `Af sedert ${day}, ${time} (${source})`,
-    idle: 'Geen onderbreking aan die gang nie.',
-    punchOut: 'Klok uit',
-    punchIn: 'Klok in',
-    punchedOut: (time: string) => `Uitgeklok om ${time}`,
-    punchedIn: (time: string) => `Ingeklok om ${time}`,
   },
 };
 

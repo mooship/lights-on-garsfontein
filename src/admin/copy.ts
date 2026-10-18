@@ -1,0 +1,70 @@
+// The admin page is always in English, whatever language the visitor chose for the public page:
+// the boot script in index.html sets <html lang="en"> on ADMIN_PAGE_PATH (shared/paths.ts), so the
+// shared masthead and footer follow. Unlike public copy, it names how an outage was recorded.
+
+import type { ERROR, ErrorCode } from '../../shared/errors.ts';
+
+/**
+ * API error codes without a message of their own, shown as `requestFailed(code)`: refusals the
+ * app's own requests never trigger, the contact form's code, and server faults.
+ */
+type Unexplained =
+  | typeof ERROR.forbidden
+  | typeof ERROR.unsupportedMediaType
+  | typeof ERROR.notConfigured
+  | typeof ERROR.internal;
+
+/** Every other API error code, and the admin page's own `session_expired`, needs a message. */
+export type AdminErrorCode = Exclude<ErrorCode, Unexplained> | 'session_expired';
+
+export const admin = {
+  back: 'Public page',
+  unreachable: 'Unable to reach the server.',
+  retry: 'Try again',
+  errors: {
+    unauthorized: 'Incorrect username or password.',
+    rate_limited: 'Too many attempts. Please wait a minute and try again.',
+    turnstile_failed: 'The security check failed. Please try again.',
+    outage_already_open: 'An outage is already open.',
+    no_open_outage: 'There is no open outage to close.',
+    end_before_start: 'The end must be after the start.',
+    invalid_json: 'The request could not be read. Reload the page and try again.',
+    bad_request: 'Check the times and try again. Times cannot be in the future.',
+    not_found: 'That outage no longer exists. Reload the page.',
+    session_expired: 'Your session has expired. Please sign in again.',
+  } satisfies Record<AdminErrorCode, string>,
+  requestFailed: (code: string) => `Request failed (${code}).`,
+  network: 'Network error.',
+  signInTitle: 'Admin sign in',
+  username: 'Username',
+  password: 'Password',
+  checking: 'Checking…',
+  signIn: 'Sign in',
+  signOut: 'Sign out',
+  ongoing: 'ongoing',
+  source: { sensor: 'sensor', manual: 'manual' },
+  plannedTag: ' · planned',
+  falsePositiveTag: ' · false positive',
+  closeNow: 'Close now',
+  falsePositive: 'False positive',
+  planned: 'Planned',
+  delete: 'Delete',
+  deleteConfirm: 'Delete this outage?',
+  logged: 'Outage logged.',
+  logTitle: 'Log a past outage',
+  started: 'Started',
+  ended: 'Ended',
+  plannedHint: 'Planned (announced in advance, e.g. maintenance or upgrades)',
+  saving: 'Saving…',
+  log: 'Log outage',
+  punchClock: 'Punch clock',
+  outages: 'Outages',
+  noOutages: 'No outages recorded.',
+  duration: 'Outage duration',
+  offSince: (day: string, time: string, source: string) => `Off since ${day}, ${time} (${source})`,
+  idle: 'No outage in progress.',
+  punchOut: 'Punch out',
+  punchIn: 'Punch in',
+  punchedOut: (time: string) => `Punched out at ${time}`,
+  punchedIn: (time: string) => `Punched in at ${time}`,
+};
