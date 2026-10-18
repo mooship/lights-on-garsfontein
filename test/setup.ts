@@ -13,7 +13,7 @@ declare global {
 
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 
-const TABLES = ['outage_confirmations', 'outages', 'heartbeats', 'sessions', 'still_off_reports'];
+const TABLES = ['outages', 'heartbeats', 'sessions'];
 
 // The Cache API outlives a test, so it is emptied like the tables.
 beforeEach(async () => {

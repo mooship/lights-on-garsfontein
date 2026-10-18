@@ -50,6 +50,13 @@
       "when": 1792255547411,
       "tag": "0006_still_off_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792302978683,
+      "tag": "0007_drop_resident_reports",
+      "breakpoints": true
     }
   ]
 }

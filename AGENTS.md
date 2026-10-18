@@ -71,7 +71,7 @@ To add an endpoint or a language, follow "Adding an endpoint" and "Adding a lang
 - **Wrangler bindings.** A new var, binding or rate limit goes in the top level of `wrangler.toml` and in `[env.e2e]` (bindings are not inherited), and in `wrangler.example.toml`, with a `namespace_id` unique in the account. A new secret goes in `.dev.vars.example`, keeping its order. Then run `npm run cf-typegen`. `[env.e2e]` is for the test suite only: never deploy it.
 - **Edge cache.** A write that changes an edge-cached view declares `purges` (usually `OUTAGE_VIEWS` from `shared/paths.ts`). A new `edgeCache` route joins `EDGE_CACHED` in `test/helpers.ts`.
 - **Service worker safety.** It never writes pages or assets at runtime, never caches admin, POSTs, Turnstile, the CSV or the feed, and must never show a cached status without the dated "No connection" label. A kill switch is in `scripts/sw-kill-switch.js`.
-- **Privacy.** Store no raw IP addresses; fingerprints are salted hashes that are blanked on schedule. Never publish the measuring home's address: public copy names only `site.landmark`. Keep `privacy.html` (both languages) accurate whenever data handling changes.
+- **Privacy.** Store no IP addresses or other data that identifies a visitor; rate limiting happens in Cloudflare, not in D1. Never publish the measuring home's address: public copy names only `site.landmark`. Keep `privacy.html` (both languages) accurate whenever data handling changes.
 - **Secrets** live in Wrangler secrets or `.dev.vars` (git-ignored), never in the repo. Never open, print or paste `.env`, `.dev.vars` or secret values; only `.dev.vars.example` may be read. The contact email is the `CONTACT_EMAIL` secret.
 
 ## Tests
@@ -87,7 +87,7 @@ To add an endpoint or a language, follow "Adding an endpoint" and "Adding a lang
 - **Say why, not what.** A comment earns its place by explaining what the code cannot: a constraint, a trade-off, a security, CSP or privacy reason, or a platform quirk.
 - **Prefer a clearer name to a comment.** Delete comments that restate a name, a type or the next line.
 - **One home per explanation.** Document a rule where it is defined, not at every caller.
-- **Name the constant, not its value** (`FINGERPRINT_DAYS`, not "30 days"), so the comment cannot drift.
+- **Name the constant, not its value** (`HEARTBEAT_THRESHOLD_MS`, not "3 minutes"), so the comment cannot drift.
 - **No history** ("now", "used to", "no longer"); that belongs in commit messages. No commented-out code, and no TODO without an issue link.
 - **JSDoc on exports is one line**, only where the name and type do not already say it: contracts, units, what `null` means.
 - **Keep coupling notes** where two places must change together, naming the file and symbol, never line numbers.

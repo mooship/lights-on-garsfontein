@@ -178,7 +178,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 8. **Regenerate the images**: `npm run og` (social card) and `npm run icons` (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand.
 9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and terms, is written for POPIA and describes this deployment's data handling; `FORKERS` comments mark what to check. Do not use utility or municipal logos, and keep the independence disclaimer.
 
-Two crons run the Worker. Every minute it opens an outage for a silent sensor. Every hour it removes expired sessions and, until the next migration drops the unused `outage_confirmations` and `still_off_reports` tables, blanks their connection fingerprints after 30 days and deletes "still off" rows after 90.
+Two crons run the Worker. Every minute it opens an outage for a silent sensor. Every hour it removes expired sessions.
 
 **Banners.** `src/banners.ts` holds short, dated notices. Append an entry to `BANNERS` with a new, stable `id` (dismissals are remembered by it), `from` and `until` via `zoned('YYYY-MM-DDTHH:mm')` (`until` is exclusive) and the copy (required in the default locale). Expired entries stop showing on their own; at most one shows at a time.
 

@@ -1,7 +1,7 @@
 import { API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
 import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
-import { detectOutage, purgeExpiredSessions, purgeOldFingerprints, purgeOldStillOffReports } from './lib/grid';
+import { detectOutage, purgeExpiredSessions } from './lib/grid';
 import { errors } from './lib/http';
 import { dispatch, purgeEdgeCache, type Routes } from './lib/router';
 import { adminRoutes } from './routes/admin';
@@ -68,11 +68,7 @@ export default {
     const db = createDb(env.DB);
     const now = new Date(controller.scheduledTime);
     if (controller.cron === HOURLY_CRON) {
-      await Promise.all([
-        purgeExpiredSessions(db, now),
-        purgeOldFingerprints(db, now),
-        purgeOldStillOffReports(db, now),
-      ]);
+      await purgeExpiredSessions(db, now);
     } else {
       const { opened } = await detectOutage(db, now);
       if (opened) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);

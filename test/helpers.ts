@@ -80,25 +80,10 @@ export async function getStatus(): Promise<StatusResponse> {
   return res.json();
 }
 
-export async function insertConfirmation(
-  outageId: number,
-  { createdAt = new Date().toISOString(), clientHash = 'fingerprint' } = {},
-): Promise<void> {
-  await env.DB.prepare('INSERT INTO outage_confirmations (outage_id, created_at, client_hash) VALUES (?, ?, ?)')
-    .bind(outageId, createdAt, clientHash)
-    .run();
-}
-
 export async function setHeartbeat(secondsAgo: number): Promise<string> {
   const lastSeen = new Date(Date.now() - secondsAgo * 1000).toISOString();
   await env.DB.prepare('INSERT OR REPLACE INTO heartbeats (id, last_seen) VALUES (1, ?)').bind(lastSeen).run();
   return lastSeen;
-}
-
-export async function insertStillOff({ createdAt = new Date().toISOString(), clientHash = 'fingerprint' } = {}) {
-  await env.DB.prepare('INSERT INTO still_off_reports (created_at, client_hash) VALUES (?, ?)')
-    .bind(createdAt, clientHash)
-    .run();
 }
 
 export async function insertOutage(values: {

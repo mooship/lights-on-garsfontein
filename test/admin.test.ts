@@ -3,15 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { type AdminOutagesResponse, MINUTE_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { ADMIN_OUTAGES_PATH, TIMER_PATH } from '../shared/paths';
-import {
-  call,
-  createSession,
-  getStatus,
-  insertConfirmation,
-  insertOutage,
-  openOutageCount,
-  setHeartbeat,
-} from './helpers';
+import { call, createSession, getStatus, insertOutage, openOutageCount, setHeartbeat } from './helpers';
 
 let cookie: string;
 beforeEach(async () => {
@@ -185,11 +177,10 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(row?.end_time).toBe('2026-10-01T12:00:00.000Z');
   });
 
-  it('deletes an outage and its confirmations', async () => {
+  it('deletes an outage', async () => {
     const id = await insertOutage({});
-    await insertConfirmation(id);
     expect((await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id })).status).toBe(200);
-    const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outage_confirmations').first<{ n: number }>()) ?? {};
+    const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
     expect(n).toBe(0);
   });
 

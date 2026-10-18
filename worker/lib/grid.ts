@@ -1,13 +1,7 @@
 import { and, desc, eq, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
-import {
-  DAY_MS,
-  HEARTBEAT_THRESHOLD_MS,
-  type OutageSource,
-  type OutageSummary,
-  type PowerStatus,
-} from '../../shared/api';
+import { HEARTBEAT_THRESHOLD_MS, type OutageSource, type OutageSummary, type PowerStatus } from '../../shared/api';
 import type { Db } from '../db/client';
-import { heartbeats, type Outage, outageConfirmations, outages, sessions, stillOffReports } from '../db/schema';
+import { heartbeats, type Outage, outages, sessions } from '../db/schema';
 
 const RECENT_LIMIT = 5;
 
@@ -162,36 +156,4 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: numb
 
 export async function purgeExpiredSessions(db: Db, now: Date): Promise<void> {
   await db.delete(sessions).where(lt(sessions.expiresAt, now.toISOString()));
-}
-
-// privacy.html states this period (both languages): change it there too.
-const FINGERPRINT_DAYS = 30;
-
-// The two purges below blank the salted IP hashes still in the unused outage_confirmations and
-// still_off_reports tables (worker/db/schema.ts); they go with those tables in the next migration.
-
-/** Replaces confirmation fingerprints older than FINGERPRINT_DAYS with a per-row placeholder. */
-export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
-  const cutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();
-  await db
-    .update(outageConfirmations)
-    .set({ clientHash: sql`'purged:' || ${outageConfirmations.id}` })
-    .where(and(lt(outageConfirmations.createdAt, cutoff), sql`${outageConfirmations.clientHash} not like 'purged:%'`));
-}
-
-const STILL_OFF_KEEP_DAYS = 90;
-
-/** "Still off" fingerprints go after FINGERPRINT_DAYS, like confirmations, and the rows after STILL_OFF_KEEP_DAYS. */
-export async function purgeOldStillOffReports(db: Db, now: Date): Promise<void> {
-  const fingerprintCutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();
-  const rowCutoff = new Date(now.getTime() - STILL_OFF_KEEP_DAYS * DAY_MS).toISOString();
-  await db.batch([
-    db.delete(stillOffReports).where(lt(stillOffReports.createdAt, rowCutoff)),
-    db
-      .update(stillOffReports)
-      .set({ clientHash: sql`'purged:' || ${stillOffReports.id}` })
-      .where(
-        and(lt(stillOffReports.createdAt, fingerprintCutoff), sql`${stillOffReports.clientHash} not like 'purged:%'`),
-      ),
-  ]);
 }

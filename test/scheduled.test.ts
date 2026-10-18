@@ -1,16 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { DAY_MS } from '../shared/api';
 import { HOURLY_CRON } from '../worker/crons';
-import {
-  getStatus,
-  insertConfirmation,
-  insertOutage,
-  insertStillOff,
-  openOutageCount,
-  runCron,
-  setHeartbeat,
-} from './helpers';
+import { getStatus, insertOutage, openOutageCount, runCron, setHeartbeat } from './helpers';
 
 const outages = async () =>
   (
@@ -87,28 +78,5 @@ describe('housekeeping (hourly cron)', () => {
     await runCron();
     const rows = await env.DB.prepare('SELECT id FROM sessions').all<{ id: string }>();
     expect(rows.results).toHaveLength(1);
-  });
-
-  it('replaces confirmation fingerprints after 30 days', async () => {
-    const id = await insertOutage({});
-    await insertConfirmation(id, { createdAt: new Date(Date.now() - 31 * DAY_MS).toISOString(), clientHash: 'aaa' });
-    await insertConfirmation(id, { clientHash: 'bbb' });
-    await runCron(HOURLY_CRON);
-    const rows = await env.DB.prepare('SELECT client_hash FROM outage_confirmations ORDER BY id').all<{
-      client_hash: string;
-    }>();
-    expect(rows.results.map((r) => r.client_hash)).toEqual([expect.stringMatching(/^purged:\d+$/), 'bbb']);
-  });
-
-  it('replaces "still off" fingerprints after 30 days and deletes reports after 90', async () => {
-    const ago = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString();
-    await insertStillOff({ createdAt: ago(91), clientHash: 'old' });
-    await insertStillOff({ createdAt: ago(31), clientHash: 'aaa' });
-    await insertStillOff({ clientHash: 'bbb' });
-    await runCron(HOURLY_CRON);
-    const rows = await env.DB.prepare('SELECT client_hash FROM still_off_reports ORDER BY id').all<{
-      client_hash: string;
-    }>();
-    expect(rows.results.map((r) => r.client_hash)).toEqual([expect.stringMatching(/^purged:\d+$/), 'bbb']);
   });
 });
