@@ -3,7 +3,8 @@ import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
-import { DAY_MS, HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
+import { CSV_FILE_NAME, DAY_MS, HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
+import { CSV_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
@@ -347,7 +348,7 @@ export const Trends: Component<TrendsProps> = (props) => {
             </For>
           </tbody>
         </table>
-        <a class={css.download} href="/api/outages.csv" download={`${site.slug}-outages.csv`}>
+        <a class={css.download} href={CSV_PATH} download={CSV_FILE_NAME}>
           <Download size={14} aria-hidden="true" /> {t().trends.download}
         </a>
       </details>

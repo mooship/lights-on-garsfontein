@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { FEED_PATH } from '../shared/paths';
 import { call, insertOutage } from './helpers';
 
 /**
@@ -37,7 +38,7 @@ describe('GET /feed.xml', () => {
   it('lists outages newest first as well-formed Atom, in the configured zone', async () => {
     const ended = await insertOutage({ startTime: '2026-10-17T12:05:00.000Z', endTime: '2026-10-17T14:15:00.000Z' });
     const open = await insertOutage({ startTime: '2026-10-18T06:30:00.000Z' });
-    const res = await call('/feed.xml');
+    const res = await call(FEED_PATH);
     expect(res.status).toBe(200);
     const xml = await res.text();
     assertWellFormed(xml);
@@ -57,7 +58,7 @@ describe('GET /feed.xml', () => {
 
   it('marks planned outages', async () => {
     await insertOutage({ startTime: '2026-10-17T12:05:00.000Z', endTime: '2026-10-17T15:05:00.000Z', isPlanned: 1 });
-    expect(field(entries(await (await call('/feed.xml')).text())[0], 'title')).toBe(
+    expect(field(entries(await (await call(FEED_PATH)).text())[0], 'title')).toBe(
       'Planned outage 17 Oct 2026 14:05 (3 h)',
     );
   });
@@ -72,7 +73,7 @@ describe('GET /feed.xml', () => {
       const start = `2026-11-${String(day).padStart(2, '0')}T08:00:00.000Z`;
       await insertOutage({ startTime: start, endTime: start.replace('T08', 'T09') });
     }
-    const xml = await (await call('/feed.xml')).text();
+    const xml = await (await call(FEED_PATH)).text();
     const list = entries(xml);
     expect(list).toHaveLength(20);
     expect(field(list[0], 'title')).toBe('Outage 21 Nov 2026 10:00 (1 h)');
@@ -83,7 +84,7 @@ describe('GET /feed.xml', () => {
   it('escapes XML', async () => {
     await insertOutage({ startTime: '2026-10-17T12:05:00.000Z', endTime: '2026-10-17T12:50:00.000Z' });
     const odd = { ...env, SITE_URL: 'https://garsfontein.example/a&b"<c>' } as Env;
-    const xml = await (await call('/feed.xml', { env: odd })).text();
+    const xml = await (await call(FEED_PATH, { env: odd })).text();
     assertWellFormed(xml);
     expect(xml).toContain('href="https://garsfontein.example/a&amp;b&quot;&lt;c&gt;/"');
     expect(xml).toContain('<id>https://garsfontein.example/a&amp;b&quot;&lt;c&gt;/feed.xml</id>');
@@ -91,13 +92,13 @@ describe('GET /feed.xml', () => {
   });
 
   it('is a valid empty feed before any outage', async () => {
-    const xml = await (await call('/feed.xml')).text();
+    const xml = await (await call(FEED_PATH)).text();
     assertWellFormed(xml);
     expect(entries(xml)).toEqual([]);
   });
 
   it('is Atom, open to any site and cached for five minutes', async () => {
-    const res = await call('/feed.xml');
+    const res = await call(FEED_PATH);
     expect(res.headers.get('Content-Type')).toBe('application/atom+xml; charset=utf-8');
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=300');
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');

@@ -1,5 +1,5 @@
 import type { StatusResponse } from '../../shared/api';
-import { OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
+import { HEARTBEAT_PATH, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
 import { requireBearer } from '../lib/auth';
 import { getGridState, recordHeartbeat } from '../lib/grid';
 import { json } from '../lib/http';
@@ -38,7 +38,7 @@ export const statusRoutes: Routes = {
     edgeCache: STATUS_EDGE_TTL_SECONDS,
   },
   // Until HEARTBEAT_TOKEN is set (no sensor yet), every heartbeat is refused.
-  'POST /api/heartbeat': {
+  [`POST ${HEARTBEAT_PATH}`]: {
     handler: postHeartbeat,
     authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),
     purges: [STATUS_PATH],

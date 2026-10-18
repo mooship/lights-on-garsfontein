@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { TurnstileAction } from '../../shared/api';
+import { ERROR } from '../../shared/errors';
 import { errors } from './http';
 import type { RouteContext } from './router';
 
@@ -30,7 +31,7 @@ export async function checkTurnstile(
   const testSecret = TEST_SECRET.test(env.TURNSTILE_SECRET_KEY);
   if (testSecret && !LOCAL_SITE.test(env.SITE_URL)) {
     console.error('TURNSTILE_SECRET_KEY is a Cloudflare test secret but SITE_URL is not local; refusing');
-    return errors.forbidden('turnstile_failed');
+    return errors.forbidden(ERROR.turnstileFailed);
   }
   const body = new FormData();
   body.append('secret', env.TURNSTILE_SECRET_KEY);
@@ -48,5 +49,5 @@ export async function checkTurnstile(
   } catch {
     // An unreachable siteverify fails closed.
   }
-  return errors.forbidden('turnstile_failed');
+  return errors.forbidden(ERROR.turnstileFailed);
 }

@@ -4,10 +4,8 @@ import { MINUTE_MS } from '../../shared/api';
 import { activeBanners, type Banner } from '../banners';
 import { DEFAULT_LOCALE, locale, t } from '../lib/i18n';
 import { useNow } from '../lib/now';
-import { isFlagged, setFlag } from '../lib/storage';
+import { bannerDismissedKey, isFlagged, setFlag } from '../lib/storage';
 import * as css from './Banner.css';
-
-const storageKey = (id: string) => `banner-dismissed:${id}`;
 
 /** The copy in the active locale, else in the default one. */
 const inLocale = (copy: Banner['text']) => copy[locale()] ?? copy[DEFAULT_LOCALE];
@@ -18,12 +16,12 @@ export const SiteBanner: Component = () => {
   // Dismissed this visit, which also covers storage being unavailable.
   const [dismissed, setDismissed] = createSignal<ReadonlySet<string>>(new Set());
   const banner = createMemo(() =>
-    activeBanners(now()).find((b) => !dismissed().has(b.id) && !isFlagged(storageKey(b.id))),
+    activeBanners(now()).find((b) => !dismissed().has(b.id) && !isFlagged(bannerDismissedKey(b.id))),
   );
 
   const dismiss = (id: string, button: HTMLElement) => {
     const hadFocus = document.activeElement === button;
-    setFlag(storageKey(id));
+    setFlag(bannerDismissedKey(id));
     setDismissed((ids) => new Set([...ids, id]));
     // The button is gone, so hand focus to the main content rather than dropping it on <body>.
     if (hadFocus) document.querySelector<HTMLElement>('.gg-main')?.focus({ preventScroll: true });

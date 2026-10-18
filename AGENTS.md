@@ -15,7 +15,8 @@ Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and 
 1. **The best code is the code we don't write.** Before adding anything, ask whether the platform, an existing helper or a config value already does it, and whether it needs to exist at all. Deleting dead code, unused options and speculative abstractions is progress. No dependency for what a few lines do; no abstraction before a second real use.
 2. **Test-driven.** Red, green, refactor: write a failing test that captures the behaviour or the bug, make it pass with the smallest change, then clean up. A bug fix starts with a test that reproduces it. If a reported bug does not reproduce, inject it briefly to prove the test would catch it; keep the test only if it fails where the existing tests pass, and prefer extending an existing test.
 3. **One home per fact.** Deployment identity lives in `site.config.ts`, copy in `src/i18n/`, shared paths and types in `shared/`. Import them; do not repeat literals.
-4. **Small, focused changes.** Commit summaries are short, sentence case and imperative, with no prefix or full stop (for example "Fix horizontal scroll on the privacy page on phones"). Commit each finished task (the hooks run). Push straight to `main` once the definition of done passes; CI runs on every push and must stay green. Push only when asked. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
+4. **Constants.** Error codes, paths, storage keys, header and cookie names, actions and durations each live in one dedicated module: `shared/` when both the app and the Worker use them (`errors.ts`, `paths.ts`, `api.ts`), otherwise next to their owner (`src/lib/storage.ts`, `worker/crons.ts`). Use an `as const` object or array with a union type derived from it, never a TypeScript `enum`, and build durations from `MINUTE_MS`, `HOUR_MS` and `DAY_MS`. A literal used once, where its meaning is obvious, may stay inline.
+5. **Small, focused changes.** Commit summaries are short, sentence case and imperative, with no prefix or full stop (for example "Fix horizontal scroll on the privacy page on phones"). Commit each finished task (the hooks run). Push straight to `main` once the definition of done passes; CI runs on every push and must stay green. Push only when asked. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
 
 ## Commands
 
@@ -49,8 +50,8 @@ Lefthook runs Biome and the typecheck on commit and `npm test` on push. CI runs 
 |---|---|
 | `site.config.ts` | Deployment identity: brand, URL, area, landmark, start date, time zone and fixed offset, locales, data licence, fault-reporting link |
 | `src/` | SolidJS app; `src/i18n/` dictionaries, `src/sw/` service worker, `src/banners.ts` dated notices |
-| `worker/` | Cloudflare Worker: `index.ts` (routes, crons), `lib/` (router, grid, stats, auth, Turnstile), `routes/`, `db/schema.ts` |
-| `shared/` | Types and constants used by both the app and the Worker (`api.ts`, `paths.ts`, `locale.ts`) |
+| `worker/` | Cloudflare Worker: `index.ts` (routes, crons), `crons.ts` (cron strings), `lib/` (router, grid, stats, auth, Turnstile), `routes/`, `db/schema.ts` |
+| `shared/` | Types and constants used by both the app and the Worker (`api.ts`, `errors.ts`, `paths.ts`, `locale.ts`) |
 | `build/html.ts`, `vite.config.ts` | Build plugins: placeholders, static shell copy, per-locale pages, locale CSS, font preload, service worker |
 | `index.html`, `privacy.html`, `templates/` | Static pages and generated files, filled from `site.config.ts` |
 | `test/`, `test/node/`, `e2e/` | Worker tests, Node tests (pure logic, build helpers, built output), Playwright |

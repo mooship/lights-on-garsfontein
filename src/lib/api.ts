@@ -1,4 +1,11 @@
-import type { AdminOutagesResponse, StatsResponse, StatusResponse, TimerAction } from '../../shared/api';
+import {
+  type AdminOutagesResponse,
+  OUTAGE_ACTION,
+  type StatsResponse,
+  type StatusResponse,
+  type TimerAction,
+} from '../../shared/api';
+import { ADMIN_OUTAGES_PATH, LOGIN_PATH, LOGOUT_PATH, STATS_PATH, STATUS_PATH, TIMER_PATH } from '../../shared/paths';
 import { FROM_CACHE_HEADER } from '../sw/strategy';
 
 /** A status, flagged when the service worker answered from its cache because the network failed. */
@@ -27,16 +34,16 @@ const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 
 export const api = {
-  status: () => request<Status>('/api/status'),
-  stats: () => request<StatsResponse>('/api/stats'),
+  status: () => request<Status>(STATUS_PATH),
+  stats: () => request<StatsResponse>(STATS_PATH),
   login: (username: string, password: string, token: string) =>
-    post<{ ok: true }>('/api/admin/login', { username, password, token }),
-  logout: () => post<{ ok: true }>('/api/admin/logout'),
-  outages: () => request<AdminOutagesResponse>('/api/admin/outages'),
-  punch: (action: TimerAction) => post('/api/admin/timer', { action }),
+    post<{ ok: true }>(LOGIN_PATH, { username, password, token }),
+  logout: () => post<{ ok: true }>(LOGOUT_PATH),
+  outages: () => request<AdminOutagesResponse>(ADMIN_OUTAGES_PATH),
+  punch: (action: TimerAction) => post(TIMER_PATH, { action }),
   createOutage: (startTime: string, endTime: string | null, isPlanned: boolean) =>
-    post('/api/admin/outages', { action: 'create', startTime, endTime, isPlanned }),
+    post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.create, startTime, endTime, isPlanned }),
   updateOutage: (id: number, changes: { endTime?: string | null; isFalsePositive?: boolean; isPlanned?: boolean }) =>
-    post('/api/admin/outages', { action: 'update', id, ...changes }),
-  deleteOutage: (id: number) => post('/api/admin/outages', { action: 'delete', id }),
+    post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, ...changes }),
+  deleteOutage: (id: number) => post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id }),
 };

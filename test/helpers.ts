@@ -1,15 +1,19 @@
 import { createScheduledController, env } from 'cloudflare:test';
 import { expect, vi } from 'vitest';
-import { DAY_MS, MINUTE_MS, type StatusResponse, type TurnstileAction } from '../shared/api';
+import { MINUTE_MS, type StatusResponse, TURNSTILE_ACTION, type TurnstileAction } from '../shared/api';
+import { CSV_PATH, FEED_PATH, LOGIN_PATH, STATS_PATH, STATUS_PATH } from '../shared/paths';
+import { MINUTE_CRON } from '../worker/crons';
 import worker from '../worker/index';
+import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { randomToken, sha256Hex } from '../worker/lib/crypto';
-import { passwordFingerprint } from '../worker/routes/auth';
+import { CLIENT_IP_HEADER } from '../worker/lib/http';
+import { ADMIN_USER_ID, passwordFingerprint, SESSION_TTL_MS } from '../worker/routes/auth';
 
 /** The test SITE_URL (set once in vitest.config.ts). */
 export const ORIGIN = env.SITE_URL;
 
 /** Routes with `edgeCache`. */
-export const EDGE_CACHED = ['/api/status', '/api/stats', '/api/outages.csv', '/feed.xml'];
+export const EDGE_CACHED = [STATUS_PATH, STATS_PATH, CSV_PATH, FEED_PATH];
 
 /**
  * Waits for a new rate-limit window when this one has under 10 s left. Miniflare counts in
@@ -41,7 +45,7 @@ interface CallOptions {
 
 export async function call(path: string, options: CallOptions = {}): Promise<Response> {
   const headers = new Headers(options.headers);
-  headers.set('CF-Connecting-IP', options.ip ?? uniqueIp());
+  headers.set(CLIENT_IP_HEADER, options.ip ?? uniqueIp());
   if (options.cookie) headers.set('Cookie', options.cookie);
   const body = options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body));
   if (body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -64,14 +68,14 @@ export function mockSiteverify(answer: () => Response | Promise<Response>) {
 /** Stubs the Turnstile siteverify call: a token solved on our host for `action`. */
 export function mockTurnstile(
   success: boolean,
-  action: TurnstileAction = 'contact',
+  action: TurnstileAction = TURNSTILE_ACTION.contact,
   hostname = new URL(ORIGIN).hostname,
 ) {
   return mockSiteverify(() => Response.json({ success, action, hostname }));
 }
 
 export async function getStatus(): Promise<StatusResponse> {
-  const res = await call('/api/status');
+  const res = await call(STATUS_PATH);
   expect(res.status).toBe(200);
   return res.json();
 }
@@ -108,7 +112,7 @@ export async function insertOutage(values: {
     'INSERT INTO outages (start_time, end_time, source, is_false_positive, is_planned) VALUES (?, ?, ?, ?, ?) RETURNING id',
   )
     .bind(
-      values.startTime ?? new Date(Date.now() - 600_000).toISOString(),
+      values.startTime ?? new Date(Date.now() - 10 * MINUTE_MS).toISOString(),
       values.endTime ?? null,
       values.source ?? 'sensor',
       values.isFalsePositive ?? 0,
@@ -125,7 +129,7 @@ export async function insertOutage(values: {
  */
 export async function createSession({
   createdAt = Date.now(),
-  expiresAt = createdAt + 30 * DAY_MS,
+  expiresAt = createdAt + SESSION_TTL_MS,
 }: {
   createdAt?: number;
   expiresAt?: number;
@@ -136,19 +140,19 @@ export async function createSession({
   )
     .bind(
       await sha256Hex(token),
-      'admin',
+      ADMIN_USER_ID,
       new Date(expiresAt).toISOString(),
       new Date(createdAt).toISOString(),
       await passwordFingerprint(env),
     )
     .run();
-  return `__Host-admin_session=${token}`;
+  return `${SESSION_COOKIE}=${token}`;
 }
 
 /** Signs in through the login route; prefer createSession unless the test is about signing in. */
 export async function login(password = 'test-password'): Promise<string> {
-  mockTurnstile(true, 'login');
-  const res = await call('/api/admin/login', {
+  mockTurnstile(true, TURNSTILE_ACTION.login);
+  const res = await call(LOGIN_PATH, {
     method: 'POST',
     body: { username: 'admin', password, token: 'turnstile-token' },
   });
@@ -156,10 +160,6 @@ export async function login(password = 'test-password'): Promise<string> {
   const cookie = res.headers.get('Set-Cookie') ?? '';
   return cookie.split(';')[0] ?? '';
 }
-
-/** The per-minute (outage detection) and hourly (housekeeping) crons in wrangler.toml. */
-export const MINUTE_CRON = '* * * * *';
-export const HOURLY_CRON = '0 * * * *';
 
 export async function runCron(cron = MINUTE_CRON, scheduledTime = Date.now()): Promise<void> {
   await worker.scheduled(createScheduledController({ scheduledTime, cron }), env);

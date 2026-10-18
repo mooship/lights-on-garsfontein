@@ -13,6 +13,7 @@ routes = [{ pattern = "garsfontein.timothybrits.co.za", custom_domain = true }]
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+# The same paths as API_PREFIX and WORKER_PAGES in shared/paths.ts; change them together.
 run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png", "/feed.xml"]
 
 [vars]
@@ -50,6 +51,7 @@ simple = { limit = 30, period = 60 }
 
 [triggers]
 # Outage detection every minute; housekeeping (session and fingerprint purges) hourly.
+# The same as MINUTE_CRON and HOURLY_CRON in worker/crons.ts; change them together.
 crons = ["* * * * *", "0 * * * *"]
 
 [observability]

@@ -1,9 +1,9 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { DAY_MS } from '../shared/api';
+import { HOURLY_CRON } from '../worker/crons';
 import {
   getStatus,
-  HOURLY_CRON,
   insertConfirmation,
   insertOutage,
   insertStillOff,

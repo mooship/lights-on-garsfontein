@@ -1,14 +1,29 @@
 import { readFileSync } from 'node:fs';
 import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
+import { DAY_MS, MINUTE_MS } from '../shared/api';
+import { ERROR } from '../shared/errors';
 import { localePath } from '../shared/locale';
+import {
+  ADMIN_OUTAGES_PATH,
+  ADMIN_PAGE_PATH,
+  FEED_PATH,
+  LOGOUT_PATH,
+  OG_IMAGE_PATH,
+  PRIVACY_PAGE_PATH,
+  ROBOTS_PATH,
+  SITEMAP_PATH,
+  STATUS_PATH,
+} from '../shared/paths';
 import { type Locale, site } from '../site.config';
 import { BANNERS } from '../src/banners';
 import { DICTIONARIES } from '../src/i18n';
 import { af } from '../src/i18n/af';
 import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
+import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
 import { cacheName, STATUS_CACHE } from '../src/sw/strategy';
+import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
 import { expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
 
@@ -40,7 +55,7 @@ let sessionCookies: Cookie[] = [];
 
 async function login(page: Page) {
   if (sessionCookies.length) await page.context().addCookies(sessionCookies);
-  await page.goto('/admin');
+  await page.goto(ADMIN_PAGE_PATH);
   const dashboard = page.getByRole('heading', { name: en.admin.punchClock });
   const password = page.getByLabel(en.admin.password);
   await expect(dashboard.or(password)).toBeVisible();
@@ -49,7 +64,7 @@ async function login(page: Page) {
   await password.fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: en.admin.signIn }).click();
   await expect(dashboard).toBeVisible();
-  sessionCookies = (await page.context().cookies()).filter((c) => c.name === '__Host-admin_session');
+  sessionCookies = (await page.context().cookies()).filter((c) => c.name === SESSION_COOKIE);
 }
 
 /** Only `locale`'s copy of the static shell shows; the others are there, but hidden. */
@@ -74,12 +89,12 @@ test.describe('theme boot', () => {
     const context = await browser.newContext({ colorScheme: 'dark' });
     const page = await context.newPage();
     await withLocale(page, appLocale);
-    await page.addInitScript(() => {
+    await page.addInitScript((key) => {
       if (!sessionStorage.getItem('seeded')) {
-        localStorage.setItem('theme', 'light');
+        localStorage.setItem(key, 'light');
         sessionStorage.setItem('seeded', '1');
       }
-    });
+    }, STORAGE_KEYS.theme);
     await page.goto('/');
     await expect(page.locator('html')).toHaveClass(/\blight\b/);
 
@@ -87,7 +102,7 @@ test.describe('theme boot', () => {
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
-    expect(await page.evaluate(() => localStorage.getItem('theme'))).toBe('dark');
+    expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEYS.theme)).toBe('dark');
     await context.close();
   });
 });
@@ -125,12 +140,12 @@ test.describe('language', () => {
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
-    expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('en');
+    expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEYS.locale)).toBe('en');
 
     await page.getByRole('button', { name: en.lang.switchTo }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('status')).toContainText(af.status.NONE);
-    expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('af');
+    expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEYS.locale)).toBe('af');
 
     // Back returns to the English URL, and the language follows it.
     await page.goBack();
@@ -142,7 +157,7 @@ test.describe('language', () => {
 
   test('opens / at /en/ for a visitor who chose English, before the app renders', async ({ page }) => {
     const statusFetchedFrom: string[] = [];
-    page.on('request', (r) => r.url().endsWith('/api/status') && statusFetchedFrom.push(r.frame().url()));
+    page.on('request', (r) => r.url().endsWith(STATUS_PATH) && statusFetchedFrom.push(r.frame().url()));
     await page.goto('/?from=share');
     await expect(page).toHaveURL(/\/en\/\?from=share$/);
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -158,7 +173,7 @@ test.describe('language', () => {
       await page.goto('/en/');
       await expect(page.locator('html')).toHaveAttribute('lang', 'en');
       await expect(page.getByRole('status')).toContainText(en.status.NONE);
-      expect(await page.evaluate(() => localStorage.getItem('locale'))).toBe('en');
+      expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEYS.locale)).toBe('en');
     });
   });
 
@@ -243,7 +258,7 @@ test.describe('public page', () => {
       // The detail line below already describes the last outage, so the badge adds nothing.
       test(`without a live reading, adds no line under the headline (${locale})`, async ({ page }) => {
         const m = DICTIONARIES[locale];
-        await page.route('**/api/status', async (route) => {
+        await page.route(`**${STATUS_PATH}`, async (route) => {
           const response = await route.fetch();
           const since = new Date().toISOString();
           await route.fulfill({ response, json: { ...(await response.json()), monitored: false, since } });
@@ -256,9 +271,9 @@ test.describe('public page', () => {
   }
 
   test('with a live reading, says the power is on and for how long', async ({ page }) => {
-    await page.route('**/api/status', async (route) => {
+    await page.route(`**${STATUS_PATH}`, async (route) => {
       const response = await route.fetch();
-      const since = new Date(Date.now() - 150 * 60_000).toISOString();
+      const since = new Date(Date.now() - 150 * MINUTE_MS).toISOString();
       await route.fulfill({ response, json: { ...(await response.json()), monitored: true, since } });
     });
     await page.goto('/');
@@ -300,8 +315,8 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: en.footer.privacy })).toBeVisible();
     await expect(page.getByRole('link', { name: site.dataLicence.name })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: en.footer.feed })).toHaveAttribute('href', '/feed.xml');
-    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute('href', '/privacy');
+    await expect(page.getByRole('link', { name: en.footer.feed })).toHaveAttribute('href', FEED_PATH);
+    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute('href', PRIVACY_PAGE_PATH);
   });
 
   for (const locale of site.locales) {
@@ -320,8 +335,8 @@ test.describe('public page', () => {
   const PAGES: [path: string, loaded: (page: Page) => Locator][] = [
     ['/', (page) => page.getByRole('status')],
     ['/en/', (page) => page.getByRole('status')],
-    ['/privacy', (page) => page.getByRole('heading', { level: 1 }).first()],
-    ['/admin', (page) => page.getByLabel(en.admin.password)],
+    [PRIVACY_PAGE_PATH, (page) => page.getByRole('heading', { level: 1 }).first()],
+    [ADMIN_PAGE_PATH, (page) => page.getByLabel(en.admin.password)],
   ];
   for (const [path, loaded] of PAGES) {
     test(`${path} loads without CSP violations or console errors`, async ({ page }) => {
@@ -330,7 +345,7 @@ test.describe('public page', () => {
         if (message.type() !== 'error') return;
         // Signed out, /admin's session check is answered 401, and the browser logs the failed request.
         const { pathname } = new URL(message.location().url || 'about:blank');
-        if (pathname === '/api/admin/outages' && message.text().includes('401')) return;
+        if (pathname === ADMIN_OUTAGES_PATH && message.text().includes('401')) return;
         errors.push(`${message.text()} (${message.location().url})`);
       });
       page.on('pageerror', (error) => errors.push(error.message));
@@ -341,7 +356,7 @@ test.describe('public page', () => {
   }
 
   test('says so when the server fails on first load', async ({ page }) => {
-    await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
+    await page.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
     await page.goto('/');
     await expect(page.getByRole('alert')).toHaveText(en.status.unreachable);
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
@@ -351,30 +366,30 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
     await expect(page.getByRole('alert')).toHaveCount(0);
-    await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
+    await page.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // polls now
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
   });
 
   test('serves the SEO manifests', async ({ request }) => {
-    expect(await (await request.get('/robots.txt')).text()).toContain('Disallow: /api/admin/');
-    const sitemap = await (await request.get('/sitemap.xml')).text();
+    expect(await (await request.get(ROBOTS_PATH)).text()).toContain('Disallow: /api/admin/');
+    const sitemap = await (await request.get(SITEMAP_PATH)).text();
     // The origin is the Worker's SITE_URL, which is local here.
     const locs = [...sitemap.matchAll(/<loc>https?:\/\/[^/]+([^<]*)<\/loc>/g)].map((m) => m[1]);
-    expect(locs).toEqual(['/', '/en/', '/privacy']);
-    const og = await request.get('/og.png');
+    expect(locs).toEqual(['/', '/en/', PRIVACY_PAGE_PATH]);
+    const og = await request.get(OG_IMAGE_PATH);
     expect(og.headers()['content-type']).toBe('image/png');
   });
 });
 
 test.describe('admin', () => {
   test('is kept out of search results', async ({ request }) => {
-    expect((await request.get('/admin')).headers()['x-robots-tag']).toBe('noindex, nofollow');
+    expect((await request.get(ADMIN_PAGE_PATH)).headers()['x-robots-tag']).toBe('noindex, nofollow');
   });
 
   test('rejects a wrong password', async ({ page }) => {
-    await page.goto('/admin');
+    await page.goto(ADMIN_PAGE_PATH);
     await page.getByLabel(en.admin.username).fill(ADMIN_USERNAME);
     await page.getByLabel(en.admin.password).fill('not-the-password');
     await page.getByRole('button', { name: en.admin.signIn }).click();
@@ -383,7 +398,7 @@ test.describe('admin', () => {
 
   test('sets an HttpOnly, Strict session cookie', async ({ page, context }) => {
     await login(page);
-    const cookie = (await context.cookies()).find((c) => c.name === '__Host-admin_session');
+    const cookie = (await context.cookies()).find((c) => c.name === SESSION_COOKIE);
     expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: 'Strict' });
   });
 
@@ -473,7 +488,7 @@ test.describe('share', () => {
 test.describe('privacy contact', () => {
   test('reveals the contact email after Turnstile', async ({ page }) => {
     const email = exampleVar('CONTACT_EMAIL');
-    await page.goto('/privacy');
+    await page.goto(PRIVACY_PAGE_PATH);
     // privacy.html's own copy: it is not in the dictionaries.
     const section = page.locator('#en');
     await section.getByRole('button', { name: 'Show email address' }).click();
@@ -557,7 +572,7 @@ test.describe('site banner', () => {
     await page.reload();
     await expect(page.getByRole('status')).toBeVisible();
     await expect(notice(page)).toHaveCount(0);
-    expect(await page.evaluate((id) => localStorage.getItem(`banner-dismissed:${id}`), banner?.id)).toBe('1');
+    expect(await page.evaluate((key) => localStorage.getItem(key), bannerDismissedKey(banner?.id ?? ''))).toBe('1');
   });
 
   test('sits in the page flow after the cards, causing no layout shift and covering nothing', async ({ page }) => {
@@ -582,7 +597,7 @@ test.describe('narrow screens', () => {
   test.use({ viewport: { width: 320, height: 640 } });
 
   for (const locale of site.locales) {
-    for (const path of ['/', '/en/', '/privacy', '/admin']) {
+    for (const path of ['/', '/en/', PRIVACY_PAGE_PATH, ADMIN_PAGE_PATH]) {
       test(`${path} has no horizontal scroll at 320px (${locale})`, async ({ page }) => {
         await withLocale(page, locale);
         await page.goto(path);
@@ -614,10 +629,10 @@ test.describe('offline', () => {
 
   /** When the server produced the worker's copy of the status, or null without one. */
   const cachedGeneratedAt = (page: Page) =>
-    page.evaluate(async () => {
-      const copy = await caches.match('/api/status');
+    page.evaluate(async (path) => {
+      const copy = await caches.match(path);
       return copy ? ((await copy.json()) as { generatedAt: string }).generatedAt : null;
-    });
+    }, STATUS_PATH);
 
   /** Makes the page poll the status now. */
   const poll = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
@@ -667,11 +682,14 @@ test.describe('offline', () => {
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)));
 
     // A copy from another day says which day.
-    await page.evaluate(async (status) => {
-      const copy = (await caches.match('/api/status')) as Response;
-      const body = { ...(await copy.json()), generatedAt: new Date(Date.now() - 86_400_000).toISOString() };
-      await (await caches.open(status)).put('/api/status', new Response(JSON.stringify(body), copy));
-    }, STATUS_CACHE);
+    await page.evaluate(
+      async ({ cache, path, day }) => {
+        const copy = (await caches.match(path)) as Response;
+        const body = { ...(await copy.json()), generatedAt: new Date(Date.now() - day).toISOString() };
+        await (await caches.open(cache)).put(path, new Response(JSON.stringify(body), copy));
+      },
+      { cache: STATUS_CACHE, path: STATUS_PATH, day: DAY_MS },
+    );
     await page.reload();
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT, en.day.yesterday)));
 
@@ -684,8 +702,8 @@ test.describe('offline', () => {
     await throughServiceWorker(page, '/en/');
     // context.route sees the worker's own requests, so this slows the network under it. The late
     // reply is stamped, because the Worker's edge cache would repeat the last generatedAt.
-    const stamp = new Date(Date.now() - 60_000).toISOString();
-    await context.route('**/api/status', async (route) => {
+    const stamp = new Date(Date.now() - MINUTE_MS).toISOString();
+    await context.route(`**${STATUS_PATH}`, async (route) => {
       const response = await route.fetch();
       await new Promise((resolve) => setTimeout(resolve, 5_000));
       await route.fulfill({ response, json: { ...(await response.json()), generatedAt: stamp } });
@@ -694,12 +712,12 @@ test.describe('offline', () => {
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)), { timeout: 4_500 });
     await expect.poll(() => cachedGeneratedAt(page), { timeout: 10_000 }).toBe(stamp); // kept for next time
 
-    await context.unroute('**/api/status');
-    await context.route('**/api/status', (route) => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
+    await context.unroute(`**${STATUS_PATH}`);
+    await context.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
     await poll(page);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)));
 
-    await context.unroute('**/api/status');
+    await context.unroute(`**${STATUS_PATH}`);
     await poll(page);
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
@@ -727,15 +745,15 @@ test.describe('offline', () => {
 
   test('keeps /admin, writes and the rest of the API out of the cache', async ({ page, context }) => {
     await throughServiceWorker(page, '/');
-    await page.goto('/admin');
+    await page.goto(ADMIN_PAGE_PATH);
     await expect(page.getByRole('button', { name: af.admin.signIn })).toBeVisible();
-    await page.goto('/privacy');
+    await page.goto(PRIVACY_PAGE_PATH);
     await page.goto('/');
     await expect(page.getByRole('status')).toBeVisible();
 
     const paths = await cachedPaths(page);
-    expect(paths).toEqual(expect.arrayContaining(['/', '/en/', '/privacy', '/api/status']));
-    const shell = new Set(['/', '/en/', '/privacy', '/api/status']);
+    expect(paths).toEqual(expect.arrayContaining(['/', '/en/', PRIVACY_PAGE_PATH, STATUS_PATH]));
+    const shell = new Set(['/', '/en/', PRIVACY_PAGE_PATH, STATUS_PATH]);
     expect(paths.filter((path) => !shell.has(path) && !path.startsWith('/assets/'))).toEqual([]);
 
     // Writes and the admin API pass straight through; the status is answered by the worker.
@@ -746,12 +764,12 @@ test.describe('offline', () => {
       ]);
       return response.fromServiceWorker();
     };
-    expect(await fetched('/api/admin/logout', { method: 'POST' })).toBe(false);
-    expect(await fetched('/api/admin/outages')).toBe(false);
-    expect(await fetched('/api/status')).toBe(true);
+    expect(await fetched(LOGOUT_PATH, { method: 'POST' })).toBe(false);
+    expect(await fetched(ADMIN_OUTAGES_PATH)).toBe(false);
+    expect(await fetched(STATUS_PATH)).toBe(true);
 
     await context.setOffline(true);
-    await expect(page.goto('/admin')).rejects.toThrow();
+    await expect(page.goto(ADMIN_PAGE_PATH)).rejects.toThrow();
   });
 
   test('a load through the worker has zero layout shift', async ({ page }) => {

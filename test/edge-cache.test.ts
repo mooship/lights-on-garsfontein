@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { HEARTBEAT_THRESHOLD_MS } from '../shared/api';
+import { HEARTBEAT_THRESHOLD_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
+import { ADMIN_OUTAGES_PATH, HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { call, EDGE_CACHED, insertOutage, ORIGIN, runCron, setHeartbeat } from './helpers';
 
 // Every edge-cached route is a view of the outages, so a write that opens, closes or changes one
@@ -13,7 +14,7 @@ const admin = (path: string, body: unknown) =>
 const openOutage = () => insertOutage({});
 
 const heartbeat = () =>
-  call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
+  call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
 
 /** A silent sensor with nothing on record yet: the next check opens an outage. */
 async function staleHeartbeat(): Promise<undefined> {
@@ -31,34 +32,34 @@ interface Write {
 }
 
 const WRITES: Write[] = [
-  { name: 'punching out', act: () => admin('/api/admin/timer', { action: 'punch_out' }), status: 201 },
+  { name: 'punching out', act: () => admin(TIMER_PATH, { action: TIMER_ACTION.punchOut }), status: 201 },
   {
     name: 'punching in',
     arrange: openOutage,
-    act: () => admin('/api/admin/timer', { action: 'punch_in' }),
+    act: () => admin(TIMER_PATH, { action: TIMER_ACTION.punchIn }),
     status: 200,
   },
   {
     name: 'logging an outage',
-    act: () => admin('/api/admin/outages', { action: 'create', startTime: '2026-10-17T08:00:00Z' }),
+    act: () => admin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.create, startTime: '2026-10-17T08:00:00Z' }),
     status: 201,
   },
   {
     name: 'flagging a false positive',
     arrange: openOutage,
-    act: (id) => admin('/api/admin/outages', { action: 'update', id, isFalsePositive: true }),
+    act: (id) => admin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, isFalsePositive: true }),
     status: 200,
   },
   {
     name: 'deleting an outage',
     arrange: openOutage,
-    act: (id) => admin('/api/admin/outages', { action: 'delete', id }),
+    act: (id) => admin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id }),
     status: 200,
   },
   {
     name: 'a heartbeat that closes an outage',
     arrange: openOutage,
-    act: () => call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } }),
+    act: () => call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } }),
     status: 200,
   },
   {
@@ -85,7 +86,7 @@ describe('edge cache purges', () => {
     await setHeartbeat(30);
     for (const path of EDGE_CACHED) await call(path);
     expect((await heartbeat()).status).toBe(200);
-    expect(await isCached('/api/status')).toBe(false);
-    for (const path of EDGE_CACHED.filter((p) => p !== '/api/status')) expect(await isCached(path), path).toBe(true);
+    expect(await isCached(STATUS_PATH)).toBe(false);
+    for (const path of EDGE_CACHED.filter((p) => p !== STATUS_PATH)) expect(await isCached(path), path).toBe(true);
   });
 });

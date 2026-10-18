@@ -6,6 +6,7 @@ import { build, defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
 import { localePath } from './shared/locale.ts';
+import { API_PREFIX, WORKER_PAGES } from './shared/paths.ts';
 import { type Locale, site } from './site.config.ts';
 import { HEAD } from './src/i18n/head.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
@@ -255,12 +256,6 @@ export default defineConfig({
   },
   server: {
     // `npm run dev` serves the UI; run `npm run dev:worker` alongside for the API.
-    proxy: {
-      '/api': WORKER,
-      '/og.png': WORKER,
-      '/sitemap.xml': WORKER,
-      '/robots.txt': WORKER,
-      '/feed.xml': WORKER,
-    },
+    proxy: Object.fromEntries([API_PREFIX, ...WORKER_PAGES].map((path) => [path, WORKER])),
   },
 });

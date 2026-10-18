@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
 import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
+import { ADMIN_PAGE_PATH, CSV_PATH, FEED_PATH, PRIVACY_PAGE_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import * as css from './App.css';
 import { bannersPending } from './banners';
@@ -30,7 +31,7 @@ import { syncThemeColor, watchSystemTheme } from './lib/theme';
 
 const Admin = lazy(() => import('./admin/Admin'));
 
-const POLL_MS = 30_000;
+const POLL_MS = MINUTE_MS / 2;
 const STATS_POLL_MS = 5 * MINUTE_MS;
 
 const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
@@ -66,13 +67,13 @@ const Footer: Component<{ isPublic: boolean }> = (props) => (
       <Share />
     </Show>
     <nav aria-label={t().footer.nav}>
-      <a href="/privacy">{t().footer.privacy}</a>
-      <a href="/api/outages.csv">{t().footer.csv}</a>
-      <a href="/feed.xml" type="application/atom+xml">
+      <a href={PRIVACY_PAGE_PATH}>{t().footer.privacy}</a>
+      <a href={CSV_PATH}>{t().footer.csv}</a>
+      <a href={FEED_PATH} type="application/atom+xml">
         {t().footer.feed}
       </a>
       <Show when={props.isPublic}>
-        <a href="/admin" rel="nofollow">
+        <a href={ADMIN_PAGE_PATH} rel="nofollow">
           {t().footer.signIn}
         </a>
       </Show>

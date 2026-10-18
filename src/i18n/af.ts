@@ -1,6 +1,21 @@
 // Afrikaans is the default and the source of truth: en.ts must match this shape.
 // Public copy never says how an outage was recorded (no "sensor" or "met die hand").
 
+import type { ERROR, ErrorCode } from '../../shared/errors.ts';
+
+/**
+ * API error codes without a message of their own, shown as `requestFailed(code)`: refusals the
+ * app's own requests never trigger, the contact form's code, and server faults.
+ */
+type Unexplained =
+  | typeof ERROR.forbidden
+  | typeof ERROR.unsupportedMediaType
+  | typeof ERROR.notConfigured
+  | typeof ERROR.internal;
+
+/** Every other API error code, and the admin page's own `session_expired`, needs a message. */
+export type AdminErrorCode = Exclude<ErrorCode, Unexplained> | 'session_expired';
+
 export const af = {
   // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
   lang: { switchTo: 'Switch to English', next: 'English' },
@@ -136,7 +151,7 @@ export const af = {
       bad_request: 'Kyk na die tye en probeer weer. Tye kan nie in die toekoms wees nie.',
       not_found: 'Daardie onderbreking bestaan nie meer nie. Herlaai die bladsy.',
       session_expired: 'Jou sessie het verval. Teken asseblief weer in.',
-    },
+    } satisfies Record<AdminErrorCode, string>,
     requestFailed: (code: string) => `Die versoek het misluk (${code}).`,
     network: 'Netwerkfout.',
     signInTitle: 'Teken in as administrateur',

@@ -2,11 +2,9 @@ import { createSignal } from 'solid-js';
 import { localePath } from '../../shared/locale';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../i18n';
-import { writeStored } from './storage';
+import { STORAGE_KEYS, writeStored } from './storage';
 
 export type { Locale };
-
-const STORAGE_KEY = 'locale';
 
 export const LOCALES: readonly Locale[] = site.locales;
 export const DEFAULT_LOCALE = site.locales[0];
@@ -26,7 +24,7 @@ const page = pageLocale(location.pathname);
 /** True while the boot script sends / on to the stored language's page: render nothing meanwhile. */
 export const leaving = page !== undefined && page !== initial;
 // Opening a language's page, from a link or a search result, is choosing it.
-if (page === initial) writeStored(STORAGE_KEY, initial);
+if (page === initial) writeStored(STORAGE_KEYS.locale, initial);
 
 export { locale };
 
@@ -38,7 +36,7 @@ export const intlLocale = () => site.intlLocales[locale()];
 function setLocale(next: Locale): void {
   document.documentElement.lang = next;
   setLocaleSignal(next);
-  writeStored(STORAGE_KEY, next);
+  writeStored(STORAGE_KEYS.locale, next);
 }
 
 /**

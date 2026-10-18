@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { HOUR_MS as H, type StatsResponse, TRACKING_SINCE } from '../shared/api';
+import { HOUR_MS as H, MINUTE_MS, type StatsResponse, TRACKING_SINCE } from '../shared/api';
+import { CSV_PATH, STATS_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import { zoned } from '../src/lib/zone';
 import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
@@ -8,7 +9,7 @@ import { call, insertOutage, sameWindow, uniqueIp } from './helpers';
 
 const t = (iso: string) => Date.parse(iso);
 /** The configured zone's UTC offset in ms; days and weeks start at local midnight. */
-const OFFSET = site.utcOffsetMinutes * 60_000;
+const OFFSET = site.utcOffsetMinutes * MINUTE_MS;
 
 describe('mergeOutages', () => {
   it('merges overlapping outages so time is never double counted', () => {
@@ -176,7 +177,7 @@ describe('GET /api/stats', () => {
     for (const outage of outages) await insertOutage(outage);
     await insertOutage({ startTime: ago(5 * H), endTime: ago(4 * H), isFalsePositive: 1 });
 
-    const res = await call('/api/stats');
+    const res = await call(STATS_PATH);
     expect(res.status).toBe(200);
     const body = (await res.json()) as StatsResponse;
     expect(body.trackingSince).toBe('2026-10-16T22:00:00.000Z');
@@ -200,8 +201,8 @@ describe('GET /api/stats', () => {
   it('shares the status rate limit', async () => {
     const ip = uniqueIp();
     await sameWindow();
-    for (let i = 0; i < 60; i++) await call('/api/stats', { ip });
-    expect((await call('/api/stats', { ip })).status).toBe(429);
+    for (let i = 0; i < 60; i++) await call(STATS_PATH, { ip });
+    expect((await call(STATS_PATH, { ip })).status).toBe(429);
   });
 });
 
@@ -211,10 +212,10 @@ describe('GET /api/outages.csv', () => {
     await env.DB.batch(
       Array.from({ length: 120 }, (_, i) => {
         const start = new Date(Date.UTC(2026, 9, 18) + i * H);
-        return insert.bind(start.toISOString(), new Date(start.getTime() + 600_000).toISOString(), 'manual');
+        return insert.bind(start.toISOString(), new Date(start.getTime() + 10 * MINUTE_MS).toISOString(), 'manual');
       }),
     );
-    const res = await call('/api/outages.csv');
+    const res = await call(CSV_PATH);
     expect(res.status).toBe(200);
     expect((await res.text()).trim().split('\n')).toHaveLength(121);
   });
@@ -233,7 +234,7 @@ describe('GET /api/outages.csv', () => {
       endTime: '2026-10-20T11:30:00.000Z',
     });
 
-    const res = await call('/api/outages.csv');
+    const res = await call(CSV_PATH);
     expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
     expect(res.headers.get('Content-Disposition')).toBe(`attachment; filename="${site.slug}-outages.csv"`);
     expect(await res.text()).toBe(

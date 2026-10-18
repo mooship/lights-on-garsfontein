@@ -1,10 +1,8 @@
 import { createSignal } from 'solid-js';
 import { PAGE_BG } from '../styles/theme.css';
-import { readStored, writeStored } from './storage';
+import { readStored, STORAGE_KEYS, writeStored } from './storage';
 
 type Theme = keyof typeof PAGE_BG;
-
-const STORAGE_KEY = 'theme';
 
 const currentTheme = (): Theme => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 
@@ -28,14 +26,14 @@ function applyTheme(next: Theme): void {
 
 export function setTheme(next: Theme): void {
   applyTheme(next);
-  writeStored(STORAGE_KEY, next);
+  writeStored(STORAGE_KEYS.theme, next);
 }
 
 /** Follow OS changes while the visitor has not picked a theme themselves. */
 export function watchSystemTheme(): () => void {
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   const onChange = (event: MediaQueryListEvent) => {
-    if (!readStored(STORAGE_KEY)) applyTheme(event.matches ? 'dark' : 'light');
+    if (!readStored(STORAGE_KEYS.theme)) applyTheme(event.matches ? 'dark' : 'light');
   };
   media.addEventListener('change', onChange);
   return () => media.removeEventListener('change', onChange);

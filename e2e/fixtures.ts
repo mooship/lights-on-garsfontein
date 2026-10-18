@@ -1,6 +1,8 @@
 import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
-import type { AdminOutagesResponse } from '../shared/api';
+import { type AdminOutagesResponse, OUTAGE_ACTION } from '../shared/api';
+import { ADMIN_OUTAGES_PATH } from '../shared/paths';
 import type { Locale } from '../site.config';
+import { STORAGE_KEYS } from '../src/lib/storage';
 import { exampleVar } from './dev-vars';
 
 export { expect };
@@ -10,12 +12,15 @@ const ADMIN_API = { Authorization: `Bearer ${exampleVar('ADMIN_API_TOKEN')}` };
 /** Deletes every outage through the admin API. */
 async function deleteOutages(request: APIRequestContext): Promise<void> {
   for (;;) {
-    const list = await request.get('/api/admin/outages', { headers: ADMIN_API });
+    const list = await request.get(ADMIN_OUTAGES_PATH, { headers: ADMIN_API });
     expect(list.status()).toBe(200);
     const { outages } = (await list.json()) as AdminOutagesResponse;
     if (outages.length === 0) return;
     for (const { id } of outages) {
-      const res = await request.post('/api/admin/outages', { headers: ADMIN_API, data: { action: 'delete', id } });
+      const res = await request.post(ADMIN_OUTAGES_PATH, {
+        headers: ADMIN_API,
+        data: { action: OUTAGE_ACTION.delete, id },
+      });
       expect(res.status()).toBe(200);
     }
   }
@@ -23,7 +28,7 @@ async function deleteOutages(request: APIRequestContext): Promise<void> {
 
 /** Stores the app's language before every load of `page` (the app's own default is site.locales[0]). */
 export const withLocale = (page: Page, locale: Locale) =>
-  page.addInitScript((l) => localStorage.setItem('locale', l), locale);
+  page.addInitScript(([key, l]) => localStorage.setItem(key, l), [STORAGE_KEYS.locale, locale] as const);
 
 /**
  * Every test starts with no outages, as the tests share one database. Rate-limit counts carry

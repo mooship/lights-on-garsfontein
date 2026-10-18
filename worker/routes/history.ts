@@ -1,9 +1,16 @@
 import { and, asc, desc, eq, gte, isNull, or } from 'drizzle-orm';
-import { DAY_MS, MINUTE_MS, outageDurationMs, type StatsResponse, TRACKING_SINCE } from '../../shared/api';
+import {
+  CSV_FILE_NAME,
+  DAY_MS,
+  MINUTE_MS,
+  outageDurationMs,
+  type StatsResponse,
+  TRACKING_SINCE,
+} from '../../shared/api';
 import { CSV_PATH, FEED_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { outages } from '../db/schema';
-import { json } from '../lib/http';
+import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { mergeOutages, weeklyStats, windowStats } from '../lib/stats';
 
@@ -34,7 +41,7 @@ async function getStats({ db }: RouteContext): Promise<Response> {
     generatedAt: new Date(now).toISOString(),
   };
   // Changes only when an outage starts or ends, so a minute of caching is harmless.
-  return json(body, 200, { 'Cache-Control': 'public, max-age=60' });
+  return json(body, 200, { 'Cache-Control': publicCache(MINUTE_MS) });
 }
 
 function csvField(value: string | number | null): string {
@@ -67,9 +74,9 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   return new Response(`${lines.join('\n')}\n`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${site.slug}-outages.csv"`,
+      'Content-Disposition': `attachment; filename="${CSV_FILE_NAME}"`,
       // About 80 bytes per outage, so even decades of data stay a few MB; a short cache keeps repeat downloads cheap.
-      'Cache-Control': 'public, max-age=300',
+      'Cache-Control': publicCache(5 * MINUTE_MS),
     },
   });
 }
@@ -132,8 +139,8 @@ async function getFeed({ env, db }: RouteContext): Promise<Response> {
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>${escapeXml(site.brand.full)}</title>
-  <id>${escapeXml(`${env.SITE_URL}/feed.xml`)}</id>
-  <link rel="self" href="${escapeXml(`${env.SITE_URL}/feed.xml`)}"/>
+  <id>${escapeXml(`${env.SITE_URL}${FEED_PATH}`)}</id>
+  <link rel="self" href="${escapeXml(`${env.SITE_URL}${FEED_PATH}`)}"/>
   <link rel="alternate" type="text/html" href="${escapeXml(home)}"/>
   <updated>${updated}</updated>
   <author><name>${escapeXml(site.operator.name)}</name></author>
@@ -151,7 +158,7 @@ ${entries
   .join('')}</feed>
 `;
   return new Response(xml, {
-    headers: { 'Content-Type': 'application/atom+xml; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
+    headers: { 'Content-Type': 'application/atom+xml; charset=utf-8', 'Cache-Control': publicCache(5 * MINUTE_MS) },
   });
 }
 

@@ -1,4 +1,6 @@
 import type { z } from 'zod';
+import { MINUTE_MS } from '../../shared/api';
+import { ERROR, type ErrorCode } from '../../shared/errors';
 
 export function json(data: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), {
@@ -11,15 +13,18 @@ export function json(data: unknown, status = 200, headers: HeadersInit = {}): Re
   });
 }
 
+/** Cache-Control for a public response that any cache may keep for `ms`. */
+export const publicCache = (ms: number) => `public, max-age=${ms / 1000}`;
+
 export const errors = {
-  badRequest: (error = 'bad_request', details?: unknown) => json({ error, details }, 400),
-  unauthorized: () => json({ error: 'unauthorized' }, 401),
-  forbidden: (error = 'forbidden') => json({ error }, 403),
-  notFound: () => json({ error: 'not_found' }, 404),
-  conflict: (error: string) => json({ error }, 409),
-  unsupportedMediaType: () => json({ error: 'unsupported_media_type' }, 415),
-  rateLimited: () => json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' }),
-  internal: () => json({ error: 'internal_error' }, 500),
+  badRequest: (error: ErrorCode = ERROR.badRequest, details?: unknown) => json({ error, details }, 400),
+  unauthorized: () => json({ error: ERROR.unauthorized }, 401),
+  forbidden: (error: ErrorCode = ERROR.forbidden) => json({ error }, 403),
+  notFound: () => json({ error: ERROR.notFound }, 404),
+  conflict: (error: ErrorCode) => json({ error }, 409),
+  unsupportedMediaType: () => json({ error: ERROR.unsupportedMediaType }, 415),
+  rateLimited: () => json({ error: ERROR.rateLimited }, 429, { 'Retry-After': String(MINUTE_MS / 1000) }),
+  internal: () => json({ error: ERROR.internal }, 500),
 };
 
 /** The token from `Authorization: Bearer <token>` ('' when empty), or null without a bearer header. */
@@ -28,8 +33,10 @@ export function bearerToken(request: Request): string | null {
   return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
 }
 
+export const CLIENT_IP_HEADER = 'CF-Connecting-IP';
+
 export function clientIp(request: Request): string {
-  return request.headers.get('CF-Connecting-IP') ?? '127.0.0.1';
+  return request.headers.get(CLIENT_IP_HEADER) ?? '127.0.0.1';
 }
 
 /**
@@ -62,10 +69,10 @@ export async function parseBody<T extends z.ZodType>(
   try {
     body = await request.json();
   } catch {
-    return { response: errors.badRequest('invalid_json') };
+    return { response: errors.badRequest(ERROR.invalidJson) };
   }
   const result = schema.safeParse(body);
-  if (!result.success) return { response: errors.badRequest('bad_request', result.error.issues) };
+  if (!result.success) return { response: errors.badRequest(ERROR.badRequest, result.error.issues) };
   return { data: result.data };
 }
 

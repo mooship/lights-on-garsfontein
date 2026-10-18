@@ -80,10 +80,15 @@ export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 
 /** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
-export type TurnstileAction = 'login' | 'contact';
+export const TURNSTILE_ACTION = { login: 'login', contact: 'contact' } as const;
+export type TurnstileAction = (typeof TURNSTILE_ACTION)[keyof typeof TURNSTILE_ACTION];
 
 /** Admin punch clock: punch out when the power goes off, punch in when it comes back. */
-export type TimerAction = 'punch_out' | 'punch_in';
+export const TIMER_ACTION = { punchOut: 'punch_out', punchIn: 'punch_in' } as const;
+export type TimerAction = (typeof TIMER_ACTION)[keyof typeof TIMER_ACTION];
+
+/** What a POST to ADMIN_OUTAGES_PATH (shared/paths.ts) does. */
+export const OUTAGE_ACTION = { create: 'create', update: 'update', delete: 'delete' } as const;
 
 /** How long an outage lasted; one still in progress runs until `now`. */
 export function outageDurationMs(outage: { startTime: string; endTime: string | null }, now: number): number {
@@ -95,3 +100,6 @@ export const HEARTBEAT_THRESHOLD_MS = 180_000;
 
 /** Statistics never count time before this. */
 export const TRACKING_SINCE = site.trackingSince;
+
+/** The download name of the CSV at CSV_PATH (shared/paths.ts). */
+export const CSV_FILE_NAME = `${site.slug}-outages.csv`;

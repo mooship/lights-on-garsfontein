@@ -1,3 +1,5 @@
+import { TURNSTILE_ACTION } from '../shared/api';
+import { CONTACT_PATH } from '../shared/paths';
 import { api } from './lib/api';
 import { getTurnstileToken } from './lib/turnstile';
 
@@ -7,7 +9,7 @@ import { getTurnstileToken } from './lib/turnstile';
 
 /** POST /api/contact: the address, or null when the deploy has none (404 not_configured). */
 async function fetchEmail(token: string): Promise<string | null> {
-  const res = await fetch('/api/contact', {
+  const res = await fetch(CONTACT_PATH, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token }),
@@ -42,7 +44,7 @@ function setUp(block: HTMLElement): void {
     result.replaceChildren();
     try {
       const { turnstileSiteKey } = await api.status();
-      const email = await fetchEmail(await getTurnstileToken(widget, turnstileSiteKey, 'contact'));
+      const email = await fetchEmail(await getTurnstileToken(widget, turnstileSiteKey, TURNSTILE_ACTION.contact));
       if (email === null) {
         // Nothing to retry: the button goes, and focus moves to the GitHub link that replaces it.
         const link = fallBack();

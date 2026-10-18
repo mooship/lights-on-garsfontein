@@ -1,4 +1,5 @@
-import { OUTAGE_VIEWS } from '../shared/paths';
+import { API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
+import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
 import { detectOutage, purgeExpiredSessions, purgeOldFingerprints, purgeOldStillOffReports } from './lib/grid';
 import { errors } from './lib/http';
@@ -10,13 +11,10 @@ import { historyRoutes } from './routes/history';
 import { seoRoutes } from './routes/seo';
 import { statusRoutes } from './routes/status';
 
-/** Must match the hourly cron in wrangler.toml. */
-const HOURLY_CRON = '0 * * * *';
-
 /**
- * Every Worker endpoint. Adding one means: its handler in a file under
- * routes/, its route map spread here, the path in wrangler's `assets.run_worker_first` if it is
- * outside /api/, and the path in vite.config.ts's dev `server.proxy`.
+ * Every Worker endpoint. Adding one means: its path in shared/paths.ts, its handler in a file
+ * under routes/, its route map spread here and, if it is outside API_PREFIX, the path in
+ * WORKER_PAGES and in wrangler's `assets.run_worker_first`.
  */
 const routes: Routes = {
   ...statusRoutes,
@@ -51,7 +49,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const match = routes[`${request.method} ${url.pathname}`];
   if (match) return dispatch(match, request, env);
-  if (url.pathname.startsWith('/api/')) return errors.notFound();
+  if (url.pathname.startsWith(API_PREFIX)) return errors.notFound();
   return env.ASSETS.fetch(request);
 }
 
@@ -65,7 +63,7 @@ export default {
     }
   },
 
-  /** Two crons (wrangler.toml): outage detection every minute, housekeeping every hour. */
+  /** The two crons in worker/crons.ts. */
   async scheduled(controller, env) {
     const db = createDb(env.DB);
     const now = new Date(controller.scheduledTime);

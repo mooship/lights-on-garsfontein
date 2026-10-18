@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { localePath } from '../../shared/locale';
+import { PRIVACY_PAGE_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 
 // Checks on the output of `npm run build`. Only in CI (which builds first) or with CHECK_DIST=1, so a
@@ -92,7 +93,7 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
 
   it('precaches the language pages, the privacy page and every asset, all of them in the build', async () => {
     const urls = await precached();
-    expect(urls).toEqual(expect.arrayContaining([...site.locales.map(localePath), '/privacy']));
+    expect(urls).toEqual(expect.arrayContaining([...site.locales.map(localePath), PRIVACY_PAGE_PATH]));
     for (const url of urls) expect(exists(fileFor(url)), url).toBe(true);
     const assets = readdirSync(resolve(DIST, 'assets')).map((name) => `/assets/${name}`);
     expect(urls.filter((url) => url.startsWith('/assets/')).sort()).toEqual(assets.sort());

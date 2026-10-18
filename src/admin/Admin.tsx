@@ -3,9 +3,16 @@ import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
 import { type Component, createResource, createSignal, For, Match, onMount, Show, Switch } from 'solid-js';
-import type { AdminOutage, AdminOutagesResponse, TimerAction } from '../../shared/api';
+import {
+  type AdminOutage,
+  type AdminOutagesResponse,
+  TIMER_ACTION,
+  type TimerAction,
+  TURNSTILE_ACTION,
+} from '../../shared/api';
+import { ERROR } from '../../shared/errors';
 import { PunchClock } from '../components/PunchClock';
-import type { Messages } from '../i18n/af';
+import type { AdminErrorCode } from '../i18n/af';
 import { ApiError, api } from '../lib/api';
 import { formatDay, formatDuration, formatTime, fromLocalInput, outageDurationMs, toLocalInput } from '../lib/format';
 import { t } from '../lib/i18n';
@@ -13,8 +20,6 @@ import { useMinute, useNow } from '../lib/now';
 import { getTurnstileToken } from '../lib/turnstile';
 import { button, errorText, input, label, plainList } from '../styles/ui.css';
 import * as css from './Admin.css';
-
-type ErrorCode = keyof Messages['admin']['errors'];
 
 const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401;
 
@@ -37,7 +42,7 @@ const FormError: Component<{ error: unknown }> = (props) => (
 /** Reports a failed dashboard action: a 401 ends the session, anything else shows through `show`. */
 type OnError = (error: unknown, show: (error: unknown) => void) => void;
 
-const LoginForm: Component<{ notice?: ErrorCode; focus: boolean; onLoggedIn: () => void }> = (props) => {
+const LoginForm: Component<{ notice?: AdminErrorCode; focus: boolean; onLoggedIn: () => void }> = (props) => {
   let widget!: HTMLDivElement;
   let heading!: HTMLHeadingElement;
   // Starts with the reason the last session ended, if any.
@@ -55,7 +60,7 @@ const LoginForm: Component<{ notice?: ErrorCode; focus: boolean; onLoggedIn: () 
     try {
       // The public status response carries the Turnstile site key.
       const { turnstileSiteKey } = await api.status();
-      const token = await getTurnstileToken(widget, turnstileSiteKey, 'login');
+      const token = await getTurnstileToken(widget, turnstileSiteKey, TURNSTILE_ACTION.login);
       await api.login(username, password, token);
       props.onLoggedIn();
     } catch (e) {
@@ -197,7 +202,7 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
     setError(undefined);
     setSaved(false);
     if (end && Date.parse(end) <= Date.parse(start)) {
-      setError('end_before_start' satisfies ErrorCode);
+      setError(ERROR.endBeforeStart);
       return;
     }
     setBusy(true);
@@ -251,7 +256,7 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
 const Dashboard: Component<{
   initial: AdminOutagesResponse;
   focus: boolean;
-  onLoggedOut: (notice?: ErrorCode) => void;
+  onLoggedOut: (notice?: AdminErrorCode) => void;
 }> = (props) => {
   let heading!: HTMLHeadingElement;
   onMount(() => props.focus && heading.focus());
@@ -310,8 +315,8 @@ const Dashboard: Component<{
           outage={open()}
           now={now()}
           busy={busy() || loading()}
-          onPunchOut={() => punch('punch_out')}
-          onPunchIn={() => punch('punch_in')}
+          onPunchOut={() => punch(TIMER_ACTION.punchOut)}
+          onPunchIn={() => punch(TIMER_ACTION.punchIn)}
         />
         <FormError error={error()} />
         <p class={css.announce} role="status">
@@ -319,7 +324,7 @@ const Dashboard: Component<{
             const p = punched();
             if (!p) return '';
             const time = formatTime(p.at);
-            return p.action === 'punch_out' ? t().admin.punchedOut(time) : t().admin.punchedIn(time);
+            return p.action === TIMER_ACTION.punchOut ? t().admin.punchedOut(time) : t().admin.punchedIn(time);
           })()}
         </p>
       </section>
@@ -350,10 +355,10 @@ const Admin: Component = () => {
       throw e;
     }
   });
-  const [notice, setNotice] = createSignal<ErrorCode>();
+  const [notice, setNotice] = createSignal<AdminErrorCode>();
   // Focus moves to the new view's heading after signing in or out, not on first load.
   const [moved, setMoved] = createSignal(false);
-  const switchView = (reason?: ErrorCode) => {
+  const switchView = (reason?: AdminErrorCode) => {
     setNotice(reason);
     setMoved(true);
     refetch();

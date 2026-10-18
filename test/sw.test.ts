@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import {
+  ADMIN_OUTAGES_PATH,
+  ADMIN_PAGE_PATH,
+  CONTACT_PATH,
+  CSV_PATH,
+  FEED_PATH,
+  OG_IMAGE_PATH,
+  PRIVACY_PAGE_PATH,
+  SITEMAP_PATH,
+  STATS_PATH,
+  STATUS_PATH,
+} from '../shared/paths';
 import { cacheName, isOldShell, STATUS_CACHE, strategyFor, strayAssets } from '../src/sw/strategy';
 
 const ORIGIN = 'https://garsfontein.example';
-const PAGES = ['/', '/en/', '/privacy'];
+const PAGES = ['/', '/en/', PRIVACY_PAGE_PATH];
 const strategy = (path: string, method = 'GET', origin = ORIGIN) =>
   strategyFor(method, new URL(path, origin), ORIGIN, PAGES);
 
@@ -17,24 +29,24 @@ describe('service worker strategy', () => {
   });
 
   it('serves the status network-first, with the last copy as the fallback', () => {
-    expect(strategy('/api/status')).toBe('status');
+    expect(strategy(STATUS_PATH)).toBe('status');
   });
 
   it('never touches writes, the admin, other API routes or other origins', () => {
     for (const method of ['POST', 'PUT', 'DELETE', 'HEAD']) {
-      expect(strategy('/api/status', method)).toBe('network');
+      expect(strategy(STATUS_PATH, method)).toBe('network');
       expect(strategy('/', method)).toBe('network');
     }
     for (const path of [
-      '/admin',
+      ADMIN_PAGE_PATH,
       '/admin/',
-      '/api/admin/outages',
-      '/api/contact',
-      '/api/stats',
-      '/api/outages.csv',
-      '/feed.xml',
-      '/og.png',
-      '/sitemap.xml',
+      ADMIN_OUTAGES_PATH,
+      CONTACT_PATH,
+      STATS_PATH,
+      CSV_PATH,
+      FEED_PATH,
+      OG_IMAGE_PATH,
+      SITEMAP_PATH,
       '/sw.js',
       '/cdn-cgi/rum',
       '/en', // redirects to /en/; the browser follows it without the worker

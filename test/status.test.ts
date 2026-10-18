@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../shared/api';
+import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, MINUTE_MS, TIMER_ACTION } from '../shared/api';
+import { HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { createDb } from '../worker/db/client';
 import { getGridState } from '../worker/lib/grid';
 import { call, insertOutage, runCron, sameWindow, setHeartbeat, getStatus as status, uniqueIp } from './helpers';
@@ -85,8 +86,8 @@ describe('GET /api/status', () => {
 
   it('reports ON since the end of the last outage', async () => {
     await setHeartbeat(10);
-    const endTime = new Date(Date.now() - 120_000).toISOString();
-    await insertOutage({ startTime: new Date(Date.now() - 900_000).toISOString(), endTime });
+    const endTime = new Date(Date.now() - 2 * MINUTE_MS).toISOString();
+    await insertOutage({ startTime: new Date(Date.now() - 15 * MINUTE_MS).toISOString(), endTime });
     const body = await status();
     expect(body.since).toBe(endTime);
     expect(body.recent[0]?.endTime).toBe(endTime);
@@ -104,7 +105,7 @@ describe('GET /api/status', () => {
 
   it('is never cached by browsers, from the edge cache or not', async () => {
     for (let i = 0; i < 2; i++) {
-      const res = await call('/api/status');
+      const res = await call(STATUS_PATH);
       expect(res.headers.get('Cache-Control')).toBe('no-store');
       expect(res.headers.has('X-Browser-Cache-Control')).toBe(false);
     }
@@ -114,16 +115,16 @@ describe('GET /api/status', () => {
     const ip = uniqueIp();
     await sameWindow();
     for (let i = 0; i < 60; i++) {
-      expect((await call('/api/status', { ip })).status).toBe(200);
+      expect((await call(STATUS_PATH, { ip })).status).toBe(200);
     }
-    expect((await call('/api/status', { ip })).status).toBe(429);
-    expect((await call('/api/status')).status).toBe(200);
+    expect((await call(STATUS_PATH, { ip })).status).toBe(429);
+    expect((await call(STATUS_PATH)).status).toBe(200);
   });
 });
 
 describe('GET /api/status edge cache', () => {
   const heartbeat = () =>
-    call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
+    call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
   const admin = { Authorization: 'Bearer test-admin-api-token' };
 
   it('serves a repeat request within the TTL from the edge cache', async () => {
@@ -148,7 +149,7 @@ describe('GET /api/status edge cache', () => {
   it('is not purged by a refused admin write', async () => {
     const first = await status();
     await insertOutage({ source: 'manual' });
-    const res = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' }, headers: admin });
+    const res = await call(TIMER_PATH, { method: 'POST', body: { action: TIMER_ACTION.punchOut }, headers: admin });
     expect(res.status).toBe(409);
     expect(await status()).toEqual(first);
   });
@@ -158,20 +159,20 @@ describe('POST /api/heartbeat', () => {
   const auth = { Authorization: 'Bearer test-heartbeat-token' };
 
   it('rejects requests without the sensor token', async () => {
-    expect((await call('/api/heartbeat', { method: 'POST' })).status).toBe(401);
-    const wrong = await call('/api/heartbeat', { method: 'POST', headers: { Authorization: 'Bearer nope' } });
+    expect((await call(HEARTBEAT_PATH, { method: 'POST' })).status).toBe(401);
+    const wrong = await call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer nope' } });
     expect(wrong.status).toBe(401);
   });
 
   it('rejects every heartbeat while no sensor token is configured', async () => {
     const noToken = { ...env, HEARTBEAT_TOKEN: '' } as Env;
-    const res = await call('/api/heartbeat', {
+    const res = await call(HEARTBEAT_PATH, {
       method: 'POST',
       headers: { Authorization: 'Bearer undefined' },
       env: noToken,
     });
     expect(res.status).toBe(401);
-    const forged = await call('/api/heartbeat', {
+    const forged = await call(HEARTBEAT_PATH, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' },
       env: noToken,
@@ -180,7 +181,7 @@ describe('POST /api/heartbeat', () => {
   });
 
   it('records the heartbeat', async () => {
-    const res = await call('/api/heartbeat', { method: 'POST', headers: auth });
+    const res = await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
     expect(res.status).toBe(200);
     const row = await env.DB.prepare('SELECT last_seen FROM heartbeats WHERE id = 1').first<{ last_seen: string }>();
     expect(Date.now() - Date.parse(row?.last_seen ?? '')).toBeLessThan(5_000);
@@ -188,7 +189,7 @@ describe('POST /api/heartbeat', () => {
 
   it('records an outage that began and ended between two cron runs', async () => {
     const lastSeen = await setHeartbeat(240);
-    const res = await call('/api/heartbeat', { method: 'POST', headers: auth });
+    const res = await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
     expect(await res.json()).toEqual({ ok: true, closedOutages: 0 });
     const rows = await env.DB.prepare('SELECT start_time, end_time, source FROM outages').all<{
       start_time: string;
@@ -200,10 +201,10 @@ describe('POST /api/heartbeat', () => {
 
   it('records no extra outage after a fresh heartbeat, or when the silence is already on record', async () => {
     await setHeartbeat(30);
-    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
     const lastSeen = await setHeartbeat(240);
     await insertOutage({ startTime: lastSeen, endTime: new Date().toISOString(), isFalsePositive: 1 });
-    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
     const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
     expect(n).toBe(1);
   });
@@ -211,7 +212,7 @@ describe('POST /api/heartbeat', () => {
   it('closes every open outage, manual ones included', async () => {
     await insertOutage({ source: 'sensor' });
     await insertOutage({ source: 'manual' });
-    const res = await call('/api/heartbeat', { method: 'POST', headers: auth });
+    const res = await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
     expect(await res.json()).toEqual({ ok: true, closedOutages: 2 });
     const rows = await env.DB.prepare('SELECT end_time FROM outages').all<{ end_time: string | null }>();
     expect(rows.results.map((r) => r.end_time)).toEqual([expect.any(String), expect.any(String)]);
@@ -221,10 +222,10 @@ describe('POST /api/heartbeat', () => {
   it('closes an open manual outage over a stale gap without recording the gap again', async () => {
     const lastSeen = await setHeartbeat(600);
     const manual = await insertOutage({
-      startTime: new Date(Date.parse(lastSeen) + 60_000).toISOString(),
+      startTime: new Date(Date.parse(lastSeen) + MINUTE_MS).toISOString(),
       source: 'manual',
     });
-    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
     const rows = await env.DB.prepare('SELECT id, end_time FROM outages').all<{
       id: number;
       end_time: string | null;
@@ -233,9 +234,9 @@ describe('POST /api/heartbeat', () => {
   });
 
   it('closes a manual outage that began before the last heartbeat, with no gap outage', async () => {
-    const manual = await insertOutage({ startTime: new Date(Date.now() - 3_600_000).toISOString(), source: 'manual' });
+    const manual = await insertOutage({ startTime: new Date(Date.now() - HOUR_MS).toISOString(), source: 'manual' });
     await setHeartbeat(600);
-    await call('/api/heartbeat', { method: 'POST', headers: auth });
+    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
     const rows = await env.DB.prepare('SELECT id, end_time FROM outages').all<{
       id: number;
       end_time: string | null;

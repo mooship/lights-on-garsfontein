@@ -187,7 +187,7 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 | Path | Contents |
 | --- | --- |
 | `src/` | SolidJS app: `components/`, `admin/`, `i18n/`, `lib/`, `styles/`, `sw/`, `banners.ts` |
-| `worker/` | Worker: `index.ts` (route table, security headers, crons), `routes/`, `lib/`, `db/schema.ts` |
+| `worker/` | Worker: `index.ts` (route table, security headers, crons), `crons.ts`, `routes/`, `lib/`, `db/schema.ts` |
 | `shared/` | Types and constants for both the app and the Worker (`api.ts`, `paths.ts`, `locale.ts`) |
 | `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages, service worker |
 | `templates/` | `llms.txt` and `site.webmanifest`, filled at build time |
@@ -195,7 +195,7 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 | `scripts/` | Password hashing, OG card and icon rendering, the service worker kill switch |
 | `test/`, `e2e/` | Vitest (Worker in workerd, and Node in `test/node/`) and Playwright |
 
-**Adding an endpoint.** Put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, spread it into `routes` in `worker/index.ts`, add any path outside `/api/` to `assets.run_worker_first` in `wrangler.toml` (and `wrangler.example.toml`), and add the path to `server.proxy` in `vite.config.ts`. Declare guards on the route (`worker/lib/router.ts`): `sameOrigin`, `limiter`, `authorize`, `cors`, `edgeCache` and `purges`.
+**Adding an endpoint.** Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in both dictionaries (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `sameOrigin`, `limiter`, `authorize`, `cors`, `edgeCache` and `purges`.
 
 **Adding a language.** Add the code to `site.locales` and `intlLocales`, create `src/i18n/<code>.ts` that `satisfies Messages`, register it in `DICTIONARIES` in `src/i18n/index.ts`, and add its `<head>` copy to `src/i18n/head.ts`. Each dictionary's `lang.switchTo` labels the switch to the next locale, in that language. The build writes the page to `/<code>/` with its own canonical and hreflang links. Add a section to `privacy.html`.
 

@@ -1,7 +1,8 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { type AdminOutagesResponse, MINUTE_MS, type TimerAction } from '../../shared/api';
-import { OUTAGE_VIEWS } from '../../shared/paths';
+import { type AdminOutagesResponse, MINUTE_MS, OUTAGE_ACTION, TIMER_ACTION } from '../../shared/api';
+import { ERROR } from '../../shared/errors';
+import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, TIMER_PATH } from '../../shared/paths';
 import { outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
 import { getOpenOutage, openOutage, summarise } from '../lib/grid';
@@ -17,24 +18,23 @@ const isoDate = z.iso
   .transform((v) => new Date(v).toISOString())
   .refine((v) => Date.parse(v) <= Date.now() + MAX_FUTURE_MS, 'time_in_future');
 
-const timerActions = ['punch_out', 'punch_in'] as const satisfies readonly TimerAction[];
-const timerSchema = z.object({ action: z.enum(timerActions) });
+const timerSchema = z.object({ action: z.enum(TIMER_ACTION) });
 
 const outageSchema = z.discriminatedUnion('action', [
   z.object({
-    action: z.literal('create'),
+    action: z.literal(OUTAGE_ACTION.create),
     startTime: isoDate,
     endTime: isoDate.nullable().optional(),
     isPlanned: z.boolean().optional(),
   }),
   z.object({
-    action: z.literal('update'),
+    action: z.literal(OUTAGE_ACTION.update),
     id: z.number().int().positive(),
     endTime: isoDate.nullable().optional(),
     isFalsePositive: z.boolean().optional(),
     isPlanned: z.boolean().optional(),
   }),
-  z.object({ action: z.literal('delete'), id: z.number().int().positive() }),
+  z.object({ action: z.literal(OUTAGE_ACTION.delete), id: z.number().int().positive() }),
 ]);
 
 async function listOutages({ db }: RouteContext): Promise<Response> {
@@ -54,20 +54,20 @@ async function timer({ request, db }: RouteContext): Promise<Response> {
   if ('response' in parsed) return parsed.response;
   const now = new Date().toISOString();
 
-  if (parsed.data.action === 'punch_out') {
-    if (!(await openOutage(db, now, 'manual'))) return errors.conflict('outage_already_open');
+  if (parsed.data.action === TIMER_ACTION.punchOut) {
+    if (!(await openOutage(db, now, 'manual'))) return errors.conflict(ERROR.outageAlreadyOpen);
     return json({ outage: await getOpenOutage(db) }, 201);
   }
 
   const open = await getOpenOutage(db);
-  if (!open) return errors.conflict('no_open_outage');
+  if (!open) return errors.conflict(ERROR.noOpenOutage);
   const [outage] = await db
     .update(outages)
     .set({ endTime: now })
     .where(and(eq(outages.id, open.id), isNull(outages.endTime)))
     .returning();
   // Closed or deleted by another request in the meantime.
-  if (!outage) return errors.conflict('no_open_outage');
+  if (!outage) return errors.conflict(ERROR.noOpenOutage);
   return json({ outage });
 }
 
@@ -76,8 +76,8 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   if ('response' in parsed) return parsed.response;
   const input = parsed.data;
 
-  if (input.action === 'create') {
-    if (input.endTime && input.endTime < input.startTime) return errors.badRequest('end_before_start');
+  if (input.action === OUTAGE_ACTION.create) {
+    if (input.endTime && input.endTime < input.startTime) return errors.badRequest(ERROR.endBeforeStart);
     const [outage] = await db
       .insert(outages)
       .values({
@@ -93,7 +93,7 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   const existing = await db.query.outages.findFirst({ where: eq(outages.id, input.id) });
   if (!existing) return errors.notFound();
 
-  if (input.action === 'delete') {
+  if (input.action === OUTAGE_ACTION.delete) {
     await db.delete(outages).where(eq(outages.id, input.id));
     return json({ ok: true });
   }
@@ -109,7 +109,7 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
     }
   }
   const endTime = changes.endTime === undefined ? existing.endTime : changes.endTime;
-  if (endTime && endTime < existing.startTime) return errors.badRequest('end_before_start');
+  if (endTime && endTime < existing.startTime) return errors.badRequest(ERROR.endBeforeStart);
   if (Object.keys(changes).length === 0) return json({ outage: existing });
 
   const [outage] = await db.update(outages).set(changes).where(eq(outages.id, input.id)).returning();
@@ -133,7 +133,7 @@ async function authorizeAdmin(ctx: RouteContext): Promise<Response | null> {
 }
 
 export const adminRoutes: Routes = {
-  'GET /api/admin/outages': { handler: listOutages, authorize: authorizeAdmin },
-  'POST /api/admin/outages': { handler: mutateOutage, authorize: authorizeAdmin, purges: OUTAGE_VIEWS },
-  'POST /api/admin/timer': { handler: timer, authorize: authorizeAdmin, purges: OUTAGE_VIEWS },
+  [`GET ${ADMIN_OUTAGES_PATH}`]: { handler: listOutages, authorize: authorizeAdmin },
+  [`POST ${ADMIN_OUTAGES_PATH}`]: { handler: mutateOutage, authorize: authorizeAdmin, purges: OUTAGE_VIEWS },
+  [`POST ${TIMER_PATH}`]: { handler: timer, authorize: authorizeAdmin, purges: OUTAGE_VIEWS },
 };

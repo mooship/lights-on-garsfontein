@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { TURNSTILE_ACTION } from '../../shared/api';
+import { ERROR } from '../../shared/errors';
+import { CONTACT_PATH } from '../../shared/paths';
 import { json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
@@ -16,12 +19,12 @@ async function postContact(ctx: RouteContext): Promise<Response> {
   if ('response' in parsed) return parsed.response;
   // Checked before Turnstile, so an unconfigured deploy spends no siteverify call.
   const email = env.CONTACT_EMAIL?.trim();
-  if (!email) return json({ error: 'not_configured' }, 404);
-  const refused = await checkTurnstile(ctx, parsed.data.token, 'contact');
+  if (!email) return json({ error: ERROR.notConfigured }, 404);
+  const refused = await checkTurnstile(ctx, parsed.data.token, TURNSTILE_ACTION.contact);
   if (refused) return refused;
   return json({ email });
 }
 
 export const contactRoutes: Routes = {
-  'POST /api/contact': { handler: postContact, sameOrigin: true, limiter: 'CONFIRM_LIMITER' },
+  [`POST ${CONTACT_PATH}`]: { handler: postContact, sameOrigin: true, limiter: 'CONFIRM_LIMITER' },
 };

@@ -1,21 +1,21 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { DAY_MS } from '../../shared/api';
+import { DAY_MS, TURNSTILE_ACTION } from '../../shared/api';
+import { LOGIN_PATH, LOGOUT_PATH } from '../../shared/paths';
 import { sessions } from '../db/schema';
+import { SESSION_COOKIE } from '../lib/cookies';
 import { randomToken, safeEqual, sha256Hex, verifyPassword } from '../lib/crypto';
 import { errors, isRateLimited, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
 
-// __Host- prefix: the browser only accepts it from this exact host (no sibling-subdomain cookie tossing).
-const SESSION_COOKIE = '__Host-admin_session';
 const SESSION_TOKEN = /^[\w-]{43}$/;
 // Stay signed in for 30 days after the last visit; renewing at most daily keeps writes rare.
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const SESSION_TTL_MS = 30 * DAY_MS;
 const RENEW_AFTER_MS = DAY_MS;
 // However often it is used, a session ends 90 days after sign-in.
 const SESSION_MAX_AGE_MS = 90 * DAY_MS;
-const ADMIN_USER_ID = 'admin';
+export const ADMIN_USER_ID = 'admin';
 
 const loginSchema = z.object({
   username: z.string().min(1).max(128),
@@ -37,9 +37,9 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-/** SESSION_TTL_SECONDS from now, capped at SESSION_MAX_AGE_MS after sign-in. */
+/** SESSION_TTL_MS from now, capped at SESSION_MAX_AGE_MS after sign-in. */
 const sessionExpiry = (now: number, createdAt: number) =>
-  Math.min(now + SESSION_TTL_SECONDS * 1000, createdAt + SESSION_MAX_AGE_MS);
+  Math.min(now + SESSION_TTL_MS, createdAt + SESSION_MAX_AGE_MS);
 
 /** Changes whenever ADMIN_PASSWORD_HASH does, so a new password signs every session out. */
 export const passwordFingerprint = async (env: Env) =>
@@ -83,7 +83,7 @@ async function login(ctx: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, loginSchema);
   if ('response' in parsed) return parsed.response;
   // Turnstile keeps bots off the sign-in form; scripts use ADMIN_API_TOKEN instead.
-  const refused = await checkTurnstile(ctx, parsed.data.token, 'login');
+  const refused = await checkTurnstile(ctx, parsed.data.token, TURNSTILE_ACTION.login);
   if (refused) return refused;
   // A site-wide cap on top of the per-connection limit, so spreading guesses over many
   // addresses does not help either. Counted only after Turnstile, so junk cannot lock out sign-in.
@@ -106,7 +106,7 @@ async function login(ctx: RouteContext): Promise<Response> {
     createdAt: new Date(now).toISOString(),
     passwordFingerprint: await passwordFingerprint(env),
   });
-  return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SECONDS) });
+  return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_MS / 1000) });
 }
 
 async function logout({ request, db }: RouteContext): Promise<Response> {
@@ -118,6 +118,6 @@ async function logout({ request, db }: RouteContext): Promise<Response> {
 }
 
 export const authRoutes: Routes = {
-  'POST /api/admin/login': { handler: login, sameOrigin: true, limiter: 'LOGIN_LIMITER' },
-  'POST /api/admin/logout': { handler: logout, sameOrigin: true },
+  [`POST ${LOGIN_PATH}`]: { handler: login, sameOrigin: true, limiter: 'LOGIN_LIMITER' },
+  [`POST ${LOGOUT_PATH}`]: { handler: logout, sameOrigin: true },
 };
