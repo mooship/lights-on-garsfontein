@@ -17,7 +17,8 @@ declare global {
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 let loader: Promise<TurnstileApi> | undefined;
 
-function loadTurnstile(): Promise<TurnstileApi> {
+/** Loads the script once; a failed load is retried on the next call. */
+export function loadTurnstile(): Promise<TurnstileApi> {
   loader ??= new Promise<TurnstileApi>((resolve, reject) => {
     const script = document.createElement('script');
     script.src = SCRIPT_URL;

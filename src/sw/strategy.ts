@@ -11,10 +11,13 @@ export { STATUS_PATH };
  * - status: network first, then the last status, marked with FROM_CACHE_HEADER.
  * - network: not handled at all, so the browser fetches it as if there were no worker.
  */
-export type Strategy = 'page' | 'asset' | 'status' | 'network';
+type Strategy = 'page' | 'asset' | 'status' | 'network';
 
 /** On a status the worker served from its cache because the network failed: not current. */
 export const FROM_CACHE_HEADER = 'X-From-Cache';
+
+/** How long the worker waits for the network before it answers a page or the status from its cache. */
+export const NETWORK_TIMEOUT_MS = 3000;
 
 /** One cache per build, so the worker that activates can delete the others. */
 export const cacheName = (buildId: string) => `shell-${buildId}`;

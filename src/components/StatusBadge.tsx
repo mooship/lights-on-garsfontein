@@ -1,4 +1,3 @@
-import clsx from 'clsx';
 import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
 import { type Component, Show } from 'solid-js';
@@ -18,7 +17,7 @@ interface StatusBadgeProps {
 }
 
 /** ON, OFF, or NONE: ON without a live reading, shown in a neutral tone and without a duration. */
-export type BadgeState = PowerStatus | 'NONE';
+type BadgeState = PowerStatus | 'NONE';
 
 export const badgeState = (status: PowerStatus, monitored: boolean): BadgeState =>
   status === 'ON' && !monitored ? 'NONE' : status;
@@ -46,7 +45,7 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
       </div>
       <div>
         {/* Only the headline is live, so the ticking duration is never re-announced. */}
-        <p class={clsx(css.headline, css.tone[state()])} role="status">
+        <p class={`${css.headline} ${css.tone[state()]}`} role="status">
           {t().status[state()]}
         </p>
         <p class={css.detail} data-testid="badge-detail">

@@ -1,10 +1,11 @@
 import X from 'lucide-solid/icons/x';
 import { type Component, createMemo, createSignal, Show } from 'solid-js';
 import { MINUTE_MS } from '../../shared/api';
+import { DEFAULT_LOCALE } from '../../shared/locale';
 import { activeBanners, type Banner } from '../banners';
-import { DEFAULT_LOCALE, locale, t } from '../lib/i18n';
+import { locale, t } from '../lib/i18n';
 import { useNow } from '../lib/now';
-import { bannerDismissedKey, isFlagged, setFlag } from '../lib/storage';
+import { bannerDismissedKey, readStored, writeStored } from '../lib/storage';
 import * as css from './Banner.css';
 
 /** The copy in the active locale, else in the default one. */
@@ -16,12 +17,12 @@ export const SiteBanner: Component = () => {
   // Dismissed this visit, which also covers storage being unavailable.
   const [dismissed, setDismissed] = createSignal<ReadonlySet<string>>(new Set());
   const banner = createMemo(() =>
-    activeBanners(now()).find((b) => !dismissed().has(b.id) && !isFlagged(bannerDismissedKey(b.id))),
+    activeBanners(now()).find((b) => !dismissed().has(b.id) && readStored(bannerDismissedKey(b.id)) === null),
   );
 
   const dismiss = (id: string, button: HTMLElement) => {
     const hadFocus = document.activeElement === button;
-    setFlag(bannerDismissedKey(id));
+    writeStored(bannerDismissedKey(id), '1');
     setDismissed((ids) => new Set([...ids, id]));
     // The button is gone, so hand focus to the main content rather than dropping it on <body>.
     if (hadFocus) document.querySelector<HTMLElement>('.gg-main')?.focus({ preventScroll: true });

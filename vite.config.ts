@@ -5,16 +5,13 @@ import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
 import { build, defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
-import { localePath } from './shared/locale.ts';
+import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from './shared/locale.ts';
 import { API_PREFIX, WORKER_PAGES } from './shared/paths.ts';
 import { type Locale, site } from './site.config.ts';
 import { HEAD } from './src/i18n/head.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
 
 const WORKER = 'http://localhost:8787';
-
-const LOCALES: readonly Locale[] = site.locales;
-const [DEFAULT_LOCALE] = site.locales;
 
 /**
  * The Fontsource woff2 files are bundled into /assets/ with a hash. This preloads the body
@@ -119,13 +116,13 @@ function localePage(html: string, locale: Locale): string {
  * (Vite's URLs are absolute, /assets/…). The dev server fills the page for the URL it serves.
  */
 function localePages(): Plugin {
-  const pageLocale = (url = '/') => LOCALES.find((locale) => localePath(locale) === url.split('?')[0]);
   return {
     name: 'locale-pages',
     transformIndexHtml: {
       order: 'pre',
       handler(html, { path, originalUrl, server }) {
-        if (server && path === '/index.html') return localePage(html, pageLocale(originalUrl) ?? DEFAULT_LOCALE);
+        if (server && path === '/index.html')
+          return localePage(html, pageLocale(originalUrl?.split('?')[0] ?? '/') ?? DEFAULT_LOCALE);
       },
     },
     generateBundle: {

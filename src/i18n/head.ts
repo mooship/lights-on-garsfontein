@@ -5,7 +5,7 @@ import type { Locale } from '../../site.config.ts';
  * reads it (localePages in vite.config.ts), so none of it reaches the app bundle. Values from
  * site.config.ts go in as %site.<path>% and the start date as %since.<locale>%.
  */
-export interface Head {
+interface Head {
   /** Also og:title. */
   title: string;
   description: string;

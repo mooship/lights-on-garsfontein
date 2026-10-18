@@ -12,7 +12,6 @@ declare const __PAGES__: string[];
 declare const __ASSETS__: string[];
 
 const SHELL = sw.cacheName(__BUILD_ID__);
-const NETWORK_TIMEOUT_MS = 3000;
 
 const install = async () => {
   const cache = await caches.open(SHELL);
@@ -51,9 +50,9 @@ self.addEventListener('fetch', (event) => {
   // Anything else: no respondWith, so the browser fetches it as if there were no worker.
 });
 
-/** `network`, or undefined if it fails or takes longer than NETWORK_TIMEOUT_MS. */
+/** `network`, or undefined if it fails or takes longer than sw.NETWORK_TIMEOUT_MS. */
 const inTime = (network: Promise<Response>) =>
-  Promise.race([network, new Promise<undefined>((r) => setTimeout(r, NETWORK_TIMEOUT_MS))]).catch(() => undefined);
+  Promise.race([network, new Promise<undefined>((r) => setTimeout(r, sw.NETWORK_TIMEOUT_MS))]).catch(() => undefined);
 
 /** Never stored at runtime, so offline a page is always this build's copy, matching its assets. */
 async function page(event: FetchEvent, precached: () => Promise<Response | undefined>): Promise<Response> {

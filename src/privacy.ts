@@ -1,24 +1,11 @@
 import { TURNSTILE_ACTION } from '../shared/api';
-import { CONTACT_PATH } from '../shared/paths';
-import { api } from './lib/api';
+import { ERROR } from '../shared/errors';
+import { ApiError, api } from './lib/api';
 import { getTurnstileToken } from './lib/turnstile';
 
 // The privacy page's "Show email address" button. The address is the Worker's CONTACT_EMAIL
 // secret and is fetched only after a Turnstile check, so it is never in the HTML or this bundle.
 // Without JavaScript the blocks stay hidden and the GitHub link is the way to get in touch.
-
-/** The address from CONTACT_PATH, or null when the deploy has none (404 not_configured). */
-async function fetchEmail(token: string): Promise<string | null> {
-  const res = await fetch(CONTACT_PATH, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  });
-  if (res.status === 404) return null;
-  const body = (await res.json().catch(() => ({}))) as { email?: unknown };
-  if (!res.ok || typeof body.email !== 'string') throw new Error(`contact_${res.status}`);
-  return body.email;
-}
 
 function setUp(block: HTMLElement): void {
   const button = block.querySelector<HTMLButtonElement>('.contact-reveal');
@@ -44,22 +31,23 @@ function setUp(block: HTMLElement): void {
     result.replaceChildren();
     try {
       const { turnstileSiteKey } = await api.status();
-      const email = await fetchEmail(await getTurnstileToken(widget, turnstileSiteKey, TURNSTILE_ACTION.contact));
-      if (email === null) {
-        // Nothing to retry: the button goes, and focus moves to the GitHub link that replaces it.
-        const link = fallBack();
-        button.parentElement?.remove();
-        link.focus();
-        return;
-      }
+      const { email } = await api.contact(await getTurnstileToken(widget, turnstileSiteKey, TURNSTILE_ACTION.contact));
       const mail = document.createElement('a');
       mail.href = `mailto:${email}`;
       mail.textContent = email;
       button.replaceWith(mail);
       mail.focus();
-    } catch {
-      // A failed check or network error: offer GitHub, and leave the button to try again.
-      fallBack();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === ERROR.notConfigured) {
+        // The deploy has no address, so there is nothing to retry: the button goes, and focus
+        // moves to the GitHub link that replaces it.
+        const link = fallBack();
+        button.parentElement?.remove();
+        link.focus();
+      } else {
+        // A failed check or network error: offer GitHub, and leave the button to try again.
+        fallBack();
+      }
     } finally {
       busy = false;
       button.removeAttribute('aria-disabled');

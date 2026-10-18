@@ -1,6 +1,7 @@
 /* The privacy page (privacy.html). base.css brings the same fonts as the app. */
 @import "./base.css";
 
+/* The colours are copies from src/styles/palette.ts, which CSS cannot import. */
 :root {
   color-scheme: light;
   --bg: #f6f4ef;

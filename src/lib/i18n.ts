@@ -1,18 +1,12 @@
 import { createSignal } from 'solid-js';
-import { localePath } from '../../shared/locale';
+import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from '../../shared/locale';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../i18n';
 import { STORAGE_KEYS, writeStored } from './storage';
 
 export type { Locale };
 
-export const LOCALES: readonly Locale[] = site.locales;
-export const DEFAULT_LOCALE = site.locales[0];
-
 const isLocale = (value: string | null): value is Locale => LOCALES.includes(value as Locale);
-
-/** The language whose own page `path` is (/ or /<code>/), if any. */
-const pageLocale = (path: string) => LOCALES.find((l) => localePath(l) === path);
 
 // The boot script in index.html has already chosen: the page's own language on a language page,
 // the stored choice elsewhere (/admin). The browser language is not consulted.

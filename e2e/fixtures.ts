@@ -16,13 +16,12 @@ async function deleteOutages(request: APIRequestContext): Promise<void> {
     expect(list.status()).toBe(200);
     const { outages } = (await list.json()) as AdminOutagesResponse;
     if (outages.length === 0) return;
-    for (const { id } of outages) {
-      const res = await request.post(ADMIN_OUTAGES_PATH, {
-        headers: ADMIN_API,
-        data: { action: OUTAGE_ACTION.delete, id },
-      });
-      expect(res.status()).toBe(200);
-    }
+    const deleted = await Promise.all(
+      outages.map(({ id }) =>
+        request.post(ADMIN_OUTAGES_PATH, { headers: ADMIN_API, data: { action: OUTAGE_ACTION.delete, id } }),
+      ),
+    );
+    for (const res of deleted) expect(res.status()).toBe(200);
   }
 }
 

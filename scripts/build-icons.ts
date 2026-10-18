@@ -3,13 +3,14 @@
 // Usage: npm run icons   (needs `npx playwright install chromium` once)
 import { writeFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
+import { PALETTE } from '../src/styles/palette.ts';
 
 const BOLT = 'M36 8 16 36h14l-4 20 22-30H34z';
 
 /** `inset` shrinks the bolt into the centre "safe zone" that maskable icons require. */
 const svg = (rounded: boolean, inset = 0) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="${rounded ? 16 : 0}" fill="#2D5A27"/>
-  <g transform="translate(${inset} ${inset}) scale(${(64 - inset * 2) / 64})"><path d="${BOLT}" fill="#F6F4EF"/></g>
+  <rect width="64" height="64" rx="${rounded ? 16 : 0}" fill="${PALETTE.light.on}"/>
+  <g transform="translate(${inset} ${inset}) scale(${(64 - inset * 2) / 64})"><path d="${BOLT}" fill="${PALETTE.light.bg}"/></g>
 </svg>`;
 
 const out = (file: string) => new URL(`../public/${file}`, import.meta.url);
@@ -33,8 +34,10 @@ writeFileSync(out('icon-512.png'), await render(512, svg(true), true));
 writeFileSync(out('icon-maskable-512.png'), await render(512, svg(false, 13), false));
 
 // ICO files may embed PNG data directly (supported since Windows Vista and in every browser).
+// One at a time: render() resizes the one shared page, so parallel calls would all capture the last size.
 const sizes = [16, 32, 48];
-const images = await Promise.all(sizes.map((s) => render(s, svg(true), true)));
+const images: Buffer[] = [];
+for (const size of sizes) images.push(await render(size, svg(true), true));
 const header = Buffer.alloc(6 + 16 * images.length);
 header.writeUInt16LE(0, 0); // reserved
 header.writeUInt16LE(1, 2); // type: icon

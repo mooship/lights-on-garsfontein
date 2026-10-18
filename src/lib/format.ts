@@ -1,9 +1,7 @@
-import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
+import { DAY_MS, HOUR_MS, MINUTE_MS, UTC_OFFSET_MS } from '../../shared/api';
 import { site } from '../../site.config';
 import { intlLocale, t } from './i18n';
 import { pad2, zoned } from './zone';
-
-export { outageDurationMs } from '../../shared/api';
 
 const TIME_ZONE = site.timeZone;
 
@@ -99,10 +97,9 @@ export function formatClock(ms: number): string {
 
 // The admin's datetime-local inputs are read and written in the configured zone (fixed offset),
 // whatever time zone the browser is in.
-const OFFSET_MS = site.utcOffsetMinutes * MINUTE_MS;
 
 /** An ISO time as a datetime-local value, "2026-10-17T14:05". */
-export const toLocalInput = (iso: string) => new Date(Date.parse(iso) + OFFSET_MS).toISOString().slice(0, 16);
+export const toLocalInput = (iso: string) => new Date(Date.parse(iso) + UTC_OFFSET_MS).toISOString().slice(0, 16);
 
 /** A datetime-local value back to ISO 8601 UTC. */
 export const fromLocalInput = (value: string) => new Date(zoned(value)).toISOString();

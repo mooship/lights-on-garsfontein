@@ -12,7 +12,7 @@ export const STORAGE_KEYS = {
   chunkReload: 'chunk-reload',
 } as const;
 
-/** Set once the visitor has closed the banner with this id. */
+/** Stored (any value) once the visitor has closed the banner with this id. */
 export const bannerDismissedKey = (id: string) => `banner-dismissed:${id}`;
 
 export function readStored(key: string): string | null {
@@ -30,7 +30,3 @@ export function writeStored(key: string, value: string): void {
     // Unavailable: the choice lasts only for this visit.
   }
 }
-
-/** A remembered yes/no, stored as '1'. */
-export const isFlagged = (key: string) => readStored(key) === '1';
-export const setFlag = (key: string) => writeStored(key, '1');

@@ -1,6 +1,5 @@
-import clsx from 'clsx';
 import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
-import { MINUTE_MS, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
+import { MINUTE_MS, outageDurationMs, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
 import { ADMIN_PAGE_PATH, CSV_PATH, FEED_PATH, PRIVACY_PAGE_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import * as css from './App.css';
@@ -15,14 +14,7 @@ import { SafetyLine, Scope } from './components/StatusNotes';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api, type Status } from './lib/api';
-import {
-  formatDate,
-  formatDuration,
-  formatRelativeDay,
-  formatTime,
-  offlineLabel,
-  outageDurationMs,
-} from './lib/format';
+import { formatDate, formatDuration, formatRelativeDay, formatTime, offlineLabel } from './lib/format';
 import { t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll } from './lib/poll';
@@ -126,6 +118,13 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
   // The last poll failed, so the status shown may be out of date. A tab back from the background
   // is not stale: it refetches at once.
   const stale = () => status.error() !== undefined;
+  // The service worker's last copy is labelled with when the server produced it, until a fresh one arrives.
+  const warning = (s: Status) =>
+    s.fromCache
+      ? offlineLabel(s.generatedAt, minute())
+      : stale()
+        ? t().status.stale(clockTime(status.updatedAt()))
+        : undefined;
 
   return (
     <>
@@ -142,19 +141,13 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <div class="gg-status-detail">
                   <p>{statusDetail(s(), minute())}</p>
                   {/* Only when something is wrong; the loading shell has no line for it. */}
-                  <Switch>
-                    {/* The service worker's last copy: labelled with when the server produced it, until a fresh one arrives. */}
-                    <Match when={s().fromCache}>
-                      <p class={clsx('gg-status-warning', css.warning)} role="alert">
-                        {offlineLabel(s().generatedAt, minute())}
+                  <Show when={warning(s())}>
+                    {(text) => (
+                      <p class={`gg-status-warning ${css.warning}`} role="alert">
+                        {text()}
                       </p>
-                    </Match>
-                    <Match when={stale()}>
-                      <p class={clsx('gg-status-warning', css.warning)} role="alert">
-                        {t().status.stale(clockTime(status.updatedAt()))}
-                      </p>
-                    </Match>
-                  </Switch>
+                    )}
+                  </Show>
                 </div>
                 <SafetyLine />
               </>

@@ -1,12 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
-import { exampleVar } from './e2e/dev-vars';
+import { STATUS_PATH } from './shared/paths';
 
 const PORT = 8788;
 // A throwaway local D1 so every run starts empty.
 const STATE = '.wrangler/e2e-state';
-// The .dev.vars.example values: a real contact address set in .dev.vars is never used, and the
-// tests know the admin API token they reset the database with (e2e/fixtures.ts).
-const VARS = ['CONTACT_EMAIL', 'ADMIN_API_TOKEN'].map((name) => `--var ${name}:${exampleVar(name)}`).join(' ');
 
 export default defineConfig({
   testDir: './e2e',
@@ -29,12 +26,15 @@ export default defineConfig({
   webServer: {
     command: [
       `node -e "require('node:fs').rmSync('${STATE}',{recursive:true,force:true})"`,
+      // --env e2e reads .dev.vars.e2e instead of .dev.vars, so the server runs on the example values
+      // the tests also read (e2e/dev-vars.ts), never a developer's own secrets.
+      `node -e "require('node:fs').copyFileSync('.dev.vars.example','.dev.vars.e2e')"`,
       'npm run build',
       `npx wrangler d1 migrations apply DB --local --env e2e --persist-to ${STATE}`,
       // --env e2e: rate limits for a test suite rather than for readers (wrangler.toml).
-      `npx wrangler dev --env e2e --port ${PORT} --persist-to ${STATE} ${VARS}`,
+      `npx wrangler dev --env e2e --port ${PORT} --persist-to ${STATE}`,
     ].join(' && '),
-    url: `http://localhost:${PORT}/api/status`,
+    url: `http://localhost:${PORT}${STATUS_PATH}`,
     timeout: 180_000,
     reuseExistingServer: false,
     // In CI the server's log (every request, and any error) is in the job output when a test fails.

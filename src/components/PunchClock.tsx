@@ -1,9 +1,8 @@
-import clsx from 'clsx';
 import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
 import { type Component, Show } from 'solid-js';
-import type { AdminOutage } from '../../shared/api';
-import { formatClock, formatDay, formatTime, outageDurationMs } from '../lib/format';
+import { type AdminOutage, outageDurationMs } from '../../shared/api';
+import { formatClock, formatDay, formatTime } from '../lib/format';
 import { t } from '../lib/i18n';
 import { button } from '../styles/ui.css';
 import * as css from './PunchClock.css';
@@ -24,7 +23,7 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
     <div class={css.root}>
       <div>
         <span class="gg-sr-only">{t().admin.duration}</span>
-        <div class={clsx(css.clock, props.outage ? css.running : css.idle)} role="timer" data-testid="punch-clock">
+        <div class={`${css.clock} ${props.outage ? css.running : css.idle}`} role="timer" data-testid="punch-clock">
           {formatClock(elapsed())}
         </div>
         <p class={css.meta}>

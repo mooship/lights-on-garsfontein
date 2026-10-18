@@ -5,7 +5,15 @@ import {
   type StatusResponse,
   type TimerAction,
 } from '../../shared/api';
-import { ADMIN_OUTAGES_PATH, LOGIN_PATH, LOGOUT_PATH, STATS_PATH, STATUS_PATH, TIMER_PATH } from '../../shared/paths';
+import {
+  ADMIN_OUTAGES_PATH,
+  CONTACT_PATH,
+  LOGIN_PATH,
+  LOGOUT_PATH,
+  STATS_PATH,
+  STATUS_PATH,
+  TIMER_PATH,
+} from '../../shared/paths';
 import { FROM_CACHE_HEADER } from '../sw/strategy';
 
 /** A status, flagged when the service worker answered from its cache because the network failed. */
@@ -38,6 +46,7 @@ const post = <T>(path: string, body?: unknown) =>
 export const api = {
   status: () => request<Status>(STATUS_PATH),
   stats: () => request<StatsResponse>(STATS_PATH),
+  contact: (token: string) => post<{ email: string }>(CONTACT_PATH, { token }),
   login: (username: string, password: string, token: string) =>
     post<{ ok: true }>(LOGIN_PATH, { username, password, token }),
   logout: () => post<{ ok: true }>(LOGOUT_PATH),

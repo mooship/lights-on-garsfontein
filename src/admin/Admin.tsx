@@ -1,4 +1,3 @@
-import clsx from 'clsx';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
@@ -6,6 +5,7 @@ import { type Component, createResource, createSignal, For, Match, onMount, Show
 import {
   type AdminOutage,
   type AdminOutagesResponse,
+  outageDurationMs,
   TIMER_ACTION,
   type TimerAction,
   TURNSTILE_ACTION,
@@ -14,10 +14,10 @@ import { ERROR } from '../../shared/errors';
 import { PunchClock } from '../components/PunchClock';
 import type { AdminErrorCode } from '../i18n/af';
 import { ApiError, api } from '../lib/api';
-import { formatDay, formatDuration, formatTime, fromLocalInput, outageDurationMs, toLocalInput } from '../lib/format';
+import { formatDay, formatDuration, formatTime, fromLocalInput, toLocalInput } from '../lib/format';
 import { t } from '../lib/i18n';
 import { useMinute, useNow } from '../lib/now';
-import { getTurnstileToken } from '../lib/turnstile';
+import { getTurnstileToken, loadTurnstile } from '../lib/turnstile';
 import { button, errorText, input, label, plainList } from '../styles/ui.css';
 import * as css from './Admin.css';
 
@@ -42,32 +42,43 @@ const FormError: Component<{ error: unknown }> = (props) => (
 /** Reports a failed dashboard action: a 401 ends the session, anything else shows through `show`. */
 type OnError = (error: unknown, show: (error: unknown) => void) => void;
 
+/** Busy and error state for one form or button; a failure goes to `onError`, which by default shows it. */
+function createAction({ onError = (e, show) => show(e), initialError }: { onError?: OnError; initialError?: unknown }) {
+  const [busy, setBusy] = createSignal(false);
+  const [error, setError] = createSignal<unknown>(initialError);
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await fn();
+    } catch (e) {
+      onError(e, setError);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { busy, error, run };
+}
+
 const LoginForm: Component<{ notice?: AdminErrorCode; focus: boolean; onLoggedIn: () => void }> = (props) => {
   let widget!: HTMLDivElement;
   let heading!: HTMLHeadingElement;
   // Starts with the reason the last session ended, if any.
-  const [error, setError] = createSignal<unknown>(props.notice);
-  const [busy, setBusy] = createSignal(false);
+  const { busy, error, run } = createAction({ initialError: props.notice });
   onMount(() => props.focus && heading.focus());
 
-  async function submit(event: SubmitEvent) {
+  function submit(event: SubmitEvent) {
     event.preventDefault();
     const form = new FormData(event.currentTarget as HTMLFormElement);
     const username = String(form.get('username') ?? '');
     const password = String(form.get('password') ?? '');
-    setBusy(true);
-    setError(undefined);
-    try {
-      // The public status response carries the Turnstile site key.
-      const { turnstileSiteKey } = await api.status();
+    return run(async () => {
+      // The public status response carries the Turnstile site key; the script loads meanwhile.
+      const [{ turnstileSiteKey }] = await Promise.all([api.status(), loadTurnstile()]);
       const token = await getTurnstileToken(widget, turnstileSiteKey, TURNSTILE_ACTION.login);
       await api.login(username, password, token);
       props.onLoggedIn();
-    } catch (e) {
-      setError(e);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -110,25 +121,17 @@ const OutageRow: Component<{
   onChange: () => Promise<void>;
   onError: OnError;
 }> = (props) => {
-  const [error, setError] = createSignal<unknown>();
-  const [busy, setBusy] = createSignal(false);
+  const { busy, error, run: act } = createAction({ onError: props.onError });
   const titleId = () => `outage-${props.outage.id}-title`;
-  const run = async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(undefined);
-    try {
-      await action();
+  const run = (change: () => Promise<unknown>) =>
+    act(async () => {
+      await change();
       await props.onChange();
-    } catch (e) {
-      props.onError(e, setError);
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
   return (
     <li class={css.item}>
-      <div class={clsx(props.outage.isFalsePositive && css.flagged)}>
+      <div classList={{ [css.flagged]: props.outage.isFalsePositive }}>
         <strong id={titleId()}>
           {formatDay(props.outage.startTime)}, {formatTime(props.outage.startTime)} –{' '}
           {props.outage.endTime ? formatTime(props.outage.endTime) : t().admin.ongoing}
@@ -189,33 +192,23 @@ const OutageRow: Component<{
 };
 
 const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError }> = (props) => {
-  const [error, setError] = createSignal<unknown>();
   const [saved, setSaved] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
+  const { busy, error, run } = createAction({ onError: props.onError });
 
-  async function submit(event: SubmitEvent) {
+  function submit(event: SubmitEvent) {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
     const start = fromLocalInput(String(data.get('start') ?? ''));
     const end = data.get('end') ? fromLocalInput(String(data.get('end'))) : null;
-    setError(undefined);
     setSaved(false);
-    if (end && Date.parse(end) <= Date.parse(start)) {
-      setError(ERROR.endBeforeStart);
-      return;
-    }
-    setBusy(true);
-    try {
+    return run(async () => {
+      if (end && Date.parse(end) <= Date.parse(start)) throw ERROR.endBeforeStart;
       await api.createOutage(start, end, data.get('planned') === 'on');
       form.reset();
       setSaved(true);
       await props.onLogged();
-    } catch (e) {
-      props.onError(e, setError);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -273,27 +266,19 @@ const Dashboard: Component<{
       setLoading(false);
     }
   };
-  const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal<unknown>();
   // The last punch and its time, announced; kept as data so it follows a language switch.
   const [punched, setPunched] = createSignal<{ action: TimerAction; at: string } | null>(null);
   const open = () => outages().outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
   const onError: OnError = (e, show) => (isUnauthorized(e) ? props.onLoggedOut('session_expired') : show(e));
+  const { busy, error, run } = createAction({ onError });
 
-  const punch = async (action: TimerAction) => {
-    setBusy(true);
-    setError(undefined);
-    setPunched(null);
-    try {
+  const punch = (action: TimerAction) =>
+    run(async () => {
+      setPunched(null);
       await api.punch(action);
       setPunched({ action, at: new Date().toISOString() });
       await refetch();
-    } catch (e) {
-      onError(e, setError);
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
   const logout = async () => {
     // The view signs out whatever the server says; a failed call leaves a session that expires.
@@ -379,7 +364,7 @@ const Admin: Component = () => {
         }
       >
         <Match when={session.error}>
-          <section class={clsx('gg-card', css.stack)}>
+          <section class={`gg-card ${css.stack}`}>
             <p class={errorText} role="alert">
               {t().admin.unreachable}
             </p>

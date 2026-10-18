@@ -5,3 +5,9 @@ import { type Locale, site } from '../site.config.ts';
  * this rule (it must stay static for its CSP hash), so change both together.
  */
 export const localePath = (locale: Locale) => (locale === site.locales[0] ? '/' : `/${locale}/`);
+
+export const LOCALES: readonly Locale[] = site.locales;
+export const DEFAULT_LOCALE = site.locales[0];
+
+/** The locale whose own page `path` is (/ or /<code>/), if any. */
+export const pageLocale = (path: string) => LOCALES.find((locale) => localePath(locale) === path);

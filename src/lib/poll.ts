@@ -1,6 +1,6 @@
 import { type Accessor, batch, createSignal } from 'solid-js';
 
-export interface Poll<T> {
+interface Poll<T> {
   /** The last successful response; kept through later failures. */
   data: Accessor<T | undefined>;
   /** The latest failure, cleared by the next success. */

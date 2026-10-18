@@ -1,5 +1,6 @@
 import { type Component, Show } from 'solid-js';
-import { DEFAULT_LOCALE, LOCALES, locale, switchLocale, t } from '../lib/i18n';
+import { DEFAULT_LOCALE, LOCALES } from '../../shared/locale';
+import { locale, switchLocale, t } from '../lib/i18n';
 
 /**
  * Shows the next language's name (with two, simply the other one; with more, it cycles in

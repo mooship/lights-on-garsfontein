@@ -9,7 +9,9 @@ import { escapeHtml } from '../build/html.ts';
 import { site } from '../site.config.ts';
 import { DICTIONARIES } from '../src/i18n/index.ts';
 import { FONT_FILES } from '../src/styles/fonts.ts';
+import { PALETTE } from '../src/styles/palette.ts';
 
+const light = PALETTE.light;
 const [PRIMARY, SECONDARY] = site.locales.map((locale) => ({ locale, m: DICTIONARIES[locale] }));
 if (!PRIMARY) throw new Error('site.locales is empty');
 
@@ -29,16 +31,16 @@ const html = `<!doctype html>
 @font-face { font-family: Fraunces; src: url(${DISPLAY_FONT}); font-weight: 100 900; }
 @font-face { font-family: Jakarta; src: url(${BODY_FONT}); font-weight: 200 800; }
 * { margin: 0; box-sizing: border-box; }
-body { width: 1200px; height: 630px; background: #F6F4EF; color: #1F2120; font-family: Jakarta, sans-serif;
+body { width: 1200px; height: 630px; background: ${light.bg}; color: ${light.text}; font-family: Jakarta, sans-serif;
   padding: 64px 80px; display: flex; flex-direction: column; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: 20px; font-size: 34px; font-weight: 700; color: #5C5850; }
+.brand { display: flex; align-items: center; gap: 20px; font-size: 34px; font-weight: 700; color: ${light.muted}; }
 .icon { width: 64px; height: 64px; border-radius: 999px; display: grid; place-items: center;
-  background: #FFFFFF; border: 2px solid #E4DFD4; color: #1F2120; }
+  background: ${light.card}; border: 2px solid ${light.border}; color: ${light.text}; }
 h1 { font-family: Fraunces, serif; font-size: 80px; font-weight: 700; line-height: 1.08; letter-spacing: -0.01em; }
-.secondary { font-family: Fraunces, serif; font-size: 48px; font-weight: 600; color: #5C5850; margin-top: 16px; }
+.secondary { font-family: Fraunces, serif; font-size: 48px; font-weight: 600; color: ${light.muted}; margin-top: 16px; }
 .cta { display: inline-block; font-size: 30px; font-weight: 650; padding: 18px 28px; border-radius: 20px;
-  background: #1F2120; color: #F6F4EF; }
-.foot { font-size: 24px; color: #5C5850; margin-top: 24px; }
+  background: ${light.text}; color: ${light.bg}; }
+.foot { font-size: 24px; color: ${light.muted}; margin-top: 24px; }
 </style></head><body>
 <div class="brand"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="${ZAP}"/></svg></span>

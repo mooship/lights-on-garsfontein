@@ -3,21 +3,13 @@ import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
-import { CSV_FILE_NAME, DAY_MS, HOUR_MS, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
+import { CSV_FILE_NAME, HOUR_MS, localDate, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
 import { CSV_PATH } from '../../shared/paths';
-import { site } from '../../site.config';
 import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
 import * as css from './Trends.css';
 
 const { AXIS_WIDTH } = css;
-
-/** The deltas compare with the previous 30 days, so they wait until that whole window is tracked. */
-const COMPARE_AFTER_MS = 60 * DAY_MS;
-
-/** The day records began in the configured zone, as YYYY-MM-DD, like WeekStats.weekStart. */
-const trackingDay = (iso: string) =>
-  new Date(Date.parse(iso) + site.utcOffsetMinutes * MINUTE_MS).toISOString().slice(0, 10);
 
 /** A tile duration like the history's ("5 u 23 min"); none at all reads "0 min". */
 const tileDuration = (hours: number) => (hours > 0 ? formatDuration(hours * HOUR_MS) : `0 ${t().units.min}`);
@@ -257,8 +249,8 @@ export const Trends: Component<TrendsProps> = (props) => {
   const since = () => Date.parse(props.stats.trackingSince);
   const started = () => props.now >= since();
   const s = () => props.stats.last30;
-  const prev = () => (props.now - since() >= COMPARE_AFTER_MS ? props.stats.previous30 : null);
-  const firstDay = () => trackingDay(props.stats.trackingSince);
+  // The day records began, in the same form as WeekStats.weekStart.
+  const firstDay = () => localDate(since());
   const place = (index: number): WeekPlace => {
     const week = props.stats.weeks[index];
     return {
@@ -283,12 +275,12 @@ export const Trends: Component<TrendsProps> = (props) => {
           <Tile
             label={t().trends.withoutPower}
             value={started() ? <DurationValue text={tileDuration(s().hoursOff)} /> : '—'}
-            delta={delta(s().hoursOff, prev()?.hoursOff, tileDuration, true)}
+            delta={delta(s().hoursOff, props.stats.previous30?.hoursOff, tileDuration, true)}
           />
           <Tile
             label={t().trends.outages}
             value={started() ? String(s().outages) : '—'}
-            delta={s().plannedOutages === 0 ? delta(s().outages, prev()?.outages, String, true) : null}
+            delta={s().plannedOutages === 0 ? delta(s().outages, props.stats.previous30?.outages, String, true) : null}
             note={s().plannedOutages > 0 ? t().trends.planned(s().plannedOutages) : undefined}
           />
           <Tile

@@ -1,11 +1,9 @@
 // The string work behind the build's plugins in vite.config.ts, kept apart from Vite so
 // test/node/plugins.test.ts can run it.
 
-import { type Locale, site } from '../site.config.ts';
+import { DEFAULT_LOCALE, LOCALES } from '../shared/locale.ts';
+import { site } from '../site.config.ts';
 import { DICTIONARIES } from '../src/i18n/index.ts';
-
-const LOCALES: readonly Locale[] = site.locales;
-const [DEFAULT_LOCALE] = site.locales;
 
 /** For HTML text and double-quoted attributes; single quotes are left alone. */
 export const escapeHtml = (text: string) =>
@@ -15,7 +13,7 @@ export const escapeHtml = (text: string) =>
 export const jsonString = (text: string) => JSON.stringify(text).slice(1, -1).replace(/</g, '\\u003c');
 
 /** How `fill` escapes a value: for HTML, inside a JSON string, or not at all. */
-export type Mode = 'html' | 'json' | 'text';
+type Mode = 'html' | 'json' | 'text';
 
 /** The value behind a placeholder name: `site.<path>` or `since.<locale>`. */
 function placeholder(name: string): string | readonly string[] {

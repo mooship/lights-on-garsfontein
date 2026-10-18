@@ -3,8 +3,9 @@ import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
 import { DAY_MS, MINUTE_MS } from '../shared/api';
 import { ERROR } from '../shared/errors';
-import { localePath } from '../shared/locale';
+import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
 import {
+  ADMIN_API_PREFIX,
   ADMIN_OUTAGES_PATH,
   ADMIN_PAGE_PATH,
   FEED_PATH,
@@ -22,7 +23,7 @@ import { af } from '../src/i18n/af';
 import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
-import { cacheName, STATUS_CACHE } from '../src/sw/strategy';
+import { cacheName, NETWORK_TIMEOUT_MS, STATUS_CACHE } from '../src/sw/strategy';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
 import { expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
@@ -31,7 +32,6 @@ import { expect, readLayoutShift, test, trackLayoutShift, withLocale } from './f
 // One literal per language ('Geen onderbreking aangemeld nie', 'No outage reported') checks the
 // dictionaries reach the page at all.
 
-const DEFAULT_LOCALE = site.locales[0];
 const BRAND = site.brand.short;
 /** The tab title without a live reading: it claims no status. */
 const NEUTRAL_TITLE = site.brand.full;
@@ -44,7 +44,7 @@ const withTime = (text: string) => new RegExp(`^${escapeRegExp(text).replaceAll(
 /** The tab title during an outage: "OFF 5m · <brand>". */
 const outageTitle = (state: string) => new RegExp(`^${state} \\d+${en.units.m} · ${escapeRegExp(BRAND)}$`);
 
-const ADMIN_USERNAME = 'admin'; // matches .dev.vars.example
+const ADMIN_USERNAME = exampleVar('ADMIN_USERNAME');
 const ADMIN_PASSWORD = 'test-password';
 
 // Public copy never says how an outage was recorded, in either language.
@@ -183,7 +183,7 @@ test.describe('language', () => {
     expect(res.headers().location).toBe('/en/');
   });
 
-  for (const locale of site.locales) {
+  for (const locale of LOCALES) {
     const path = localePath(locale);
 
     test(`${path} is the ${locale} page before any script runs`, async ({ browser }) => {
@@ -199,13 +199,13 @@ test.describe('language', () => {
       await expect(meta('property="og:description"')).toHaveAttribute('content', head('ogDescription'));
       await expect(meta('property="og:url"')).toHaveAttribute('content', `${site.url}${path}`);
       await expect(meta('property="og:locale"')).toHaveAttribute('content', site.intlLocales[locale].replace('-', '_'));
-      await expect(meta('property="og:locale:alternate"')).toHaveCount(site.locales.length - 1);
+      await expect(meta('property="og:locale:alternate"')).toHaveCount(LOCALES.length - 1);
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${site.url}${path}`);
       const alternates = await page
         .locator('link[rel="alternate"][hreflang]')
         .evaluateAll((links) => links.map((link) => [link.getAttribute('hreflang'), link.getAttribute('href')]));
       expect(alternates).toEqual([
-        ...site.locales.map((l) => [l, `${site.url}${localePath(l)}`]),
+        ...LOCALES.map((l) => [l, `${site.url}${localePath(l)}`]),
         ['x-default', `${site.url}/`],
       ]);
       // The shell carries every language; the page's lang alone picks which one shows.
@@ -251,7 +251,7 @@ test.describe('public page', () => {
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
   });
 
-  for (const locale of site.locales) {
+  for (const locale of LOCALES) {
     test.describe(locale, () => {
       test.use({ appLocale: locale });
 
@@ -311,15 +311,14 @@ test.describe('public page', () => {
     for (const line of en.trends.how) await expect(page.getByText(line, { exact: true })).toBeVisible();
   });
 
-  test('the footer links the feed and the privacy page, and not the data licence', async ({ page }) => {
+  test('the footer links the feed and the privacy page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: en.footer.privacy })).toBeVisible();
-    await expect(page.getByRole('link', { name: site.dataLicence.name })).toHaveCount(0);
     await expect(page.getByRole('link', { name: en.footer.feed })).toHaveAttribute('href', FEED_PATH);
     await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute('href', PRIVACY_PAGE_PATH);
   });
 
-  for (const locale of site.locales) {
+  for (const locale of LOCALES) {
     test.describe(locale, () => {
       test.use({ appLocale: locale });
 
@@ -373,7 +372,7 @@ test.describe('public page', () => {
   });
 
   test('serves the SEO manifests', async ({ request }) => {
-    expect(await (await request.get(ROBOTS_PATH)).text()).toContain('Disallow: /api/admin/');
+    expect(await (await request.get(ROBOTS_PATH)).text()).toContain(`Disallow: ${ADMIN_API_PREFIX}`);
     const sitemap = await (await request.get(SITEMAP_PATH)).text();
     // The origin is the Worker's SITE_URL, which is local here.
     const locs = [...sitemap.matchAll(/<loc>https?:\/\/[^/]+([^<]*)<\/loc>/g)].map((m) => m[1]);
@@ -596,7 +595,7 @@ test.describe('site banner', () => {
 test.describe('narrow screens', () => {
   test.use({ viewport: { width: 320, height: 640 } });
 
-  for (const locale of site.locales) {
+  for (const locale of LOCALES) {
     for (const path of ['/', '/en/', PRIVACY_PAGE_PATH, ADMIN_PAGE_PATH]) {
       test(`${path} has no horizontal scroll at 320px (${locale})`, async ({ page }) => {
         await withLocale(page, locale);
@@ -702,14 +701,16 @@ test.describe('offline', () => {
     await throughServiceWorker(page, '/en/');
     // context.route sees the worker's own requests, so this slows the network under it. The late
     // reply is stamped, because the Worker's edge cache would repeat the last generatedAt.
+    // Slower than the worker waits, and the label must show before the late reply lands.
+    const lateBy = NETWORK_TIMEOUT_MS + 2_000;
     const stamp = new Date(Date.now() - MINUTE_MS).toISOString();
     await context.route(`**${STATUS_PATH}`, async (route) => {
       const response = await route.fetch();
-      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      await new Promise((resolve) => setTimeout(resolve, lateBy));
       await route.fulfill({ response, json: { ...(await response.json()), generatedAt: stamp } });
     });
     await poll(page);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)), { timeout: 4_500 });
+    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)), { timeout: lateBy - 500 });
     await expect.poll(() => cachedGeneratedAt(page), { timeout: 10_000 }).toBe(stamp); // kept for next time
 
     await context.unroute(`**${STATUS_PATH}`);

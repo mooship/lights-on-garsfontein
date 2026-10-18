@@ -1,7 +1,6 @@
-import clsx from 'clsx';
 import { type Component, For, Show } from 'solid-js';
-import type { OutageSummary } from '../../shared/api';
-import { formatDay, formatDuration, formatTime, outageDurationMs } from '../lib/format';
+import { type OutageSummary, outageDurationMs } from '../../shared/api';
+import { formatDay, formatDuration, formatTime } from '../lib/format';
 import { t } from '../lib/i18n';
 import { plainList } from '../styles/ui.css';
 import * as css from './OutageHistory.css';
@@ -27,7 +26,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
               </div>
             </div>
             <div class={css.end}>
-              <div class={clsx(css.primary, !outage.endTime && css.ongoing)}>
+              <div class={css.primary} classList={{ [css.ongoing]: !outage.endTime }}>
                 {formatDuration(outageDurationMs(outage, props.now))}
               </div>
               <div class={css.secondary}>

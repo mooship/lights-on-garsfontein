@@ -1,4 +1,3 @@
-import clsx from 'clsx';
 import Link from 'lucide-solid/icons/link';
 import MessageCircle from 'lucide-solid/icons/message-circle';
 import Send from 'lucide-solid/icons/send';
@@ -71,7 +70,7 @@ export const Share: Component = () => {
           </button>
         </Show>
         <a
-          class={clsx(button.ghost, css.link)}
+          class={`${button.ghost} ${css.link}`}
           href={whatsappHref(t().share.text, shareUrl())}
           aria-label={`${t().share.whatsapp} ${t().share.newTab}`}
           {...external}
@@ -79,7 +78,7 @@ export const Share: Component = () => {
           <MessageCircle size={16} aria-hidden="true" /> WhatsApp
         </a>
         <a
-          class={clsx(button.ghost, css.link)}
+          class={`${button.ghost} ${css.link}`}
           href={telegramHref(t().share.text, shareUrl())}
           aria-label={`${t().share.telegram} ${t().share.newTab}`}
           {...external}
