@@ -1,6 +1,6 @@
 import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
-import { MINUTE_MS } from '../shared/api';
+import { MINUTE_MS, type StatsResponse } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
 import {
@@ -12,6 +12,7 @@ import {
   PRIVACY_PAGE_PATH,
   ROBOTS_PATH,
   SITEMAP_PATH,
+  STATS_PATH,
   STATUS_PATH,
 } from '../shared/paths';
 import { type Locale, site } from '../site.config';
@@ -629,5 +630,56 @@ test.describe('narrow screens', () => {
         expect(scroll).toBeLessThanOrEqual(client);
       });
     }
+  }
+});
+
+test.describe('outages by time of day', () => {
+  /** Serves the real statistics with 90 minutes off at 18:00, 30 at 19:00 and an outage this week. */
+  const withOutages = (page: Page) =>
+    page.route(`**${STATS_PATH}`, async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as StatsResponse;
+      const last30ByHour = Array.from({ length: 24 }, (_, hour) => ({ 18: 90, 19: 30 })[hour] ?? 0);
+      const weeks = body.weeks.map((w, i, all) => (i === all.length - 1 ? { ...w, hoursOff: 2, outages: 1 } : w));
+      await route.fulfill({ response, json: { ...body, weeks, last30ByHour } });
+    });
+
+  test('opens on the hour with the most time off, and the arrow keys move between hours', async ({ page }) => {
+    await withOutages(page);
+    await page.goto('/en/');
+    await expect(page.getByRole('heading', { name: en.trends.byHourTitle })).toBeVisible();
+    const u = en.units;
+    await expect(page.getByText(`18:00–19:00: 1 ${u.h} 30 ${u.min} ${en.trends.off}`, { exact: true })).toBeVisible();
+    await page.getByRole('img', { name: en.trends.byHourLabel }).focus();
+    await page.keyboard.press('ArrowRight');
+    // The visible readout, and the announcement a keyboard move makes for screen readers.
+    const next = page.getByText(`19:00–20:00: 30 ${u.min} ${en.trends.off}`, { exact: true });
+    await expect(next).toHaveCount(2);
+    await expect(next.and(page.locator('[aria-live]'))).toHaveCount(1);
+  });
+
+  test.describe('af', () => {
+    test.use({ appLocale: 'af' });
+
+    test('is in Afrikaans', async ({ page }) => {
+      await withOutages(page);
+      await page.goto('/');
+      await expect(page.getByRole('heading', { name: af.trends.byHourTitle })).toBeVisible();
+      await expect(page.getByRole('img', { name: af.trends.byHourLabel })).toBeVisible();
+    });
+  });
+
+  for (const locale of LOCALES) {
+    test.describe(`${locale} layout`, () => {
+      test.use({ appLocale: locale });
+
+      test(`has zero cumulative layout shift while loading with outages on record (${locale})`, async ({ page }) => {
+        await withOutages(page);
+        await trackLayoutShift(page);
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('heading', { name: DICTIONARIES[locale].trends.byHourTitle })).toBeVisible();
+        expect(await readLayoutShift(page)).toBe(0);
+      });
+    });
   }
 });

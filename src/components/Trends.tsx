@@ -2,11 +2,12 @@ import Download from 'lucide-solid/icons/download';
 import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
-import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show } from 'solid-js';
+import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show, untrack } from 'solid-js';
 import { CSV_FILE_NAME, HOUR_MS, localDate, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
 import { CSV_PATH } from '../../shared/paths';
 import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
+import { pad2 } from '../lib/zone';
 import * as css from './Trends.css';
 
 const { AXIS_WIDTH } = css;
@@ -94,28 +95,52 @@ function weekNote(place: WeekPlace) {
   return place.from ? m.partial(formatCalendarDay(place.from)) : place.current ? m.soFar : '';
 }
 
-/** The readout for a week in parts, so the visible line can emphasise the hours. */
-function readoutParts(w: WeekStats, place: WeekPlace) {
+/** A bar's readout in parts, so the visible line can emphasise the value. */
+interface ReadoutParts {
+  lead: string;
+  value: string;
+  rest: string;
+}
+
+const readoutText = (p: ReadoutParts) => `${p.lead}: ${p.value} ${p.rest}`;
+
+/** The readout for a week. */
+function weekReadout(w: WeekStats, place: WeekPlace): ReadoutParts {
   const m = t().trends;
   return {
-    week: m.weekOf(formatCalendarDay(w.weekStart)),
-    hours: formatHours(w.hoursOff),
+    lead: m.weekOf(formatCalendarDay(w.weekStart)),
+    value: formatHours(w.hoursOff),
     rest: `${m.off} · ${m.outageCount(w.outages)}${weekNote(place)}`,
   };
 }
 
-const readout = (w: WeekStats, place: WeekPlace) => {
-  const p = readoutParts(w, place);
-  return `${p.week}: ${p.hours} ${p.rest}`;
-};
+const hourLabel = (hour: number) => `${pad2(hour % 24)}:00`;
+/** "18:00–19:00" for the hour starting at `hour`. */
+const hourRange = (hour: number) => `${hourLabel(hour)}–${hourLabel(hour + 1)}`;
+
+/** The hour with the most minutes off, the earliest of any tie. */
+const peakHour = (minutes: number[]) => minutes.indexOf(Math.max(...minutes));
 
 const CHART_HEIGHT = 144;
 const TOP_PAD = 6;
 
-const WeeklyChart: Component<{ weeks: WeekStats[]; place: (index: number) => WeekPlace }> = (props) => {
+interface BarChartProps {
+  title: string;
+  /** The chart's accessible name, which says how to move between bars. */
+  label: string;
+  /** Each bar's height in hours, and its readout. */
+  bars: { hours: number; readout: ReadoutParts }[];
+  /** The bar the readout starts on. */
+  initial: number;
+  /** Under the first and the last bar. */
+  xLabels: [string, string];
+}
+
+const BarChart: Component<BarChartProps> = (props) => {
   let svg!: SVGSVGElement;
   const [width, setWidth] = createSignal(320);
-  const [active, setActive] = createSignal(props.weeks.length - 1);
+  // Read once: the readout starts on this bar, and moving away from it is up to the reader.
+  const [active, setActive] = createSignal(untrack(() => props.initial));
 
   onMount(() => {
     const observer = new ResizeObserver(([entry]) => entry && setWidth(entry.contentRect.width));
@@ -123,52 +148,49 @@ const WeeklyChart: Component<{ weeks: WeekStats[]; place: (index: number) => Wee
     onCleanup(() => observer.disconnect());
   });
 
-  const max = createMemo(() => niceMax(Math.max(1, ...props.weeks.map((w) => w.hoursOff))));
+  const max = createMemo(() => niceMax(Math.max(1, ...props.bars.map((b) => b.hours))));
   const geometry = createMemo(() => {
     const plot = Math.max(1, width() - AXIS_WIDTH);
-    const slot = plot / Math.max(1, props.weeks.length);
+    const slot = plot / Math.max(1, props.bars.length);
     const barWidth = Math.max(2, Math.min(24, slot - 2, slot * 0.7));
     return { slot, barWidth };
   });
   const y = (hours: number) => TOP_PAD + (CHART_HEIGHT - TOP_PAD) * (1 - hours / max());
-  // Clamped so a refresh with fewer weeks never points past the end.
-  const activeIndex = createMemo(() => Math.min(active(), props.weeks.length - 1));
-  const activeWeek = () => props.weeks[activeIndex()];
+  // Clamped so a refresh with fewer bars never points past the end.
+  const activeIndex = createMemo(() => Math.min(active(), props.bars.length - 1));
+  const parts = () => props.bars[activeIndex()]?.readout;
   // Announced only on keyboard moves; pointer moves would flood a screen reader.
   const [announcement, setAnnouncement] = createSignal('');
 
   const onKey: JSX.EventHandler<SVGSVGElement, KeyboardEvent> = (event) => {
-    const last = props.weeks.length - 1;
+    const last = props.bars.length - 1;
     if (event.key === 'ArrowLeft') setActive((i) => Math.max(0, Math.min(last, i) - 1));
     else if (event.key === 'ArrowRight') setActive((i) => Math.min(last, i + 1));
     else if (event.key === 'Home') setActive(0);
     else if (event.key === 'End') setActive(last);
     else return;
     event.preventDefault();
-    const w = activeWeek();
-    if (w) setAnnouncement(readout(w, props.place(activeIndex())));
+    const p = parts();
+    if (p) setAnnouncement(readoutText(p));
   };
 
   // The whole column slot is the hit target, not just the painted bar.
   const onPointer: JSX.EventHandler<SVGSVGElement, PointerEvent> = (event) => {
     const x = event.clientX - svg.getBoundingClientRect().left - AXIS_WIDTH;
     if (x < 0) return;
-    setActive(Math.min(props.weeks.length - 1, Math.floor(x / geometry().slot)));
+    setActive(Math.min(props.bars.length - 1, Math.floor(x / geometry().slot)));
   };
 
   return (
     <div class={css.chartBlock}>
-      <h3 class={css.chartTitle}>{t().trends.chartTitle}</h3>
+      <h3 class={css.chartTitle}>{props.title}</h3>
       <p class={css.readout}>
-        <Show when={activeWeek()}>
-          {(w) => {
-            const p = () => readoutParts(w(), props.place(activeIndex()));
-            return (
-              <>
-                {p().week}: <span class={css.readoutValue}>{p().hours}</span> {p().rest}
-              </>
-            );
-          }}
+        <Show when={parts()}>
+          {(p) => (
+            <>
+              {p().lead}: <span class={css.readoutValue}>{p().value}</span> {p().rest}
+            </>
+          )}
         </Show>
       </p>
       <p class="gg-sr-only" aria-live="polite">
@@ -178,7 +200,7 @@ const WeeklyChart: Component<{ weeks: WeekStats[]; place: (index: number) => Wee
         ref={svg}
         class={css.svg}
         role="img"
-        aria-label={t().trends.chartLabel}
+        aria-label={props.label}
         tabindex="0"
         onKeyDown={onKey}
         onPointerMove={onPointer}
@@ -194,15 +216,15 @@ const WeeklyChart: Component<{ weeks: WeekStats[]; place: (index: number) => Wee
             </>
           )}
         </For>
-        <For each={props.weeks}>
-          {(week, index) => {
+        <For each={props.bars}>
+          {(bar, index) => {
             const x = () => AXIS_WIDTH + index() * geometry().slot;
             const barX = () => x() + (geometry().slot - geometry().barWidth) / 2;
-            const top = () => y(week.hoursOff);
+            const top = () => y(bar.hours);
             const height = () => CHART_HEIGHT - top();
             return (
               <g class={css.barGroup} data-active={activeIndex() === index() ? '' : undefined}>
-                <Show when={week.hoursOff > 0}>
+                <Show when={bar.hours > 0}>
                   <rect
                     data-bar
                     class={css.bar}
@@ -238,8 +260,8 @@ const WeeklyChart: Component<{ weeks: WeekStats[]; place: (index: number) => Wee
         </For>
       </svg>
       <div class={css.xLabels}>
-        <span>{props.weeks.length > 1 && props.weeks[0] ? formatCalendarDay(props.weeks[0].weekStart) : ''}</span>
-        <span>{t().trends.thisWeek}</span>
+        <span>{props.xLabels[0]}</span>
+        <span>{props.xLabels[1]}</span>
       </div>
     </div>
   );
@@ -306,7 +328,28 @@ export const Trends: Component<TrendsProps> = (props) => {
           />
         </div>
         <Show when={anyOutage()} fallback={<p class={css.chartEmpty}>{t().trends.chartEmpty}</p>}>
-          <WeeklyChart weeks={props.stats.weeks} place={place} />
+          <BarChart
+            title={t().trends.chartTitle}
+            label={t().trends.chartLabel}
+            bars={props.stats.weeks.map((w, i) => ({ hours: w.hoursOff, readout: weekReadout(w, place(i)) }))}
+            initial={props.stats.weeks.length - 1}
+            xLabels={[
+              props.stats.weeks.length > 1 && props.stats.weeks[0]
+                ? formatCalendarDay(props.stats.weeks[0].weekStart)
+                : '',
+              t().trends.thisWeek,
+            ]}
+          />
+          <BarChart
+            title={t().trends.byHourTitle}
+            label={t().trends.byHourLabel}
+            bars={props.stats.last30ByHour.map((minutes, hour) => ({
+              hours: minutes / 60,
+              readout: { lead: hourRange(hour), value: tileDuration(minutes / 60), rest: t().trends.off },
+            }))}
+            initial={peakHour(props.stats.last30ByHour)}
+            xLabels={[hourLabel(0), hourLabel(23)]}
+          />
         </Show>
       </div>
       <details class="gg-trends-details">

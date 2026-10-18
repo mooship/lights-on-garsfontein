@@ -128,10 +128,11 @@ export const download = style({
   minHeight: '2.75rem',
 });
 
-// Takes the chart's place at about its height (.gg-skel-chart), so the card does not look broken.
+// Takes the place of both charts at about their height (the two .gg-skel-chart in the shell and the gap
+// between them), so the card does not look broken.
 export const chartEmpty = style({
   marginTop: '1.25rem',
-  minHeight: '11.5rem',
+  minHeight: '24.875rem',
   display: 'grid',
   placeItems: 'center',
   padding: '1rem',

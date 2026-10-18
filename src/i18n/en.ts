@@ -86,6 +86,8 @@ export const en = {
     chartEmpty: 'No outages to chart yet.',
     chartTitle: 'Hours without power per week',
     chartLabel: 'Hours without power per week. Use the arrow keys to move between weeks, or open the table below.',
+    byHourTitle: 'When outages happen',
+    byHourLabel: 'Hours without power by time of day. Use the arrow keys to move between hours.',
     weekOf: (day: string) => `Week of ${day}`,
     off: 'off',
     outageCount: (n: number) => `${n} ${n === 1 ? 'outage' : 'outages'}`,

@@ -38,6 +38,7 @@ export const TrendsCardSkeleton: Component = () => (
           <For each={[1, 2, 3, 4]}>{() => <span class="gg-skel gg-skel-tile" />}</For>
         </div>
         <span class="gg-skel gg-skel-chart" />
+        <span class="gg-skel gg-skel-chart" />
       </div>
     </div>
     <details class="gg-trends-details">
