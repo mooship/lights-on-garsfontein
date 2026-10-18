@@ -64,8 +64,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      # Local-only values: Cloudflare's public Turnstile test keys and a test password hash.
-      - run: cp .dev.vars.example .dev.vars
+      # npm run test:e2e writes .dev.vars.e2e from .dev.vars.example itself (playwright.config.ts).
       - run: npm run test:e2e
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()

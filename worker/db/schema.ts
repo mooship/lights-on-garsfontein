@@ -19,9 +19,8 @@ export const outages = sqliteTable(
     startTime: text('start_time').notNull(),
     /** Null while the outage is open. */
     endTime: text('end_time'),
-    // Adding a source: extend OUTAGE_SOURCES (shared/api.ts) and the admin `source` labels in the
-    // dictionaries together, then run `npm run db:generate`. The enum is type-level only (SQLite
-    // gets no CHECK constraint), so existing rows need no migration.
+    // Adding a source: extend OUTAGE_SOURCES (shared/api.ts) and its admin label in src/admin/copy.ts.
+    // The enum is type-level only (SQLite gets no CHECK constraint), so no migration is needed.
     source: text('source', { enum: OUTAGE_SOURCES }).notNull(),
     isFalsePositive: integer('is_false_positive', { mode: 'boolean' }).notNull().default(sql`0`),
     isPlanned: integer('is_planned', { mode: 'boolean' }).notNull().default(sql`0`),
