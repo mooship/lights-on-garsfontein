@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
 import { HEARTBEAT_THRESHOLD_MS, type OutageSource, type OutageSummary, type PowerStatus } from '../../shared/api';
 import type { Db } from '../db/client';
 import { heartbeats, type Outage, outages, sessions } from '../db/schema';
@@ -9,25 +9,32 @@ const RECENT_LIMIT = 5;
 const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, false));
 
 /**
+ * When the sensor's current silence began: its last heartbeat, or the end of a pause after it.
+ * During a pause this lies in the future, so the heartbeat never counts as stale.
+ */
+const silentSince = () => sql<string>`max(${heartbeats.lastSeen}, coalesce(${heartbeats.pausedUntil}, ''))`;
+
+/**
  * The sensor heartbeat, plus whether any outage (false positives included) starts at or after
- * it. If one does, the current silence is already on record: an admin who dismissed it as a
- * false positive (a dead sensor) is not overruled by showing OFF or opening it again.
+ * its silence began. If one does, the current silence is already on record: an admin who
+ * dismissed it as a false positive (a dead sensor) is not overruled by showing OFF or opening it again.
  */
 function heartbeatQuery(db: Db) {
   return db
     .select({
       lastSeen: heartbeats.lastSeen,
-      onRecord:
-        sql<boolean>`exists (select 1 from ${outages} where ${outages.startTime} >= ${heartbeats.lastSeen})`.mapWith(
-          Boolean,
-        ),
+      pausedUntil: heartbeats.pausedUntil,
+      silentSince: silentSince(),
+      onRecord: sql<boolean>`exists (select 1 from ${outages} where ${outages.startTime} >= ${silentSince()})`.mapWith(
+        Boolean,
+      ),
     })
     .from(heartbeats)
     .where(eq(heartbeats.id, 1))
     .limit(1);
 }
 
-type Heartbeat = { lastSeen: string; onRecord: boolean };
+type Heartbeat = { lastSeen: string; pausedUntil: string | null; silentSince: string; onRecord: boolean };
 
 /** A plain select, not `findFirst`: relational queries break inside `db.batch` when nothing matches. */
 function openOutageQuery(db: Db) {
@@ -56,6 +63,10 @@ function isStale(lastSeen: string, now: Date): boolean {
   return now.getTime() - Date.parse(lastSeen) > HEARTBEAT_THRESHOLD_MS;
 }
 
+function isPaused({ pausedUntil }: Heartbeat, now: Date): boolean {
+  return pausedUntil !== null && Date.parse(pausedUntil) > now.getTime();
+}
+
 /** The public shape of an outage row. */
 export function summarise(outage: Pick<Outage, 'id' | 'startTime' | 'endTime' | 'isPlanned'>): OutageSummary {
   const { id, startTime, endTime, isPlanned } = outage;
@@ -70,8 +81,8 @@ function powerState(
 ): { status: PowerStatus; since: string | null } {
   if (openStart) return { status: 'OFF', since: openStart };
   // A stale heartbeat is OFF straight away; the cron job opens the record within a minute.
-  if (heartbeat && !heartbeat.onRecord && isStale(heartbeat.lastSeen, now)) {
-    return { status: 'OFF', since: heartbeat.lastSeen };
+  if (heartbeat && !heartbeat.onRecord && isStale(heartbeat.silentSince, now)) {
+    return { status: 'OFF', since: heartbeat.silentSince };
   }
   return { status: 'ON', since: null };
 }
@@ -100,7 +111,7 @@ export async function getGridState(db: Db, now: Date) {
     outage: open ? summarise(open) : null,
     recent: recentRows.map(summarise),
     // Whether a sensor is reporting now; says nothing about how any outage was recorded.
-    monitored: heartbeat !== undefined && !isStale(heartbeat.lastSeen, now),
+    monitored: heartbeat !== undefined && !isStale(heartbeat.lastSeen, now) && !isPaused(heartbeat, now),
   };
 }
 
@@ -110,9 +121,9 @@ export async function getGridState(db: Db, now: Date) {
  */
 export async function detectOutage(db: Db, now: Date): Promise<boolean> {
   const [[heartbeat], [open]] = await db.batch([heartbeatQuery(db), openOutageQuery(db)]);
-  if (open || !heartbeat || heartbeat.onRecord || !isStale(heartbeat.lastSeen, now)) return false;
+  if (open || !heartbeat || heartbeat.onRecord || !isStale(heartbeat.silentSince, now)) return false;
   // The insert re-checks both conditions, in case another request got there first.
-  return openOutage(db, heartbeat.lastSeen, 'sensor', gte(outages.startTime, heartbeat.lastSeen));
+  return openOutage(db, heartbeat.silentSince, 'sensor', gte(outages.startTime, heartbeat.silentSince));
 }
 
 /**
@@ -129,7 +140,7 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: numb
   const missedOutage = db
     .select({
       id: sql<number>`null`.as('id'),
-      startTime: heartbeats.lastSeen,
+      startTime: silentSince().as('start_time'),
       endTime: sql<string>`${iso}`.as('end_time'),
       source: sql<OutageSource>`'sensor'`.as('source'),
       isFalsePositive: sql<boolean>`0`.as('is_false_positive'),
@@ -139,8 +150,8 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: numb
     .where(
       and(
         eq(heartbeats.id, 1),
-        lt(heartbeats.lastSeen, staleBefore),
-        sql`not exists (select 1 from ${outages} where ${outages.startTime} >= ${heartbeats.lastSeen} or ${anyOpen})`,
+        lt(silentSince(), staleBefore),
+        sql`not exists (select 1 from ${outages} where ${outages.startTime} >= ${silentSince()} or ${anyOpen})`,
       ),
     );
   const [missed, , closed] = await db.batch([
@@ -152,6 +163,20 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: numb
     db.update(outages).set({ endTime: iso }).where(anyOpen).returning({ id: outages.id }),
   ]);
   return { closed: closed.length, changed: closed.length > 0 || missed.meta.changes > 0 };
+}
+
+/**
+ * Pauses outage detection until `until`, or with null ends a running pause now, so the silence
+ * counts from then. Does nothing before the sensor's first heartbeat. Returns the pause's end.
+ */
+export async function pauseSensor(db: Db, until: string | null, now: Date): Promise<string | null> {
+  const iso = now.toISOString();
+  const [row] = await db
+    .update(heartbeats)
+    .set({ pausedUntil: until ?? iso })
+    .where(until ? eq(heartbeats.id, 1) : and(eq(heartbeats.id, 1), gt(heartbeats.pausedUntil, iso)))
+    .returning({ pausedUntil: heartbeats.pausedUntil });
+  return row?.pausedUntil ?? null;
 }
 
 /** Deletes sessions past `expiresAt`; run by HOURLY_CRON, as checkSession deletes only the ones it meets. */

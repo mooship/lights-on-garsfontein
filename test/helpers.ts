@@ -91,7 +91,11 @@ export async function getStatus(): Promise<StatusResponse> {
 /** Writes the sensor's last heartbeat straight to D1, `secondsAgo` in the past; returns it as ISO. */
 export async function setHeartbeat(secondsAgo: number): Promise<string> {
   const lastSeen = new Date(Date.now() - secondsAgo * 1000).toISOString();
-  await env.DB.prepare('INSERT OR REPLACE INTO heartbeats (id, last_seen) VALUES (1, ?)').bind(lastSeen).run();
+  await env.DB.prepare(
+    'INSERT INTO heartbeats (id, last_seen) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET last_seen = excluded.last_seen',
+  )
+    .bind(lastSeen)
+    .run();
   return lastSeen;
 }
 

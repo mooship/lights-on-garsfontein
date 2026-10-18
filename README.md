@@ -31,13 +31,14 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
 | `POST /api/contact` | The privacy contact address | `no-store` | 5/min; Turnstile |
 | `POST /api/heartbeat` | Sensor check-in | `no-store` | `HEARTBEAT_TOKEN` |
+| `POST /api/heartbeat/pause` | Pauses outage detection | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
 - "Shared 60/min" is one limit per connection across those four endpoints; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
 - A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt.
 - Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
-- `monitored` is `true` while the sensor's last heartbeat is fresh. When it is `false`, `ON` means only that no outage has been reported.
+- `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.
 - Only the admin API exposes an outage's `source`.
 - `POST /api/contact` takes `{ "token" }`, a Turnstile token solved for the `contact` action, and answers `200` with `{ "email" }`, or `404` with `not_configured`.
 
@@ -92,6 +93,8 @@ curl -X POST "$SITE_URL/api/admin/outages" \
 
 An always-on device posts to `/api/heartbeat` every minute. Once the last heartbeat is more than three minutes old, the status shows `OFF` and the minute cron opens an outage starting at that heartbeat. The next heartbeat closes **every** open outage, punch-clock ones included, since the sensor seeing power means the power is on; if power returned between two cron runs, the gap is still recorded. Heartbeats are refused until `HEARTBEAT_TOKEN` is set. Each instance supports one sensor (`worker/db/schema.ts` keeps a single heartbeat row).
 
+A sensor that will be away from its usual supply can pause detection: `POST /api/heartbeat/pause` with `{ "until": "<ISO time with offset>" }`, at most 30 days ahead. Until then no outage opens and `monitored` is `false`, so the status reads only that no outage has been reported; the punch clock still works. Afterwards the silence counts from the pause's end, not the last heartbeat. `{ "until": null }` ends a pause now. The answer is `{ "ok": true, "pausedUntil" }`, with `null` when nothing is paused.
+
 Hardware tips:
 
 - An ESP32 in an enclosure, such as an M5Stack Atom, on a USB charger.
@@ -137,13 +140,22 @@ A Raspberry Pi, or an old Android phone with Termux, works too:
 * * * * * curl -fsS -m 20 -X POST -H "Authorization: Bearer YOUR_TOKEN" https://YOUR_DOMAIN/api/heartbeat >/dev/null
 ```
 
-A MacBook that stays on its charger works without extra hardware. It posts only while drawing from AC power, so when it falls back to its battery the heartbeats stop and an outage opens, even if the router is on backup power. On the Mac, from a clone of this repository:
+A MacBook that stays on its charger works without extra hardware. It posts only while drawing from AC power, so when it falls back to its battery the heartbeats stop and an outage opens, even if the router is on backup power. On the Mac, without cloning:
 
 ```sh
-sh scripts/mac-sensor.sh install https://YOUR_DOMAIN
+curl -fsSL -o /tmp/lights-on.sh https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scripts/mac-sensor.sh && sh /tmp/lights-on.sh install https://YOUR_DOMAIN
 ```
 
-It asks for `HEARTBEAT_TOKEN` and keeps it in the login keychain, then starts a launch agent that keeps the Mac awake only while it is on the charger. Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. Errors go to `~/Library/Logs/lights-on-heartbeat.log`; `sh scripts/mac-sensor.sh uninstall` removes everything.
+It asks for `HEARTBEAT_TOKEN` (hidden as you paste it, and never on a command line) and keeps it in a file only your account can read. It then starts a launch agent that keeps the Mac awake only while it is on the charger, and adds a `lights-on` command:
+
+| Command | Does |
+| --- | --- |
+| `lights-on pause 3h` | Stops reporting for `30m`, `3h`, `2d` and so on, without logging an outage. Use it before you leave with the Mac or charge it somewhere else |
+| `lights-on resume` | Reports again now |
+| `lights-on status` | Shows whether it is reporting, paused or on battery, and the last logged error |
+| `lights-on uninstall` | Removes the agent, the command and the token |
+
+Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. Errors go to `~/Library/Logs/lights-on-heartbeat.log`.
 
 ## Run it for your area
 

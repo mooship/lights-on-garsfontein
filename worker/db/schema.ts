@@ -9,6 +9,8 @@ import { OUTAGE_SOURCES } from '../../shared/api';
 export const heartbeats = sqliteTable('heartbeats', {
   id: integer('id').primaryKey(),
   lastSeen: text('last_seen').notNull(),
+  /** Until then, silence is expected and opens no outage; null when never paused. */
+  pausedUntil: text('paused_until'),
 });
 
 export const outages = sqliteTable(
