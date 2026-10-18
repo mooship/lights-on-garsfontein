@@ -93,6 +93,8 @@ export interface StatsResponse {
   previous30: WindowStats | null;
   /** Up to WEEKS_SHOWN (worker/lib/stats.ts) weeks, oldest first, starting no earlier than the tracking start. */
   weeks: WeekStats[];
+  /** Minutes without power in each local clock hour over `last30`'s window: 24 entries, index 0 is 00:00 to 01:00. */
+  last30ByHour: number[];
   generatedAt: string;
 }
 

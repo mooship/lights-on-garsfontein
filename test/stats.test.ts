@@ -4,7 +4,7 @@ import { HOUR_MS as H, MINUTE_MS, type StatsResponse, TRACKING_SINCE, UTC_OFFSET
 import { CSV_PATH, STATS_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import { zoned } from '../src/lib/zone';
-import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
+import { hourlyMinutes, mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
 import { call, insertOutage, stubLimiter } from './helpers';
 
 const t = (iso: string) => Date.parse(iso);
@@ -164,7 +164,65 @@ describe('weekly stats', () => {
   });
 });
 
+describe('hourlyMinutes', () => {
+  const since = t(TRACKING_SINCE);
+  const from = since;
+  const to = t(zoned('2026-11-30T00:00:00'));
+  const span = (a: string, b: string) => [{ start: t(zoned(a)), end: t(zoned(b)) }];
+  const only = (entries: Record<number, number>) =>
+    Array.from({ length: 24 }, (_, hour) => entries[hour] ?? 0);
+
+  it('splits an outage across the local clock hours it covers', () => {
+    expect(hourlyMinutes(span('2026-10-20T17:30:00', '2026-10-20T19:15:00'), from, to, since)).toEqual(
+      only({ 17: 30, 18: 60, 19: 15 }),
+    );
+  });
+
+  it('splits an outage across local midnight', () => {
+    expect(hourlyMinutes(span('2026-10-20T23:30:00', '2026-10-21T00:30:00'), from, to, since)).toEqual(
+      only({ 23: 30, 0: 30 }),
+    );
+  });
+
+  it('adds up the same hour on different days', () => {
+    const intervals = [
+      ...span('2026-10-20T18:00:00', '2026-10-20T18:20:00'),
+      ...span('2026-10-22T18:30:00', '2026-10-22T18:40:00'),
+    ];
+    expect(hourlyMinutes(intervals, from, to, since)).toEqual(only({ 18: 30 }));
+  });
+
+  it('counts only the part inside the window and after tracking began', () => {
+    const intervals = span('2026-10-16T23:00:00', '2026-10-17T01:00:00');
+    expect(hourlyMinutes(intervals, from, to, since)).toEqual(only({ 0: 60 }));
+    const windowFrom = t(zoned('2026-10-17T00:30:00'));
+    expect(hourlyMinutes(intervals, windowFrom, to, since)).toEqual(only({ 0: 30 }));
+  });
+
+  it('is 24 zeros without outages', () => {
+    expect(hourlyMinutes([], from, to, since)).toEqual(only({}));
+  });
+});
+
 describe('GET /api/stats', () => {
+  it('gives the minutes without power in each local hour over the last 30 days, without false positives', async () => {
+    const now = Date.now();
+    // Whole local hours two and three hours ago, so the test does not depend on the time it runs.
+    const hourStart = (ms: number) => Math.floor((ms + UTC_OFFSET_MS) / H) * H - UTC_OFFSET_MS;
+    const start = hourStart(now) - 3 * H;
+    await insertOutage({ startTime: new Date(start).toISOString(), endTime: new Date(start + H).toISOString() });
+    await insertOutage({
+      startTime: new Date(start + H).toISOString(),
+      endTime: new Date(start + 2 * H).toISOString(),
+      isFalsePositive: 1,
+    });
+    const body = (await (await call(STATS_PATH)).json()) as StatsResponse;
+    const hour = new Date(start + UTC_OFFSET_MS).getUTCHours();
+    expect(body.last30ByHour).toHaveLength(24);
+    expect(body.last30ByHour[hour]).toBe(60);
+    expect(body.last30ByHour.reduce((a, b) => a + b, 0)).toBe(60);
+  });
+
   it('counts planned and open outages but not false positives', async () => {
     const now = Date.now();
     const ago = (ms: number) => new Date(now - ms).toISOString();
