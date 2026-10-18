@@ -38,5 +38,3 @@ All public endpoints are free to use; the JSON API, the CSV and the feed allow a
 All times are UTC. Local time is %site.timeZone% (SAST, UTC+2, no daylight saving).
 
 `planned` is true for outages announced in advance (for example maintenance or upgrades). Planned outages still count as time without power.
-
-On 18 October 2026 the `confirmations` field and CSV column and the `stillOffReports` field were removed, with the features that filled them; every recorded `confirmations` value was 0.

@@ -29,17 +29,17 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `GET /feed.xml` | Atom feed of the 20 most recent outages, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
-| `POST /api/contact` | The privacy contact address | `no-store` | 5/min; same-origin; Turnstile |
+| `POST /api/contact` | The privacy contact address | `no-store` | 5/min; Turnstile |
 | `POST /api/heartbeat` | Sensor check-in | `no-store` | `HEARTBEAT_TOKEN` |
-| `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Same-origin; login: Turnstile, 5/min per connection and 30/min site-wide |
+| `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
 - "Shared 60/min" is one limit per connection across those four endpoints; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
-- The edge cache is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
+- A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt.
+- Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh. When it is `false`, `ON` means only that no outage has been reported.
 - Only the admin API exposes an outage's `source`.
 - `POST /api/contact` takes `{ "token" }`, a Turnstile token solved for the `contact` action, and answers `200` with `{ "email" }`, or `404` with `not_configured`.
-- 18 October 2026: community confirmations and "still off" reports were removed, with `POST /api/confirm`, `POST /api/still-off`, the `confirmations` field on each outage and `stillOffReports` in the status. Every recorded `confirmations` value was 0.
 
 ### CSV contract
 
@@ -52,9 +52,11 @@ id,start_time_utc,end_time_utc,duration_minutes,planned
 - `start_time_utc` and `end_time_utc` are ISO 8601 UTC; `end_time_utc` and `duration_minutes` (whole minutes) are empty while an outage is open.
 - `planned` is `yes` or `no`.
 
-Columns are never renamed, reordered or reformatted. New columns are only appended, with a version note here.
+Columns are never renamed, reordered or reformatted. New columns are only appended, with a note under "Contract changes".
 
-- 18 October 2026: the `confirmations` column was removed with community confirmations; every recorded value was 0.
+### Contract changes
+
+- 18 October 2026: community confirmations and "still off" reports were removed, with `POST /api/confirm`, `POST /api/still-off`, the `confirmations` field on each outage and CSV column, and `stillOffReports` in the status. Every recorded `confirmations` value was 0.
 
 ## Recording outages
 
@@ -175,33 +177,35 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 
    For random values, use for example `openssl rand -base64 32`.
 7. **Deploy.** `npm run deploy` builds, applies pending D1 migrations and deploys. With Cloudflare Workers Builds, use `npm run build` as the build command and `npm run deploy:ci` as the deploy command: migrations run first, so if one fails the previous version stays live.
-8. **Regenerate the images**: `npm run og` (social card) and `npm run icons` (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand.
+8. **Regenerate the images**: `npm run og` (social card) and `npm run icons` (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand. The colours come from `src/styles/palette.ts`; files that cannot import it keep copies to change with it: `src/styles/privacy.css`, the theme-color metas in `index.html`, `public/favicon*.svg`, and `background_color` and `theme_color` in `templates/site.webmanifest` (JSON, so it cannot carry a note).
 9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and terms, is written for POPIA and describes this deployment's data handling; `FORKERS` comments mark what to check. Do not use utility or municipal logos, and keep the independence disclaimer.
 
 Two crons run the Worker. Every minute it opens an outage for a silent sensor. Every hour it removes expired sessions.
-
-**Banners.** `src/banners.ts` holds short, dated notices. Append an entry to `BANNERS` with a new, stable `id` (dismissals are remembered by it), `from` and `until` via `zoned('YYYY-MM-DDTHH:mm')` (`until` is exclusive) and the copy (required in the default locale). Expired entries stop showing on their own; at most one shows at a time.
 
 ## Extending
 
 | Path | Contents |
 | --- | --- |
-| `src/` | SolidJS app: `components/`, `admin/`, `i18n/`, `lib/`, `styles/`, `sw/`, `banners.ts` |
-| `worker/` | Worker: `index.ts` (route table, security headers, crons), `crons.ts`, `routes/`, `lib/`, `db/schema.ts` |
-| `shared/` | Types and constants for both the app and the Worker (`api.ts`, `paths.ts`, `locale.ts`) |
-| `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages, service worker |
-| `templates/` | `llms.txt` and `site.webmanifest`, filled at build time |
-| `drizzle/` | Generated SQL migrations |
-| `scripts/` | Password hashing, OG card and icon rendering, the service worker kill switch |
-| `test/`, `e2e/` | Vitest (Worker in workerd, and Node in `test/node/`) and Playwright |
+| `site.config.ts` | Deployment identity (see [Run it for your area](#run-it-for-your-area)) |
+| `src/` | SolidJS app: `components/`, `lib/`, `styles/` (colours in `palette.ts`), `sw/` (service worker), `banners.ts` |
+| `src/i18n/` | Public copy: one dictionary per language (`af.ts` is the source) and `head.ts` for the `<head>` |
+| `src/admin/` | The `/admin` page; its copy is English-only, in `copy.ts`, outside the dictionaries |
+| `worker/` | Worker: `index.ts` (security headers, crons), `routes/` (handlers; the route table is in `routes/index.ts`), `lib/` (router, grid, stats, auth, Turnstile), `crons.ts`, `db/schema.ts` |
+| `shared/` | Types and constants for both the app and the Worker: `api.ts` (API types, `OUTAGE_SOURCES`, `UTC_OFFSET_MS`, `localDate`), `paths.ts`, `errors.ts`, `locale.ts` (`LOCALES`, `DEFAULT_LOCALE`, `pageLocale`) |
+| `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload, service worker |
+| `index.html`, `privacy.html`, `templates/` | Static pages, `llms.txt` and `site.webmanifest`, filled from `site.config.ts` at build time |
+| `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the service worker kill switch |
+| `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 
-**Adding an endpoint.** Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in both dictionaries (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `sameOrigin`, `limiter`, `authorize`, `cors`, `edgeCache` and `purges`.
+**Adding an endpoint.** Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/routes/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in `src/admin/copy.ts` (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `limiter`, `authorize`, `cors`, `edgeCache` and `purges`. The cross-site and JSON checks on writes apply to every route.
 
 **Adding a language.** Add the code to `site.locales` and `intlLocales`, create `src/i18n/<code>.ts` that `satisfies Messages`, register it in `DICTIONARIES` in `src/i18n/index.ts`, and add its `<head>` copy to `src/i18n/head.ts`. Each dictionary's `lang.switchTo` labels the switch to the next locale, in that language. The build writes the page to `/<code>/` with its own canonical and hreflang links. Add a section to `privacy.html`.
 
-**Adding an outage source.** Extend the `source` enum in `worker/db/schema.ts`, `OutageSource` in `shared/api.ts` and the admin labels in the dictionaries, then `npm run db:generate`.
+**Adding a banner.** `BANNERS` in `src/banners.ts` holds short, dated notices. Append an entry with a new, stable `id` (dismissals are remembered by it), `from` and `until` via `zoned('YYYY-MM-DDTHH:mm')` in the configured zone (`until` is exclusive), the `text` and an optional `link`. Copy is required in the default locale, which the others fall back to. Expired entries stop showing on their own; at most one shows at a time, the first active one not yet dismissed.
 
-**Migrations.** The database changes a few seconds before the code, so each migration must work with both. Add a column before using it, stop using one before dropping it, give new columns a default or make them nullable, and never rename in place. Check what drizzle-kit generates: a SQLite table rebuild can cascade-delete related rows on D1 (see `drizzle/0003_boolean_flags.sql`).
+**Adding an outage source.** Extend `OUTAGE_SOURCES` in `shared/api.ts` (the schema's enum follows) and add its label to `source` in `src/admin/copy.ts`. The enum is checked in TypeScript only, so no migration is needed.
+
+**Changing the database.** Follow the migration rules in [AGENTS.md](AGENTS.md#hard-rules): the database changes a few seconds before the code, so each migration must work with both.
 
 ## Offline support and kill switch
 
@@ -209,9 +213,9 @@ A service worker (`src/sw/sw.ts`, built to `dist/sw.js`) keeps the pages and the
 
 | Request | Strategy |
 | --- | --- |
-| `/`, `/en/`, `/privacy` | Network first; after 3 seconds or on failure, this build's precached copy. Never stored at runtime |
+| `/`, `/en/`, `/privacy` | Network first; after `NETWORK_TIMEOUT_MS` (3 seconds) or on failure, this build's precached copy. Never stored at runtime |
 | `/assets/*` | Precache, else network |
-| `/api/status` | Network first; after 3 seconds, on failure or on a 5xx or 429, the last good status, marked `X-From-Cache: 1`. The page then shows "No connection" with the time the status was produced |
+| `/api/status` | Network first; after that timeout, on failure or on a 5xx or 429, the last good status, marked `X-From-Cache: 1`. The page then shows "No connection" with the time the status was produced |
 | Everything else | Not handled: writes, `/admin`, the rest of the API, the CSV, the feed, `/og.png`, `/cdn-cgi/*` and other origins |
 
 Each build precaches into a cache named after a hash of its files and `src/sw/`, so every deploy changes `sw.js` (served with `Cache-Control: no-cache`). The new worker installs in the background, retrying at the next navigation if a precached page is redirected or references an asset the build lacks, then takes over and deletes older caches. The status cache survives deploys. An open page that needs a chunk the server no longer has reloads onto the current build.
@@ -244,8 +248,10 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | --- | --- |
 | `npm run dev` / `dev:worker` | Vite dev server / local Worker |
 | `npm run build` / `preview` | Build to `dist/` / build and serve locally |
-| `npm test` / `test:watch` | Vitest, once or in watch mode |
-| `npm run test:e2e` | Playwright against a fresh local Worker and database |
+| `npm test` / `test:watch` | Vitest, once or in watch mode: the `worker` project (workerd with D1) and the `node` project (`test/node/`); `CHECK_DIST=1` also checks `dist/` |
+| `npm run test:coverage` | Istanbul coverage for the Worker |
+| `npm run test:e2e` | Playwright against `wrangler dev --env e2e` with a fresh local database; each run writes `.dev.vars.e2e` from `.dev.vars.example` |
+| `npm run test:api` / `test:api:prod` | Bruno, by hand (below) |
 | `npm run lint` / `lint:fix` / `lint:ci` | Biome: check / fix / check as CI does |
 | `npm run typecheck` | Type-check the app, service worker, Worker, tests and Node scripts |
 | `npm run cf-typegen` | Regenerate `worker/worker-configuration.d.ts` after a `wrangler.toml` or `.dev.vars.example` change |
@@ -255,12 +261,14 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
+Lefthook runs Biome and the typecheck on commit and `npm test` on push. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
+
 ### API tests (Bruno)
 
 `bruno/` is a [Bruno](https://www.usebruno.com) collection: one request per endpoint, each with assertions. It runs by hand, not in CI. Start a local server with the e2e rate limits and its own database, then run the suite in a second terminal:
 
 ```sh
-cp .dev.vars.example .dev.vars   # if you have not already
+cp .dev.vars.example .dev.vars.e2e   # --env e2e reads this file; npm run test:e2e also writes it
 cp bruno/.env.example bruno/.env
 npm run build
 npx wrangler d1 migrations apply DB --local --env e2e --persist-to .wrangler/bruno-state
@@ -273,16 +281,12 @@ npm run test:api
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/mooship/lights-on-garsfontein); please open an issue before a larger change. [AGENTS.md](AGENTS.md) holds the rules for changing the code, for people and AI tools alike. Before opening a pull request, run:
-
-```sh
-npm run lint:ci && npm run typecheck && npm run build && CHECK_DIST=1 npm test && npm run test:e2e
-```
+Issues and pull requests are welcome on [GitHub](https://github.com/mooship/lights-on-garsfontein); please open an issue before a larger change. [AGENTS.md](AGENTS.md) holds the rules for changing the code, for people and AI tools alike; meet its [definition of done](AGENTS.md#definition-of-done) before opening a pull request.
 
 By contributing, you agree that your contributions are licensed under the MIT licence.
 
 ## Licence and credits
 
-Code: [MIT](LICENSE). Outage data: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Code: [MIT](LICENSE). Outage data: see [Using the data](#using-the-data).
 
 Built with SolidJS, Vite, Vanilla Extract, Cloudflare Workers, D1, Drizzle ORM, Zod, Cloudflare Turnstile, Vitest, Playwright, Biome and Lefthook. Fonts: Fraunces and Plus Jakarta Sans (SIL Open Font License), via Fontsource. Icons: Lucide (ISC).

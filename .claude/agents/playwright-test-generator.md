@@ -70,7 +70,8 @@ Where these differ from the instructions above, these win.
   before each test; rate-limit counts are not reset, so no test may rely on them being empty.
 - Cover both locales (`site.locales` in `site.config.ts`). Take copy from the dictionaries (`af` and `en` in
   `src/i18n/`), `HEAD`, `BANNERS` and `site.config.ts` rather than writing the strings out, unless the test is
-  about the wording itself.
+  about the wording itself. `/admin` is English-only: take its copy from `admin` in `src/admin/copy.ts`, outside the
+  dictionaries, and test it in English only.
 - Single quotes and Biome formatting: run `npm run lint:fix` on what you write.
 - `generator_write_test` writes a file of its own: put it in `e2e/`, importing from `./fixtures`, and say in your
   reply which describe in `e2e/app.spec.ts` it belongs in, so it can be moved there.

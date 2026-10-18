@@ -1,12 +1,7 @@
 /**
- * Site banners: short, dated notices shown in a bar at the bottom of the public page.
- *
- * To add one, append an entry to `BANNERS` with a new, stable `id` (dismissals are remembered
- * by it), a `from` and `until` in the configured zone via `zoned` (`until` is exclusive), and the
- * copy. Copy is required in the default locale (`site.locales[0]`) and optional in the others,
- * which fall back to the default's text. To remove one, delete its entry; expired entries are
- * harmless and stop rendering on their own. At most one banner shows: the first active one not
- * yet dismissed.
+ * Site banners: short, dated notices shown in a bar at the bottom of the public page. Each entry
+ * has a stable `id` (dismissals are remembered by it), a `from` and an exclusive `until`, and copy
+ * required in the default locale. How to add one: README, "Adding a banner".
  */
 import type { Locale, site } from '../site.config';
 import { zoned } from './lib/zone';
