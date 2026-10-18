@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs';
 import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
-import { DAY_MS, MINUTE_MS } from '../shared/api';
+import { MINUTE_MS } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
 import {
@@ -9,7 +8,6 @@ import {
   ADMIN_OUTAGES_PATH,
   ADMIN_PAGE_PATH,
   FEED_PATH,
-  LOGOUT_PATH,
   OG_IMAGE_PATH,
   PRIVACY_PAGE_PATH,
   ROBOTS_PATH,
@@ -24,7 +22,6 @@ import { af } from '../src/i18n/af';
 import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
-import { cacheName, NETWORK_TIMEOUT_MS, STATUS_CACHE } from '../src/sw/strategy';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
 import { expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
@@ -633,174 +630,4 @@ test.describe('narrow screens', () => {
       });
     }
   }
-});
-
-test.describe('offline', () => {
-  // Every other test blocks service workers (playwright.config.ts).
-  test.use({ serviceWorkers: 'allow', appLocale: 'af' });
-
-  /** Opens `path` through the service worker, with the status it fetched stored for offline use. */
-  async function throughServiceWorker(page: Page, path: string) {
-    await page.goto(path);
-    await page.evaluate(async () => {
-      await navigator.serviceWorker.ready;
-    });
-    await page.reload(); // the first load came before the worker; this one goes through it
-    await expect(page.getByRole('status')).toBeVisible();
-    await expect.poll(() => cachedGeneratedAt(page)).not.toBeNull();
-  }
-
-  /** When the server produced the worker's copy of the status, or null without one. */
-  const cachedGeneratedAt = (page: Page) =>
-    page.evaluate(async (path) => {
-      const copy = await caches.match(path);
-      return copy ? ((await copy.json()) as { generatedAt: string }).generatedAt : null;
-    }, STATUS_PATH);
-
-  /** Makes the page poll the status now. */
-  const poll = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-
-  const cachedPaths = (page: Page) =>
-    page.evaluate(async () => {
-      const paths: string[] = [];
-      for (const name of await caches.keys()) {
-        for (const request of await (await caches.open(name)).keys()) paths.push(new URL(request.url).pathname);
-      }
-      return paths;
-    });
-
-  test('registers the worker only after the page has loaded', async ({ page }) => {
-    const order: string[] = [];
-    page.on('load', () => order.push('load'));
-    page.context().on('serviceworker', () => order.push('worker'));
-    await page.goto('/');
-    await page.evaluate(async () => {
-      await navigator.serviceWorker.ready;
-    });
-    expect(order).toEqual(['load', 'worker']);
-  });
-
-  test('shows / and /en/ from the cache, labelled with the age of the status, until the network is back', async ({
-    page,
-    context,
-  }) => {
-    await throughServiceWorker(page, '/');
-    await expect(page.getByRole('status')).toContainText(af.status.NONE);
-    await expect(page.getByRole('alert')).toHaveCount(0);
-    // This build's shell, named after the build id in sw.js, and the status copy beside it.
-    const keys = (await page.evaluate(() => caches.keys())).sort();
-    expect(keys).toEqual([STATUS_CACHE, expect.stringMatching(`^${cacheName('')}`)].sort());
-    const buildId = keys.find((key) => key !== STATUS_CACHE)?.slice(cacheName('').length);
-    expect(readFileSync('dist/sw.js', 'utf8')).toContain(`\`${buildId}\``);
-
-    await context.setOffline(true);
-    await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('lang', 'af');
-    await expect(page.getByRole('status')).toContainText(af.status.NONE);
-    await expect(page.getByRole('alert')).toHaveText(withTime(af.status.offline(AT)));
-
-    await page.goto('/en/');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('status')).toContainText(en.status.NONE);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)));
-
-    // A copy from another day says which day.
-    await page.evaluate(
-      async ({ cache, path, day }) => {
-        const copy = (await caches.match(path)) as Response;
-        const body = { ...(await copy.json()), generatedAt: new Date(Date.now() - day).toISOString() };
-        await (await caches.open(cache)).put(path, new Response(JSON.stringify(body), copy));
-      },
-      { cache: STATUS_CACHE, path: STATUS_PATH, day: DAY_MS },
-    );
-    await page.reload();
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT, en.day.yesterday)));
-
-    await context.setOffline(false);
-    await poll(page);
-    await expect(page.getByRole('alert')).toHaveCount(0);
-  });
-
-  test('labels the copy while the network is slow or failing, and keeps a late reply', async ({ page, context }) => {
-    await throughServiceWorker(page, '/en/');
-    // context.route sees the worker's own requests, so this slows the network under it. The late
-    // reply is stamped, because the Worker's edge cache would repeat the last generatedAt.
-    // Slower than the worker waits, and the label must show before the late reply lands.
-    const lateBy = NETWORK_TIMEOUT_MS + 2_000;
-    const stamp = new Date(Date.now() - MINUTE_MS).toISOString();
-    await context.route(`**${STATUS_PATH}`, async (route) => {
-      const response = await route.fetch();
-      await new Promise((resolve) => setTimeout(resolve, lateBy));
-      await route.fulfill({ response, json: { ...(await response.json()), generatedAt: stamp } });
-    });
-    await poll(page);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)), { timeout: lateBy - 500 });
-    await expect.poll(() => cachedGeneratedAt(page), { timeout: 10_000 }).toBe(stamp); // kept for next time
-
-    await context.unroute(`**${STATUS_PATH}`);
-    await context.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
-    await poll(page);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.offline(AT)));
-
-    await context.unroute(`**${STATUS_PATH}`);
-    await poll(page);
-    await expect(page.getByRole('alert')).toHaveCount(0);
-  });
-
-  test('never stores pages at runtime: offline is always this build’s own copy', async ({ page, context }) => {
-    await throughServiceWorker(page, '/en/');
-    // Another deploy's page, as a navigation might fetch mid-deploy. Without navigation preload,
-    // which context.route cannot see, the worker's own fetch brings it.
-    await page.evaluate(async () => (await navigator.serviceWorker.ready).navigationPreload.disable());
-    const enPage = (url: URL) => url.pathname === '/en/';
-    await context.route(enPage, async (route) => {
-      const response = await route.fetch();
-      const body = (await response.text()).replace('</head>', '<meta name="e2e-build" content="next" /></head>');
-      await route.fulfill({ response, body });
-    });
-    await page.reload();
-    await expect(page.locator('meta[name="e2e-build"]')).toHaveCount(1);
-
-    await context.unroute(enPage);
-    await context.setOffline(true);
-    await page.reload();
-    await expect(page.getByRole('status')).toContainText(en.status.NONE);
-    await expect(page.locator('meta[name="e2e-build"]')).toHaveCount(0);
-  });
-
-  test('keeps /admin, writes and the rest of the API out of the cache', async ({ page, context }) => {
-    await throughServiceWorker(page, '/');
-    await page.goto(ADMIN_PAGE_PATH);
-    await expect(page.getByRole('button', { name: admin.signIn })).toBeVisible();
-    await page.goto(PRIVACY_PAGE_PATH);
-    await page.goto('/');
-    await expect(page.getByRole('status')).toBeVisible();
-
-    const paths = await cachedPaths(page);
-    expect(paths).toEqual(expect.arrayContaining(['/', '/en/', PRIVACY_PAGE_PATH, STATUS_PATH]));
-    const shell = new Set(['/', '/en/', PRIVACY_PAGE_PATH, STATUS_PATH]);
-    expect(paths.filter((path) => !shell.has(path) && !path.startsWith('/assets/'))).toEqual([]);
-
-    // Writes and the admin API pass straight through; the status is answered by the worker.
-    const fetched = async (path: string, init?: { method: string }) => {
-      const [response] = await Promise.all([
-        page.waitForResponse((r) => new URL(r.url()).pathname === path),
-        page.evaluate(([p, i]) => fetch(p, i).then((r) => r.status), [path, init] as const),
-      ]);
-      return response.fromServiceWorker();
-    };
-    expect(await fetched(LOGOUT_PATH, { method: 'POST' })).toBe(false);
-    expect(await fetched(ADMIN_OUTAGES_PATH)).toBe(false);
-    expect(await fetched(STATUS_PATH)).toBe(true);
-
-    await context.setOffline(true);
-    await expect(page.goto(ADMIN_PAGE_PATH)).rejects.toThrow();
-  });
-
-  test('a load through the worker has zero layout shift', async ({ page }) => {
-    await throughServiceWorker(page, '/en/');
-    await trackLayoutShift(page);
-    await page.reload();
-    expect(await readLayoutShift(page)).toBe(0);
-  });
 });

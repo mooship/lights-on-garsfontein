@@ -11,11 +11,6 @@
 /admin
   X-Robots-Tag: noindex, nofollow
 
-# Browsers check for a new worker on every navigation; no-cache keeps any HTTP cache between
-# them from answering with the old one.
-/sw.js
-  Cache-Control: no-cache
-
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 

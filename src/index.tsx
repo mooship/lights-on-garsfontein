@@ -29,8 +29,8 @@ function start() {
 // On / with another language chosen, the boot script is already loading that language's page.
 if (!leaving) start();
 
-// A lazy chunk of an older build can be gone once a new deploy's worker has taken over (sw.ts):
-// a reload brings the page onto the current build. At most one reload per CHUNK_RELOAD_GAP_MS, so a
+// A page left open across a deploy asks for lazy chunks of its own build, which the server no longer
+// has: a reload brings the page onto the current build. At most one reload per CHUNK_RELOAD_GAP_MS, so a
 // chunk that is truly missing cannot loop, while a later deploy in the same tab can still recover.
 const CHUNK_RELOAD_GAP_MS = 10_000;
 addEventListener('vite:preloadError', () => {
@@ -43,9 +43,3 @@ addEventListener('vite:preloadError', () => {
   }
   location.reload();
 });
-
-// Production only: the dev server has no /sw.js. After load, so the worker's precache never
-// competes with the page's own requests. Without it the site still works, only not offline.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}), { once: true });
-}

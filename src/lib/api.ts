@@ -14,10 +14,6 @@ import {
   STATUS_PATH,
   TIMER_PATH,
 } from '../../shared/paths';
-import { FROM_CACHE_HEADER } from '../sw/strategy';
-
-/** A status, flagged when the service worker answered from its cache because the network failed. */
-export type Status = StatusResponse & { fromCache?: true };
 
 /** A non-2xx reply: `code` is the body's ErrorCode, or `http_<status>` when it has none. */
 export class ApiError extends Error {
@@ -36,7 +32,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = (await res.json().catch(() => ({}))) as { error?: string };
   if (!res.ok) throw new ApiError(res.status, body.error ?? `http_${res.status}`);
-  return (res.headers.has(FROM_CACHE_HEADER) ? { ...body, fromCache: true } : body) as T;
+  return body as T;
 }
 
 const post = <T>(path: string, body?: unknown) =>
@@ -44,7 +40,7 @@ const post = <T>(path: string, body?: unknown) =>
 
 /** The app's calls to the Worker; each rejects with ApiError on a non-2xx reply. */
 export const api = {
-  status: () => request<Status>(STATUS_PATH),
+  status: () => request<StatusResponse>(STATUS_PATH),
   stats: () => request<StatsResponse>(STATS_PATH),
   contact: (token: string) => post<{ email: string }>(CONTACT_PATH, { token }),
   login: (username: string, password: string, token: string) =>

@@ -207,14 +207,14 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 | Path | Contents |
 | --- | --- |
 | `site.config.ts` | Deployment identity (see [Run it for your area](#run-it-for-your-area)) |
-| `src/` | SolidJS app: `components/`, `lib/`, `styles/` (colours in `palette.ts`), `sw/` (service worker), `banners.ts` |
+| `src/` | SolidJS app: `components/`, `lib/`, `styles/` (colours in `palette.ts`), `banners.ts` |
 | `src/i18n/` | Public copy: one dictionary per language (`af.ts` is the source) and `head.ts` for the `<head>` |
 | `src/admin/` | The `/admin` page; its copy is English-only, in `copy.ts`, outside the dictionaries |
 | `worker/` | Worker: `index.ts` (security headers, crons), `routes/` (handlers; the route table is in `routes/index.ts`), `lib/` (router, grid, stats, auth, Turnstile), `crons.ts`, `db/schema.ts` |
 | `shared/` | Types and constants for both the app and the Worker: `api.ts` (API types, `OUTAGE_SOURCES`, `UTC_OFFSET_MS`, `localDate`), `paths.ts`, `errors.ts`, `locale.ts` (`LOCALES`, `DEFAULT_LOCALE`, `pageLocale`) |
-| `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload, service worker |
+| `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload |
 | `index.html`, `privacy.html`, `templates/` | Static pages, `llms.txt` and `site.webmanifest`, filled from `site.config.ts` at build time |
-| `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the service worker kill switch, the MacBook sensor |
+| `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the MacBook sensor |
 | `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 
 **Adding an endpoint.** Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/routes/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in `src/admin/copy.ts` (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `limiter`, `authorize`, `cors`, `edgeCache` and `purges`. The cross-site and JSON checks on writes apply to every route.
@@ -226,32 +226,6 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 **Adding an outage source.** Extend `OUTAGE_SOURCES` in `shared/api.ts` (the schema's enum follows) and add its label to `source` in `src/admin/copy.ts`. The enum is checked in TypeScript only, so no migration is needed.
 
 **Changing the database.** Follow the migration rules in [AGENTS.md](AGENTS.md#hard-rules): the database changes a few seconds before the code, so each migration must work with both.
-
-## Offline support and kill switch
-
-A service worker (`src/sw/sw.ts`, built to `dist/sw.js`) keeps the pages and the last status available offline. It is registered after load, in production builds only, and handles only same-origin GETs (`src/sw/strategy.ts`):
-
-| Request | Strategy |
-| --- | --- |
-| `/`, `/en/`, `/privacy` | Network first; after `NETWORK_TIMEOUT_MS` (3 seconds) or on failure, this build's precached copy. Never stored at runtime |
-| `/assets/*` | Precache, else network |
-| `/api/status` | Network first; after that timeout, on failure or on a 5xx or 429, the last good status, marked `X-From-Cache: 1`. The page then shows "No connection" with the time the status was produced |
-| Everything else | Not handled: writes, `/admin`, the rest of the API, the CSV, the feed, `/og.png`, `/cdn-cgi/*` and other origins |
-
-Each build precaches into a cache named after a hash of its files and `src/sw/`, so every deploy changes `sw.js` (served with `Cache-Control: no-cache`). The new worker installs in the background, retrying at the next navigation if a precached page is redirected or references an asset the build lacks, then takes over and deletes older caches. The status cache survives deploys. An open page that needs a chunk the server no longer has reloads onto the current build.
-
-**If the service worker misbehaves**, replace it with `scripts/sw-kill-switch.js`, which deletes the site's caches and unregisters itself; browsers pick it up at their next visit.
-
-1. If the fault may last more than a day, first remove the registration from `src/index.tsx`.
-2. Deploy the kill switch in place of the built worker:
-
-   ```sh
-   npm run build
-   cp scripts/sw-kill-switch.js dist/sw.js
-   npm run deploy:ci   # not "npm run deploy", which would rebuild sw.js
-   ```
-
-3. Until the fault is fixed, deploy this way every time.
 
 ## Local development
 
@@ -273,7 +247,7 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run test:e2e` | Playwright against `wrangler dev --env e2e` with a fresh local database; each run writes `.dev.vars.e2e` from `.dev.vars.example` |
 | `npm run test:api` / `test:api:prod` | Bruno, by hand (below) |
 | `npm run lint` / `lint:fix` / `lint:ci` | Biome: check / fix / check as CI does |
-| `npm run typecheck` | Type-check the app, service worker, Worker, tests and Node scripts |
+| `npm run typecheck` | Type-check the app, Worker, tests and Node scripts |
 | `npm run cf-typegen` | Regenerate `worker/worker-configuration.d.ts` after a `wrangler.toml` or `.dev.vars.example` change |
 | `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
 | `npm run db:migrate:local` / `db:migrate:remote` | Apply pending migrations locally / to production |

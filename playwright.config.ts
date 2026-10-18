@@ -18,9 +18,6 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
-    // page.route does not see requests a service worker makes, so tests that stub the API would
-    // pass or fail by whether the worker had taken control yet. The offline tests opt back in.
-    serviceWorkers: 'block',
   },
   projects: [{ name: 'mobile-chrome', use: { ...devices['Pixel 7'] } }],
   webServer: {

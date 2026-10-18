@@ -5,7 +5,6 @@ import {
   formatDuration,
   formatRelativeDay,
   fromLocalInput,
-  offlineLabel,
   toLocalInput,
 } from '../../src/lib/format';
 import { switchLocale } from '../../src/lib/i18n';
@@ -64,20 +63,5 @@ describe('formatRelativeDay', () => {
     expect(formatRelativeDay(zoned('2026-10-16T23:59:59'), now)).toBe('on Fri, 16 Oct');
     // 23:30 UTC on the 17th is already the 18th here.
     expect(formatRelativeDay('2026-10-17T23:30:00.000Z', at('2026-10-18T09:00:00'))).toBe('today');
-  });
-});
-
-describe('offlineLabel', () => {
-  const now = at('2026-10-18T09:00:00');
-
-  it('gives the time alone for today, and the day for any other', () => {
-    expect(offlineLabel(zoned('2026-10-18T08:45:00'), now)).toBe('No connection · status as at 08:45');
-    expect(offlineLabel(zoned('2026-10-17T23:10:00'), now)).toBe('No connection · status as at 23:10 yesterday');
-    expect(offlineLabel(zoned('2026-10-15T07:05:00'), now)).toBe('No connection · status as at 07:05 on Thu, 15 Oct');
-  });
-
-  it('is in the active language', () => {
-    switchLocale('af');
-    expect(offlineLabel(zoned('2026-10-17T23:10:00'), now)).toBe('Geen verbinding · status soos gister om 23:10');
   });
 });

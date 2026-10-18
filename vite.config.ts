@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
-import { build, defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
 import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from './shared/locale.ts';
@@ -142,63 +141,6 @@ function localePages(): Plugin {
   };
 }
 
-const SW_SOURCE = resolve(import.meta.dirname, 'src/sw');
-
-/**
- * Builds src/sw/sw.ts into dist/sw.js once the site is written, with the pages and assets to
- * precache and a build id hashed from them and from src/sw/. A change to either changes the
- * worker's bytes (which is what makes browsers install it) and its cache name. A separate build,
- * because a service worker must be one classic script; inside the app's build it would share chunks.
- */
-function serviceWorker(): Plugin {
-  let outDir = '';
-  const url = (fileName: string) => `/${fileName.replace(/(^|\/)index\.html$/, '$1').replace(/\.html$/, '')}`;
-  return {
-    name: 'service-worker',
-    apply: 'build',
-    configResolved(config) {
-      outDir = resolve(config.root, config.build.outDir);
-    },
-    async writeBundle(_options, bundle) {
-      const files = Object.values(bundle)
-        .filter(({ fileName }) => fileName.endsWith('.html') || fileName.startsWith('assets/'))
-        .sort((a, b) => a.fileName.localeCompare(b.fileName));
-      const hash = createHash('sha256');
-      for (const file of files)
-        hash.update(`${file.fileName}\0`).update(file.type === 'chunk' ? file.code : file.source);
-      for (const name of readdirSync(SW_SOURCE).sort()) {
-        hash.update(`src/sw/${name}\0`).update(readFileSync(resolve(SW_SOURCE, name)));
-      }
-      const pages = files.filter(({ fileName }) => fileName.endsWith('.html')).map(({ fileName }) => url(fileName));
-      // Every asset, lazy chunks included, so this build's pages never need the network for one.
-      const assets = files
-        .filter(({ fileName }) => fileName.startsWith('assets/'))
-        .map(({ fileName }) => url(fileName));
-      await build({
-        configFile: false,
-        logLevel: 'warn',
-        publicDir: false,
-        define: {
-          __BUILD_ID__: JSON.stringify(hash.digest('hex').slice(0, 16)),
-          __PAGES__: JSON.stringify(pages),
-          __ASSETS__: JSON.stringify(assets),
-        },
-        build: {
-          outDir,
-          emptyOutDir: false,
-          target: 'es2022',
-          lib: {
-            entry: resolve(SW_SOURCE, 'sw.ts'),
-            formats: ['iife'],
-            name: 'sw',
-            fileName: () => 'sw.js',
-          },
-        },
-      });
-    },
-  };
-}
-
 /**
  * Fills the index.html loading shell from the dictionaries, once per locale in site.locales
  * (fillStaticI18n in build/html.ts); base.css shows the one matching <html lang>: the page's own
@@ -236,7 +178,6 @@ export default defineConfig({
     staticI18n(),
     hashedFonts(),
     localePages(),
-    serviceWorker(),
   ],
   build: {
     target: 'es2022',
