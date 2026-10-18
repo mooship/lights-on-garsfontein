@@ -28,6 +28,10 @@ globalStyle('body', {
 
 globalStyle('h1, h2, h3, p', { margin: 0 });
 
+// No lone word on a paragraph's last line, and headings broken into even lines.
+globalStyle('p', { textWrap: 'pretty' });
+globalStyle('h1, h2, h3', { textWrap: 'balance' });
+
 globalStyle('a', { color: 'inherit', textUnderlineOffset: '0.2em' });
 
 globalStyle(':focus-visible', {
@@ -182,7 +186,9 @@ globalStyle('.gg-footer', {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.5rem',
-  paddingTop: '0.5rem',
+  marginTop: '0.5rem',
+  paddingTop: '1rem',
+  borderTop: `1px solid ${vars.color.border}`,
 });
 
 globalStyle('.gg-footer nav', { display: 'flex', flexWrap: 'wrap', gap: '0 1rem' });
