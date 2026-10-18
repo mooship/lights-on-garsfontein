@@ -59,7 +59,6 @@ export const af = {
     // ON without a fresh live reading: no outage is known, but nothing measured the power as on.
     NONE: 'Geen onderbreking aangemeld nie',
     // Under NONE instead of `for`: `day` is vandag, gister or "op Sa. 17 Okt.".
-    lastEnded: (time: string, day: string) => `Laaste onderbreking het ${day} om ${time} geëindig`,
     for: (duration: string) => `Al ${duration}`,
     loading: 'Laai tans die huidige status…',
     wentOff: (time: string, day: string) => `Die onderbreking het ${day} om ${time} begin.`,

@@ -225,9 +225,8 @@ test.describe('public page', () => {
     await page.goto('/');
     const status = page.getByRole('status');
     await expect(status).toHaveText('No outage reported');
-    // No "for 7 h": nothing measured it on. No outage is on record, so no "Last outage ended" either.
+    // No "for 7 h": nothing measured it on.
     await expect(page.getByText(new RegExp(`^${escapeRegExp(en.status.for(''))}\\d`))).toHaveCount(0);
-    await expect(page.getByText(withTime(en.status.lastEnded(AT, en.day.today)))).toHaveCount(0);
     await expect(page.locator('[data-status="NONE"]')).toBeVisible();
     // Just the one line of detail: no "Updated HH:MM" while all is well.
     await expect(page.locator('.gg-status-detail > p')).toHaveCount(1);
@@ -241,7 +240,8 @@ test.describe('public page', () => {
     test.describe(locale, () => {
       test.use({ appLocale: locale });
 
-      test(`without a live reading, says when the last outage ended (${locale})`, async ({ page }) => {
+      // The detail line below already describes the last outage, so the badge adds nothing.
+      test(`without a live reading, adds no line under the headline (${locale})`, async ({ page }) => {
         const m = DICTIONARIES[locale];
         await page.route('**/api/status', async (route) => {
           const response = await route.fetch();
@@ -250,7 +250,7 @@ test.describe('public page', () => {
         });
         await page.goto(localePath(locale));
         await expect(page.getByRole('status')).toHaveText(m.status.NONE);
-        await expect(page.getByText(withTime(m.status.lastEnded(AT, m.day.today)))).toBeVisible();
+        await expect(page.locator('[data-status="NONE"] [data-testid="badge-detail"]')).toHaveText(/^\s*$/);
       });
     });
   }

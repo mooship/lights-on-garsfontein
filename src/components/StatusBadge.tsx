@@ -3,7 +3,7 @@ import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
 import { type Component, Show } from 'solid-js';
 import type { PowerStatus } from '../../shared/api';
-import { formatDuration, formatRelativeDay, formatTime } from '../lib/format';
+import { formatDuration } from '../lib/format';
 import { t } from '../lib/i18n';
 import * as css from './StatusBadge.css';
 
@@ -25,11 +25,11 @@ export const badgeState = (status: PowerStatus, monitored: boolean): BadgeState 
 
 export const StatusBadge: Component<StatusBadgeProps> = (props) => {
   const state = () => badgeState(props.status, props.monitored);
-  // Without a live reading nothing measured how long the power has been on, only when the last outage ended.
+  // Without a live reading nothing measured how long the power has been on; the status detail below
+  // already describes the last outage.
   const detail = () => {
     const since = props.since;
-    if (!since) return ' ';
-    if (state() === 'NONE') return t().status.lastEnded(formatTime(since), formatRelativeDay(since, props.now));
+    if (!since || state() === 'NONE') return ' ';
     return t().status.for(formatDuration(props.now - Date.parse(since)));
   };
 
@@ -49,7 +49,9 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
         <p class={clsx(css.headline, css.tone[state()])} role="status">
           {t().status[state()]}
         </p>
-        <p class={css.detail}>{detail()}</p>
+        <p class={css.detail} data-testid="badge-detail">
+          {detail()}
+        </p>
       </div>
     </div>
   );

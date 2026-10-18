@@ -50,7 +50,6 @@ export const en = {
     ON: 'The power is on',
     OFF: 'The power is off',
     NONE: 'No outage reported',
-    lastEnded: (time: string, day: string) => `Last outage ended ${day} at ${time}`,
     for: (duration: string) => `for ${duration}`,
     loading: 'Loading the current status…',
     wentOff: (time: string, day: string) => `Outage started at ${time} ${day}.`,

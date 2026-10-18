@@ -84,7 +84,7 @@ curl -X POST "$SITE_URL/api/admin/outages" \
   -d '{"action":"update","id":3,"endTime":"2026-10-17T11:20:00+02:00"}'
 ```
 
-`update` also accepts `isPlanned` and `isFalsePositive` (marking an open outage as a false positive closes it); `delete` takes only an `id`. Keep the URL and token in a git-ignored `.env`.
+`update` also accepts `isPlanned` and `isFalsePositive` (marking an open outage as a false positive closes it); `delete` takes only an `id`. Keep the URL and token in a git-ignored `.env` (copy `.env.example`).
 
 ### Sensor
 
