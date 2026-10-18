@@ -35,8 +35,17 @@ async function getStatus({ env, db }: RouteContext): Promise<Response> {
   return json(body);
 }
 
+const heartbeatSchema = z.object({ poweredFor: z.int().nonnegative().default(0) });
+
 async function postHeartbeat({ db, request }: RouteContext): Promise<Response> {
-  const { closed, changed } = await recordHeartbeat(db, new Date());
+  // The body is optional: a sensor that cannot tell how long it has had power posts none.
+  let poweredFor = 0;
+  if (request.headers.get('Content-Type')?.startsWith('application/json')) {
+    const parsed = await parseBody(request, heartbeatSchema);
+    if ('response' in parsed) return parsed.response;
+    poweredFor = parsed.data.poweredFor;
+  }
+  const { closed, changed } = await recordHeartbeat(db, new Date(), poweredFor);
   // The status always, as its live reading changed; the other views only when an outage did, so a
   // sensor posting every minute does not keep emptying them.
   await purgeEdgeCache(new URL(request.url).origin, changed ? OUTAGE_VIEWS : [STATUS_PATH]);

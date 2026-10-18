@@ -1,0 +1,30 @@
+meta {
+  name: heartbeat with poweredFor
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/heartbeat
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{heartbeatToken}}
+}
+
+body:json {
+  {
+    "poweredFor": 3600
+  }
+}
+
+tests {
+  test('200 JSON, not cached', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+    expect(res.getBody().ok).to.equal(true);
+    expect(res.getBody().closedOutages).to.be.a('number');
+  });
+}

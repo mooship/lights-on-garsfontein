@@ -131,17 +131,27 @@ export async function detectOutage(db: Db, now: Date): Promise<boolean> {
  * means power is on at the measuring point. If the heartbeat had gone stale but no outage was
  * opened for it (power came back between two cron runs), the gap is recorded as a closed sensor
  * outage, unless the gap is already on record or an open outage (closed here) covers it.
+ *
+ * `poweredFor` is how many seconds the sensor has had power without a break; 0 vouches only for
+ * now. A sensor outage that began since then was only the sensor's connection dropping: it is
+ * dismissed as a false positive, and such a gap is not recorded. Other outages end when the power
+ * came back.
  */
-export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: number; changed: boolean }> {
+export async function recordHeartbeat(
+  db: Db,
+  now: Date,
+  poweredFor = 0,
+): Promise<{ closed: number; changed: boolean }> {
   const iso = now.toISOString();
   const staleBefore = new Date(now.getTime() - HEARTBEAT_THRESHOLD_MS).toISOString();
+  const poweredSince = new Date(Math.max(0, now.getTime() - poweredFor * 1000)).toISOString();
   const anyOpen = isNull(outages.endTime);
   // Insert-select (raw `db.run` cannot be batched): it needs every column, in table order.
   const missedOutage = db
     .select({
       id: sql<number>`null`.as('id'),
       startTime: silentSince().as('start_time'),
-      endTime: sql<string>`${iso}`.as('end_time'),
+      endTime: sql<string>`${poweredSince}`.as('end_time'),
       source: sql<OutageSource>`'sensor'`.as('source'),
       isFalsePositive: sql<boolean>`0`.as('is_false_positive'),
       isPlanned: sql<boolean>`0`.as('is_planned'),
@@ -151,18 +161,29 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: numb
       and(
         eq(heartbeats.id, 1),
         lt(silentSince(), staleBefore),
+        lt(silentSince(), poweredSince),
         sql`not exists (select 1 from ${outages} where ${outages.startTime} >= ${silentSince()} or ${anyOpen})`,
       ),
     );
-  const [missed, , closed] = await db.batch([
+  // Before the close below, which would otherwise end these as real outages.
+  const dismissed = db
+    .update(outages)
+    .set({ endTime: iso, isFalsePositive: true })
+    .where(and(anyOpen, eq(outages.source, 'sensor'), gte(outages.startTime, poweredSince)))
+    .returning({ id: outages.id });
+  // A manual outage logged while the sensor had power is still the admin's record: it ends now.
+  const endTime = sql`case when ${outages.startTime} < ${poweredSince} then ${poweredSince} else ${iso} end`;
+  const [missed, , gaps, closed] = await db.batch([
     db.insert(outages).select(missedOutage),
     db
       .insert(heartbeats)
       .values({ id: 1, lastSeen: iso })
       .onConflictDoUpdate({ target: heartbeats.id, set: { lastSeen: iso } }),
-    db.update(outages).set({ endTime: iso }).where(anyOpen).returning({ id: outages.id }),
+    dismissed,
+    db.update(outages).set({ endTime }).where(anyOpen).returning({ id: outages.id }),
   ]);
-  return { closed: closed.length, changed: closed.length > 0 || missed.meta.changes > 0 };
+  const count = closed.length + gaps.length;
+  return { closed: count, changed: count > 0 || missed.meta.changes > 0 };
 }
 
 /**

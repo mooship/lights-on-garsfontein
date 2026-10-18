@@ -20,6 +20,10 @@ URL_FILE="$HOME_DIR/url"
 AUTH_FILE="$HOME_DIR/auth-header"
 # Holds the pause's end in epoch seconds; the Worker holds its own copy (/api/heartbeat/pause).
 PAUSE_FILE="$HOME_DIR/paused-until"
+SOURCE=https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scripts/mac-sensor.sh
+# The loop sleeps a minute and curl may take 20 seconds more. A longer gap means the Mac slept or
+# the agent was not running, and a power cut could have passed unseen.
+MAX_TICK_GAP=150
 LOG="$HOME/Library/Logs/lights-on-heartbeat.log"
 DOMAIN="gui/$(id -u)"
 
@@ -31,6 +35,7 @@ usage: lights-on <command>
   pause DURATION       stop reporting, e.g. 30m, 2h or 3d, without logging an outage
   resume               report again now
   status               show what the sensor is doing
+  update               install the latest version, keeping the URL and token
   uninstall            stop and remove everything
 EOF
   exit 64
@@ -54,27 +59,14 @@ send_pause() {
   post -H 'Content-Type: application/json' -d "{\"until\":$1}" "$(cat "$URL_FILE")/api/heartbeat/pause" >/dev/null
 }
 
-case "${1:-}" in
-  install)
-    url=${2:-}
-    case "$url" in
-      https://*) url=${url%/} ;;
-      *) usage ;;
-    esac
-    printf 'Paste HEARTBEAT_TOKEN (hidden), then press Return: '
-    stty -echo </dev/tty
-    read -r token </dev/tty
-    stty echo </dev/tty
-    echo
-    [ -n "$token" ] || usage
-    # Stopped before the copy: sh reads a script as it runs, so overwriting it mid-loop breaks it.
-    launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true # not loaded yet
-    mkdir -p "$HOME_DIR" "$(dirname "$PLIST")"
-    [ "$0" -ef "$INSTALLED" ] || cp "$0" "$INSTALLED"
-    chmod +x "$INSTALLED"
-    echo "$url" >"$URL_FILE"
-    (umask 077 && printf 'Authorization: Bearer %s\n' "$token" >"$AUTH_FILE")
-    cat >"$PLIST" <<EOF
+# Installs this file as the agent and (re)starts it.
+start_agent() {
+  # Stopped before the copy: sh reads a script as it runs, so overwriting it mid-loop breaks it.
+  launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true # not loaded yet
+  mkdir -p "$HOME_DIR" "$(dirname "$PLIST")"
+  [ "$0" -ef "$INSTALLED" ] || cp "$0" "$INSTALLED"
+  chmod +x "$INSTALLED"
+  cat >"$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -94,7 +86,26 @@ case "${1:-}" in
 </dict>
 </plist>
 EOF
-    launchctl bootstrap "$DOMAIN" "$PLIST"
+  launchctl bootstrap "$DOMAIN" "$PLIST"
+}
+
+case "${1:-}" in
+  install)
+    url=${2:-}
+    case "$url" in
+      https://*) url=${url%/} ;;
+      *) usage ;;
+    esac
+    printf 'Paste HEARTBEAT_TOKEN (hidden), then press Return: '
+    stty -echo </dev/tty
+    read -r token </dev/tty
+    stty echo </dev/tty
+    echo
+    [ -n "$token" ] || usage
+    mkdir -p "$HOME_DIR"
+    echo "$url" >"$URL_FILE"
+    (umask 077 && printf 'Authorization: Bearer %s\n' "$token" >"$AUTH_FILE")
+    start_agent
     echo "Adding the lights-on command to $(dirname "$COMMAND") (asks for your Mac password)."
     sudo mkdir -p "$(dirname "$COMMAND")"
     sudo ln -sf "$INSTALLED" "$COMMAND"
@@ -143,6 +154,21 @@ EOF
       echo "Last logged error: $(tail -n 1 "$LOG")"
     fi
     ;;
+  update)
+    if [ ! -f "$URL_FILE" ] || [ ! -f "$AUTH_FILE" ]; then
+      echo "Not installed. Install with: lights-on install URL"
+      exit 1
+    fi
+    if [ "$0" -ef "$INSTALLED" ]; then
+      # The new version installs itself, so its own update steps are the ones that run.
+      latest=$(mktemp)
+      curl -fsSL -m 60 -o "$latest" "$SOURCE"
+      exec sh "$latest" update
+    fi
+    start_agent
+    [ -L "$COMMAND" ] || sudo ln -sf "$INSTALLED" "$COMMAND"
+    echo "Updated and reporting again. Try: lights-on status"
+    ;;
   uninstall)
     launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true # already stopped
     rm -f "$PLIST"
@@ -151,9 +177,21 @@ EOF
     echo "Uninstalled."
     ;;
   run)
+    # When the Mac last started drawing AC power without a break since; empty on battery. Sent as
+    # poweredFor, so a heartbeat after the Wi-Fi drops and returns shows the power stayed on.
+    powered_since=
+    last_tick=0
     while :; do
-      if [ -z "$(paused_until)" ] && on_ac_power; then
-        post "$(cat "$URL_FILE")/api/heartbeat" >/dev/null ||
+      now=$(date +%s)
+      if ! on_ac_power; then
+        powered_since=
+      elif [ -z "$powered_since" ] || [ $((now - last_tick)) -gt "$MAX_TICK_GAP" ]; then
+        powered_since=$now
+      fi
+      last_tick=$now
+      if [ -z "$(paused_until)" ] && [ -n "$powered_since" ]; then
+        post -H 'Content-Type: application/json' -d "{\"poweredFor\":$((now - powered_since))}" \
+          "$(cat "$URL_FILE")/api/heartbeat" >/dev/null ||
           true # a missed beat is retried next minute; curl has logged why
       fi
       sleep 60

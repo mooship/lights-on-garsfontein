@@ -30,7 +30,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
 | `POST /api/contact` | The privacy contact address | `no-store` | 5/min; Turnstile |
-| `POST /api/heartbeat` | Sensor check-in | `no-store` | `HEARTBEAT_TOKEN` |
+| `POST /api/heartbeat` | Sensor check-in, with an optional `{ "poweredFor" }` ([Sensor](#sensor)) | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/heartbeat/pause` | Pauses outage detection | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
@@ -93,6 +93,8 @@ curl -X POST "$SITE_URL/api/admin/outages" \
 
 An always-on device posts to `/api/heartbeat` every minute. Once the last heartbeat is more than three minutes old, the status shows `OFF` and the minute cron opens an outage starting at that heartbeat. The next heartbeat closes **every** open outage, punch-clock ones included, since the sensor seeing power means the power is on; if power returned between two cron runs, the gap is still recorded. Heartbeats are refused until `HEARTBEAT_TOKEN` is set. Each instance supports one sensor (`worker/db/schema.ts` keeps a single heartbeat row).
 
+A sensor that knows how long it has had power can say so, which lets the Worker tell a lost connection from a power cut. It posts `{ "poweredFor": <whole seconds> }` as JSON: its uptime, if a power cut restarts it, or how long it has been on its charger. A sensor outage that began since then was only the connection dropping, so the heartbeat marks it as a false positive, which takes it off the site, and records no gap. Other outages end when the power came back, not when the heartbeat arrived. Without a body, a heartbeat vouches only for the moment it is sent. Punch-clock outages are closed but never marked as false positives. The status still shows `OFF` while the sensor is silent, since the Worker cannot tell why until it hears from it again.
+
 A sensor that will be away from its usual supply can pause detection: `POST /api/heartbeat/pause` with `{ "until": "<ISO time with offset>" }`, at most 30 days ahead. Until then no outage opens and `monitored` is `false`, so the status reads only that no outage has been reported; the punch clock still works. Afterwards the silence counts from the pause's end, not the last heartbeat. `{ "until": null }` ends a pause now. The answer is `{ "ok": true, "pausedUntil" }`, with `null` when nothing is paused.
 
 Hardware tips:
@@ -100,7 +102,7 @@ Hardware tips:
 - An ESP32 in an enclosure, such as an M5Stack Atom, on a USB charger.
 - Plug it into a socket on the grid, not one behind an inverter, UPS or backup supply, or it will never see an outage.
 - The ESP32 needs 2.4 GHz Wi-Fi. Put the router on backup power if you can, so the sensor goes quiet only when the grid does.
-- If the internet drops while the power stays on, an outage is logged; mark it as a false positive.
+- If the internet drops while the power stays on, an outage is logged. A sensor that sends `poweredFor` has it marked as a false positive when it reconnects; otherwise mark it yourself.
 
 ESP32 sketch (Arduino IDE, ESP32 Arduino core 3.3 or later), verifying the server against the core's built-in root certificates:
 
@@ -108,6 +110,7 @@ ESP32 sketch (Arduino IDE, ESP32 Arduino core 3.3 or later), verifying the serve
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <esp_timer.h>
 
 const char* WIFI_SSID = "your-wifi";
 const char* WIFI_PASS = "your-password";
@@ -125,7 +128,10 @@ void loop() {
     HTTPClient http;
     http.begin(client, URL);
     http.addHeader("Authorization", String("Bearer ") + TOKEN);
-    http.POST("");
+    http.addHeader("Content-Type", "application/json");
+    // Seconds since boot: a power cut restarts the ESP32, so this is how long it has had power.
+    unsigned long poweredFor = esp_timer_get_time() / 1000000;
+    http.POST(String("{\"poweredFor\":") + poweredFor + "}");
     http.end();
   } else {
     WiFi.reconnect();
@@ -134,11 +140,13 @@ void loop() {
 }
 ```
 
-A Raspberry Pi, or an old Android phone with Termux, works too:
+A Raspberry Pi works too, sending its uptime:
 
 ```cron
-* * * * * curl -fsS -m 20 -X POST -H "Authorization: Bearer YOUR_TOKEN" https://YOUR_DOMAIN/api/heartbeat >/dev/null
+* * * * * curl -fsS -m 20 -X POST -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d "{\"poweredFor\":$(cut -d. -f1 /proc/uptime)}" https://YOUR_DOMAIN/api/heartbeat >/dev/null
 ```
+
+So does an old Android phone with Termux, but leave out the body (the `Content-Type` and `-d` parts): its battery keeps it running through a power cut, so its uptime says nothing about the power.
 
 A MacBook that stays on its charger works without extra hardware. It posts only while drawing from AC power, so when it falls back to its battery the heartbeats stop and an outage opens, even if the router is on backup power. On the Mac, without cloning:
 
@@ -153,9 +161,16 @@ It asks for `HEARTBEAT_TOKEN` (hidden as you paste it, and never on a command li
 | `lights-on pause 3h` | Stops reporting for `30m`, `3h`, `2d` and so on, without logging an outage. Use it before you leave with the Mac or charge it somewhere else |
 | `lights-on resume` | Reports again now |
 | `lights-on status` | Shows whether it is reporting, paused or on battery, and the last logged error |
+| `lights-on update` | Installs the latest version from `main`, keeping the URL and token |
 | `lights-on uninstall` | Removes the agent, the command and the token |
 
-Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. Errors go to `~/Library/Logs/lights-on-heartbeat.log`.
+An install from before `lights-on update` existed is updated by running the latest script once:
+
+```sh
+curl -fsSL -o /tmp/lights-on.sh https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scripts/mac-sensor.sh && sh /tmp/lights-on.sh update
+```
+
+The Mac sends how long it has been on the charger as `poweredFor`, so if the Wi-Fi drops while it stays on the charger, the outage that opens is marked as a false positive once it reconnects. The count starts again whenever it has missed a minute (asleep, or the agent not running), since a power cut could have passed unseen. Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. Errors go to `~/Library/Logs/lights-on-heartbeat.log`.
 
 ## Run it for your area
 
