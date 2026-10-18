@@ -8,7 +8,6 @@
 set -eu
 
 LABEL=local.lights-on.heartbeat
-KEYCHAIN_SERVICE=lights-on-heartbeat
 COMMAND=/usr/local/bin/lights-on
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 # launchd cannot read scripts in ~/Documents or ~/Desktop (privacy protection), where a clone
@@ -16,6 +15,9 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 HOME_DIR="$HOME/Library/Application Support/lights-on"
 INSTALLED="$HOME_DIR/lights-on.sh"
 URL_FILE="$HOME_DIR/url"
+# The token never goes on a command line, where `ps` would show it to every user: curl reads the
+# header from this file, which only this account can read.
+AUTH_FILE="$HOME_DIR/auth-header"
 # Holds the pause's end in epoch seconds; the Worker holds its own copy (/api/heartbeat/pause).
 PAUSE_FILE="$HOME_DIR/paused-until"
 LOG="$HOME/Library/Logs/lights-on-heartbeat.log"
@@ -25,7 +27,7 @@ usage() {
   cat >&2 <<EOF
 usage: lights-on <command>
 
-  install URL [TOKEN]  start reporting to URL (asks for the token if not given)
+  install URL          start reporting to URL (asks for HEARTBEAT_TOKEN)
   pause DURATION       stop reporting, e.g. 30m, 2h or 3d, without logging an outage
   resume               report again now
   status               show what the sensor is doing
@@ -34,11 +36,9 @@ EOF
   exit 64
 }
 
-token() { security find-generic-password -s "$KEYCHAIN_SERVICE" -w; }
-
 # Posts to the Worker; prints the response body, fails on an HTTP error.
 post() {
-  curl -fsS -m 20 -X POST -H "Authorization: Bearer $(token)" "$@"
+  curl -fsS -m 20 -X POST -H "@$AUTH_FILE" "$@"
 }
 
 on_ac_power() { pmset -g batt | grep -q "'AC Power'"; }
@@ -61,18 +61,19 @@ case "${1:-}" in
       https://*) url=${url%/} ;;
       *) usage ;;
     esac
-    if [ -n "${3:-}" ]; then
-      security add-generic-password -U -a "$USER" -s "$KEYCHAIN_SERVICE" -w "$3"
-    else
-      echo "Paste HEARTBEAT_TOKEN when asked; it is kept in your login keychain."
-      security add-generic-password -U -a "$USER" -s "$KEYCHAIN_SERVICE" -w
-    fi
+    printf 'Paste HEARTBEAT_TOKEN (hidden), then press Return: '
+    stty -echo </dev/tty
+    read -r token </dev/tty
+    stty echo </dev/tty
+    echo
+    [ -n "$token" ] || usage
     # Stopped before the copy: sh reads a script as it runs, so overwriting it mid-loop breaks it.
     launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true # not loaded yet
     mkdir -p "$HOME_DIR" "$(dirname "$PLIST")"
     [ "$0" -ef "$INSTALLED" ] || cp "$0" "$INSTALLED"
     chmod +x "$INSTALLED"
     echo "$url" >"$URL_FILE"
+    (umask 077 && printf 'Authorization: Bearer %s\n' "$token" >"$AUTH_FILE")
     cat >"$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -146,7 +147,6 @@ EOF
     launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true # already stopped
     rm -f "$PLIST"
     rm -rf "$HOME_DIR"
-    security delete-generic-password -s "$KEYCHAIN_SERVICE" >/dev/null 2>&1 || true # already gone
     if [ -L "$COMMAND" ]; then sudo rm -f "$COMMAND"; fi
     echo "Uninstalled."
     ;;

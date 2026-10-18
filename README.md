@@ -143,10 +143,10 @@ A Raspberry Pi, or an old Android phone with Termux, works too:
 A MacBook that stays on its charger works without extra hardware. It posts only while drawing from AC power, so when it falls back to its battery the heartbeats stop and an outage opens, even if the router is on backup power. On the Mac, without cloning:
 
 ```sh
-curl -fsSL -o /tmp/lights-on.sh https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scripts/mac-sensor.sh && sh /tmp/lights-on.sh install https://YOUR_DOMAIN YOUR_TOKEN
+curl -fsSL -o /tmp/lights-on.sh https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scripts/mac-sensor.sh && sh /tmp/lights-on.sh install https://YOUR_DOMAIN
 ```
 
-This keeps the token in the login keychain (leave it off to be asked for it instead, which keeps it out of your shell history), starts a launch agent that keeps the Mac awake only while it is on the charger, and adds a `lights-on` command:
+It asks for `HEARTBEAT_TOKEN` (hidden as you paste it, and never on a command line) and keeps it in a file only your account can read. It then starts a launch agent that keeps the Mac awake only while it is on the charger, and adds a `lights-on` command:
 
 | Command | Does |
 | --- | --- |
