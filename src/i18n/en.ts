@@ -17,7 +17,6 @@ export const en = {
     csv: 'Outage data (CSV)',
     feed: 'Atom feed',
     signIn: 'Sign in',
-    licence: 'Outage data:',
     measured: 'Measured in Garsfontein Ext. 16, Pretoria · Ward 45 · Region 6, City of Tshwane',
     operator: 'Operated independently by a Garsfontein Ext. 16 resident.',
   },
@@ -39,7 +38,7 @@ export const en = {
         : 'Measured in Garsfontein Ext. 16. Some streets may differ.',
     why: 'Why?',
     whyText:
-      'The area is supplied by the Garsfontein substation and usually goes off as a whole. Some streets are on a different feed, so their power can go off or come back at different times. If yours differs, use the button below.',
+      'Garsfontein is supplied by the Garsfontein substation, so an outage usually affects the whole area. A few streets are supplied by a different line, so they can lose or regain power at a different time.',
   },
   safety: {
     live: 'Always treat power lines as live.',
@@ -51,7 +50,7 @@ export const en = {
     ON: 'The power is on',
     OFF: 'The power is off',
     NONE: 'No outage reported',
-    noLiveReading: 'Not measured live.',
+    lastEnded: (time: string, day: string) => `Last outage ended ${day} at ${time}`,
     for: (duration: string) => `for ${duration}`,
     loading: 'Loading the current status…',
     wentOff: (time: string, day: string) => `Outage started at ${time} ${day}.`,
@@ -59,40 +58,9 @@ export const en = {
     noOutages: (date: string) => `No outages since records began on ${date}.`,
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Last outage: ${from} to ${to} ${day} (${lasted}).`,
-    updated: (time: string) => `Updated ${time}`,
     stale: (time: string) => `Unable to reach the server. Showing the status as at ${time}.`,
     offline: (time: string, day?: string) => `No connection · status as at ${time}${day ? ` ${day}` : ''}`,
     unreachable: 'Unable to reach the server. Retrying shortly.',
-  },
-  confirm: {
-    helper:
-      'Is your power off too? One tap, anonymous. It shows neighbours how widespread the outage is. It does not notify the City.',
-    button: 'My power is off too',
-    busy: 'Submitting…',
-    done: 'Confirmation recorded',
-    first: 'Be the first to confirm.',
-    count: (n: number) => `${n} community ${n === 1 ? 'confirmation' : 'confirmations'}.`,
-    errors: {
-      already_confirmed: 'You have already confirmed this outage.',
-      rate_limited: 'Too many requests. Please try again in a minute.',
-      no_active_outage: 'There is no outage in progress to confirm.',
-      outage_changed: 'That outage has ended. The status will update shortly.',
-      turnstile_failed: 'The security check could not be completed. Please try again.',
-    },
-    unknown: 'Something went wrong. Please try again.',
-  },
-  stillOff: {
-    button: 'Still off where you are?',
-    busy: 'Submitting…',
-    done: 'Thanks, noted.',
-    note: 'This does not change the status or notify the City.',
-    count: (n: number) => `${n} ${n === 1 ? 'resident' : 'residents'} reported their power still off in the last hour.`,
-    errors: {
-      already_reported: 'You have already reported in the last two hours.',
-      outage_in_progress: 'An outage is already in progress. The status will update shortly.',
-      rate_limited: 'Too many requests. Please try again in a minute.',
-      turnstile_failed: 'The security check could not be completed. Please try again.',
-    },
   },
   history: {
     title: 'Recent outages',
@@ -102,7 +70,6 @@ export const en = {
     now: 'now',
     ongoing: 'Ongoing',
     planned: 'Planned',
-    confirmed: (n: number) => `${n} ${n === 1 ? 'confirmation' : 'confirmations'}`,
   },
   trends: {
     title: 'Statistics',
@@ -168,7 +135,6 @@ export const en = {
     signOut: 'Sign out',
     ongoing: 'ongoing',
     source: { sensor: 'sensor', manual: 'manual' },
-    confirmed: (n: number) => `${n} ${n === 1 ? 'confirmation' : 'confirmations'}`,
     plannedTag: ' · planned',
     falsePositiveTag: ' · false positive',
     closeNow: 'Close now',

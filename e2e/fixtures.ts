@@ -7,7 +7,7 @@ export { expect };
 
 const ADMIN_API = { Authorization: `Bearer ${exampleVar('ADMIN_API_TOKEN')}` };
 
-/** Deletes every outage, and with them their confirmations, through the admin API. */
+/** Deletes every outage through the admin API. */
 async function deleteOutages(request: APIRequestContext): Promise<void> {
   for (;;) {
     const list = await request.get('/api/admin/outages', { headers: ADMIN_API });
@@ -26,8 +26,8 @@ export const withLocale = (page: Page, locale: Locale) =>
   page.addInitScript((l) => localStorage.setItem('locale', l), locale);
 
 /**
- * Every test starts with no outages, as the tests share one database. "Still off" reports and
- * rate-limit counts carry over: the admin API cannot clear them.
+ * Every test starts with no outages, as the tests share one database. Rate-limit counts carry
+ * over: the admin API cannot clear them.
  *
  * Most tests read the English copy; a block opts into another language with
  * test.use({ appLocale: 'af' }). Pages from browser.newContext() don't get it: pass them to withLocale.

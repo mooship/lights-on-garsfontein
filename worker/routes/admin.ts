@@ -4,7 +4,7 @@ import { type AdminOutagesResponse, MINUTE_MS, type TimerAction } from '../../sh
 import { OUTAGE_VIEWS } from '../../shared/paths';
 import { outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
-import { getOpenOutage, openOutage, outagesWithCounts, summarise } from '../lib/grid';
+import { getOpenOutage, openOutage, summarise } from '../lib/grid';
 import { errors, json, parseBody, refuseCrossSite } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkSession } from './auth';
@@ -38,7 +38,7 @@ const outageSchema = z.discriminatedUnion('action', [
 ]);
 
 async function listOutages({ db }: RouteContext): Promise<Response> {
-  const rows = await outagesWithCounts(db).orderBy(desc(outages.startTime)).limit(50);
+  const rows = await db.select().from(outages).orderBy(desc(outages.startTime)).limit(50);
   const body: AdminOutagesResponse = {
     outages: rows.map((r) => ({
       ...summarise(r),

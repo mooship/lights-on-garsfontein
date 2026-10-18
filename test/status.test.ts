@@ -3,17 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../shared/api';
 import { createDb } from '../worker/db/client';
 import { getGridState } from '../worker/lib/grid';
-import {
-  call,
-  insertOutage,
-  insertStillOff,
-  mockTurnstile,
-  runCron,
-  sameWindow,
-  setHeartbeat,
-  getStatus as status,
-  uniqueIp,
-} from './helpers';
+import { call, insertOutage, runCron, sameWindow, setHeartbeat, getStatus as status, uniqueIp } from './helpers';
 
 describe('GET /api/status', () => {
   it('is ON in manual mode before any sensor heartbeat arrives', async () => {
@@ -24,7 +14,7 @@ describe('GET /api/status', () => {
   });
 
   it('is not monitored before any heartbeat', async () => {
-    expect(await status()).toMatchObject({ status: 'ON', monitored: false, stillOffReports: 0 });
+    expect(await status()).toMatchObject({ status: 'ON', monitored: false });
   });
 
   it('is monitored while the heartbeat is fresh', async () => {
@@ -42,20 +32,6 @@ describe('GET /api/status', () => {
     const lastSeen = await setHeartbeat(HEARTBEAT_THRESHOLD_MS / 1000 + 60);
     await insertOutage({ startTime: lastSeen, endTime: new Date().toISOString(), isFalsePositive: 1 });
     expect(await status()).toMatchObject({ status: 'ON', monitored: false });
-  });
-
-  it('counts "still off" reports from the last hour while ON', async () => {
-    const ago = (minutes: number) => new Date(Date.now() - minutes * MINUTE_MS).toISOString();
-    await insertStillOff({ createdAt: ago(61), clientHash: 'a' });
-    await insertStillOff({ createdAt: ago(59), clientHash: 'b' });
-    await insertStillOff({ createdAt: ago(1), clientHash: 'c' });
-    expect((await status()).stillOffReports).toBe(2);
-  });
-
-  it('shows no "still off" reports while OFF', async () => {
-    await insertStillOff();
-    await insertOutage({ source: 'manual' });
-    expect(await status()).toMatchObject({ status: 'OFF', stillOffReports: 0 });
   });
 
   it('is OFF in manual mode while the admin has an outage open', async () => {
@@ -87,19 +63,16 @@ describe('GET /api/status', () => {
     expect(body.outage?.id).toBe(id);
   });
 
-  it('counts confirmations against the outage they belong to', async () => {
-    const ago = (minutes: number) => new Date(Date.now() - minutes * MINUTE_MS).toISOString();
-    const older = await insertOutage({ startTime: ago(60), endTime: ago(50) });
-    const newer = await insertOutage({ startTime: ago(10) });
-    // The confirmation's own id is the older outage's id, which must not make it count there.
-    await env.DB.prepare(
-      'INSERT INTO outage_confirmations (id, outage_id, created_at, client_hash) VALUES (?, ?, ?, ?)',
-    )
-      .bind(older, newer, new Date().toISOString(), 'fingerprint')
-      .run();
+  it('gives each outage its times and whether it was planned, and nothing else', async () => {
+    const startTime = new Date(Date.now() - 10 * MINUTE_MS).toISOString();
+    const id = await insertOutage({ startTime, isPlanned: 1 });
     const body = await status();
-    expect(body.outage).toMatchObject({ id: newer, confirmations: 1 });
-    expect(body.recent.find((o) => o.id === older)?.confirmations).toBe(0);
+    const summary = { id, startTime, endTime: null, planned: true };
+    expect(body.outage).toEqual(summary);
+    expect(body.recent).toEqual([summary]);
+    expect(Object.keys(body).sort()).toEqual(
+      ['generatedAt', 'monitored', 'outage', 'recent', 'since', 'status', 'turnstileSiteKey'].sort(),
+    );
   });
 
   it('ignores false-positive outages', async () => {
@@ -178,15 +151,6 @@ describe('GET /api/status edge cache', () => {
     const res = await call('/api/admin/timer', { method: 'POST', body: { action: 'punch_out' }, headers: admin });
     expect(res.status).toBe(409);
     expect(await status()).toEqual(first);
-  });
-
-  it('is purged by a confirmation', async () => {
-    mockTurnstile(true);
-    await insertOutage({});
-    expect((await status()).outage?.confirmations).toBe(0);
-    const res = await call('/api/confirm', { method: 'POST', body: { token: 'turnstile-token' } });
-    expect(res.status).toBe(201);
-    expect((await status()).outage?.confirmations).toBe(1);
   });
 });
 
@@ -277,5 +241,14 @@ describe('POST /api/heartbeat', () => {
       end_time: string | null;
     }>();
     expect(rows.results).toEqual([{ id: manual, end_time: expect.any(String) }]);
+  });
+});
+
+describe('community reports', () => {
+  it('has no public endpoints for residents to report their power', async () => {
+    for (const path of ['/api/confirm', '/api/still-off']) {
+      const res = await call(path, { method: 'POST', body: { token: 'turnstile-token' } });
+      expect(res.status, path).toBe(404);
+    }
   });
 });

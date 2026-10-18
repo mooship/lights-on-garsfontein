@@ -129,8 +129,7 @@ const OutageRow: Component<{
           {props.outage.endTime ? formatTime(props.outage.endTime) : t().admin.ongoing}
         </strong>
         <div class={css.itemMeta}>
-          {formatDuration(outageDurationMs(props.outage, props.now))} · {t().admin.source[props.outage.source]} ·{' '}
-          {t().admin.confirmed(props.outage.confirmations)}
+          {formatDuration(outageDurationMs(props.outage, props.now))} · {t().admin.source[props.outage.source]}
           {props.outage.planned ? t().admin.plannedTag : ''}
           {props.outage.isFalsePositive ? t().admin.falsePositiveTag : ''}
         </div>

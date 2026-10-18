@@ -44,7 +44,7 @@ describe('POST /api/contact', () => {
   });
 
   it('rejects a token solved for another action', async () => {
-    for (const action of ['confirm', 'login', 'still_off'] as const) {
+    for (const action of ['login'] as const) {
       mockTurnstile(true, action);
       const res = await reveal();
       expect(res.status).toBe(403);

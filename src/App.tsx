@@ -5,14 +5,12 @@ import { site } from '../site.config';
 import * as css from './App.css';
 import { bannersPending } from './banners';
 import { SiteBanner } from './components/Banner';
-import { ConfirmOutage } from './components/ConfirmOutage';
 import { LanguageToggle } from './components/LanguageToggle';
 import { OutageHistory } from './components/OutageHistory';
 import { Share } from './components/Share';
 import { HistorySkeleton, StatusSkeleton, TrendsCardSkeleton } from './components/Skeletons';
 import { StatusBadge } from './components/StatusBadge';
 import { SafetyLine, Scope } from './components/StatusNotes';
-import { StillOff } from './components/StillOff';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
 import { api, type Status } from './lib/api';
@@ -80,9 +78,6 @@ const Footer: Component<{ isPublic: boolean }> = (props) => (
       </Show>
     </nav>
     <p>{t().footer.measured}</p>
-    <p>
-      {t().footer.licence} <a href={site.dataLicence.url}>{site.dataLicence.name}</a>
-    </p>
     <p>{t().footer.operator}</p>
   </footer>
 );
@@ -145,34 +140,21 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <Scope />
                 <div class="gg-status-detail">
                   <p>{statusDetail(s(), minute())}</p>
-                  <Switch
-                    fallback={<p class="gg-status-updated">{t().status.updated(clockTime(status.updatedAt()))}</p>}
-                  >
+                  {/* Only when something is wrong; the loading shell has no line for it. */}
+                  <Switch>
                     {/* The service worker's last copy: labelled with when the server produced it, until a fresh one arrives. */}
                     <Match when={s().fromCache}>
-                      <p class={clsx('gg-status-updated', css.warning)} role="alert">
+                      <p class={clsx('gg-status-warning', css.warning)} role="alert">
                         {offlineLabel(s().generatedAt, minute())}
                       </p>
                     </Match>
                     <Match when={stale()}>
-                      <p class={clsx('gg-status-updated', css.warning)} role="alert">
+                      <p class={clsx('gg-status-warning', css.warning)} role="alert">
                         {t().status.stale(clockTime(status.updatedAt()))}
                       </p>
                     </Match>
                   </Switch>
                 </div>
-                <Show when={s().status === 'OFF' && s().outage?.id} keyed>
-                  {(id) => (
-                    <ConfirmOutage
-                      outageId={id}
-                      confirmations={s().outage?.confirmations ?? 0}
-                      siteKey={s().turnstileSiteKey}
-                    />
-                  )}
-                </Show>
-                <Show when={s().status === 'ON'}>
-                  <StillOff reports={s().stillOffReports} siteKey={s().turnstileSiteKey} />
-                </Show>
                 <SafetyLine />
               </>
             )}

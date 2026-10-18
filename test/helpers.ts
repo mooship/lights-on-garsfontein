@@ -64,7 +64,7 @@ export function mockSiteverify(answer: () => Response | Promise<Response>) {
 /** Stubs the Turnstile siteverify call: a token solved on our host for `action`. */
 export function mockTurnstile(
   success: boolean,
-  action: TurnstileAction = 'confirm',
+  action: TurnstileAction = 'contact',
   hostname = new URL(ORIGIN).hostname,
 ) {
   return mockSiteverify(() => Response.json({ success, action, hostname }));

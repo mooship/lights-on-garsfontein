@@ -31,6 +31,7 @@ export const outages = sqliteTable(
   ],
 );
 
+// Unused: dropped in the next migration, with purgeOldFingerprints in worker/lib/grid.ts.
 export const outageConfirmations = sqliteTable(
   'outage_confirmations',
   {
@@ -48,10 +49,7 @@ export const outageConfirmations = sqliteTable(
   ],
 );
 
-/**
- * "Still off where you are?": a resident says the power is still off while the status is ON
- * (e.g. a back-fed street). Counted and shown, never acted on: reports do not change the status.
- */
+// Unused: dropped in the next migration, with purgeOldStillOffReports in worker/lib/grid.ts.
 export const stillOffReports = sqliteTable(
   'still_off_reports',
   {
@@ -60,9 +58,8 @@ export const stillOffReports = sqliteTable(
     clientHash: text('client_hash').notNull(),
   },
   (table) => [
-    // The per-client dedupe check.
     index('still_off_reports_client_created_idx').on(table.clientHash, table.createdAt),
-    // The recent count and the hourly purges.
+    // The hourly purges.
     index('still_off_reports_created_at_idx').on(table.createdAt),
   ],
 );

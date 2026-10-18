@@ -3,7 +3,6 @@ import { DAY_MS, MINUTE_MS, outageDurationMs, type StatsResponse, TRACKING_SINCE
 import { CSV_PATH, FEED_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { outages } from '../db/schema';
-import { outagesWithCounts } from '../lib/grid';
 import { json } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { mergeOutages, weeklyStats, windowStats } from '../lib/stats';
@@ -50,18 +49,19 @@ function csvField(value: string | number | null): string {
  * The columns are a stable public contract that other people's scripts read, so don't rename,
  * reorder or reformat them; add new columns only at the end, and note any change with a version
  * in the README. `start_time_utc` and `end_time_utc` are ISO 8601 UTC; `end_time_utc` and
- * `duration_minutes` (whole minutes) are empty while the outage is open; `planned` is yes or no;
- * `confirmations` counts community confirmations.
+ * `duration_minutes` (whole minutes) are empty while the outage is open; `planned` is yes or no.
  */
 async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
-  const rows = await outagesWithCounts(db, eq(outages.isFalsePositive, false)).orderBy(asc(outages.startTime));
+  const rows = await db
+    .select()
+    .from(outages)
+    .where(eq(outages.isFalsePositive, false))
+    .orderBy(asc(outages.startTime));
   const lines = [
-    'id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations',
+    'id,start_time_utc,end_time_utc,duration_minutes,planned',
     ...rows.map((r) => {
       const minutes = r.endTime ? Math.round(outageDurationMs(r, 0) / MINUTE_MS) : null;
-      return [r.id, r.startTime, r.endTime, minutes, r.isPlanned ? 'yes' : 'no', r.confirmations]
-        .map(csvField)
-        .join(',');
+      return [r.id, r.startTime, r.endTime, minutes, r.isPlanned ? 'yes' : 'no'].map(csvField).join(',');
     }),
   ];
   return new Response(`${lines.join('\n')}\n`, {

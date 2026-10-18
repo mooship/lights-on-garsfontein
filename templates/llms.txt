@@ -21,7 +21,7 @@ All public endpoints are free to use; the JSON API, the CSV and the feed allow a
 
 - [Status (JSON)](%site.url%/api/status): the status as last recorded at the measuring point
 - [Statistics (JSON)](%site.url%/api/stats): for the last 7, 30 and 365 days, hours without power, number of outages (and how many were planned), days with an outage, share of time with power, and the longest outage; the previous 30 days for comparison; and weekly totals. Only time since records began is counted.
-- [All outages (CSV)](%site.url%/api/outages.csv): one row per outage, with id, start and end (UTC), duration in minutes, whether it was planned, and the number of community confirmations. Outages marked as false positives are excluded.
+- [All outages (CSV)](%site.url%/api/outages.csv): one row per outage, with id, start and end (UTC), duration in minutes, and whether it was planned. Outages marked as false positives are excluded.
 - [Outage feed (Atom)](%site.url%/feed.xml): the 20 most recent outages, for feed readers
 - [Sitemap](%site.url%/sitemap.xml)
 - [Privacy and terms of use](%site.url%/privacy)
@@ -30,14 +30,13 @@ All public endpoints are free to use; the JSON API, the CSV and the feed allow a
 
 - `status`: `"ON"` or `"OFF"`, as last recorded
 - `since`: when the current state began (ISO 8601), or null
-- `outage`: the outage in progress (`id`, `startTime`, `endTime`, `planned`, `confirmations`), or null
+- `outage`: the outage in progress (`id`, `startTime`, `endTime`, `planned`), or null
 - `recent`: the five most recent outages, newest first
 - `monitored`: true while a live reading from the measuring point is current. When false, `"ON"` only means that no outage has been reported, not that power was measured.
-- `stillOffReports`: while `status` is `"ON"`, how many residents reported in the last hour that their power is still off where they are (always 0 while `"OFF"`). Reports never change `status`.
 - `generatedAt`: server time of the response
 
 All times are UTC. Local time is %site.timeZone% (SAST, UTC+2, no daylight saving).
 
 `planned` is true for outages announced in advance (for example maintenance or upgrades). Planned outages still count as time without power.
 
-`confirmations` is the number of community confirmations: residents who reported that their power was also off. At most one per connection per outage, verified with Cloudflare Turnstile. Confirmations and still-off reports are counts from residents, not measurements, and never change the status.
+On 18 October 2026 the `confirmations` field and CSV column and the `stillOffReports` field were removed, with the features that filled them; every recorded `confirmations` value was 0.

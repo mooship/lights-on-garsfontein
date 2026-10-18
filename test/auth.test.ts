@@ -31,7 +31,7 @@ describe('admin auth', () => {
   });
 
   it('rejects a Turnstile token solved for another action or host', async () => {
-    mockTurnstile(true, 'confirm');
+    mockTurnstile(true, 'contact');
     expect((await attempt('test-password')).status).toBe(403);
     mockTurnstile(true, 'login', 'evil.example');
     expect((await attempt('test-password')).status).toBe(403);

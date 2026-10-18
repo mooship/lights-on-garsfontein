@@ -29,8 +29,6 @@ describe('service worker strategy', () => {
       '/admin',
       '/admin/',
       '/api/admin/outages',
-      '/api/still-off',
-      '/api/confirm',
       '/api/contact',
       '/api/stats',
       '/api/outages.csv',

@@ -130,8 +130,8 @@ describe('/api/admin/outages', () => {
       endTime: '2026-10-01T16:30:00.000Z',
       source: 'manual',
       isFalsePositive: false,
-      confirmations: 0,
     });
+    expect(list.outages[0]).not.toHaveProperty('confirmations');
   });
 
   it('rejects an end time before the start time', async () => {

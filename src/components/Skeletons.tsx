@@ -1,7 +1,6 @@
 import { type Component, For } from 'solid-js';
 import { t } from '../lib/i18n';
 import { SafetyLine, Scope } from './StatusNotes';
-import { StillOffPlaceholder } from './StillOff';
 
 // Loading placeholders. index.html renders the same markup statically before any
 // JavaScript runs, so keep the boxes in step: identical boxes mean zero layout shift. Its text
@@ -21,9 +20,7 @@ export const StatusSkeleton: Component = () => (
     <Scope />
     <div class="gg-status-detail" aria-hidden="true">
       <span class="gg-skel gg-skel-text gg-w-80" />
-      <span class="gg-skel gg-skel-text gg-w-30" />
     </div>
-    <StillOffPlaceholder />
     <SafetyLine />
   </>
 );

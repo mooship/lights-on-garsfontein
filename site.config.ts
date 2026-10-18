@@ -15,8 +15,8 @@ export const site = {
   operator: { name: 'Timothy Brits' },
   /** A landmark near the measuring point that residents recognise; never the exact address. */
   landmark: 'Mediclinic Denmar',
-  /** The utility's official page for reporting faults. Check it still works before relying on it. */
-  faultReporting: { url: 'https://www.tshwane.gov.za/?page_id=65278' },
+  /** The City's online power-failure form. Check it still works before relying on it. */
+  faultReporting: { url: 'https://powerfailure.tshwane.gov.za/Tshwanesms/NewCall' },
   /** Licence for the outage data (CSV and API); the code is MIT. */
   dataLicence: { name: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
   /** For structured data (JSON-LD). Visible place copy lives in the dictionaries. */

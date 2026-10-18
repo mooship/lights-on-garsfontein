@@ -13,7 +13,7 @@ describe('rateLimitKey', () => {
 
 describe('refuseCrossSite', () => {
   const post = (headers: Record<string, string>, body?: BodyInit) =>
-    refuseCrossSite(new Request(`${ORIGIN}/api/confirm`, { method: 'POST', headers, body }));
+    refuseCrossSite(new Request(`${ORIGIN}/api/contact`, { method: 'POST', headers, body }));
 
   it('accepts JSON with parameters, and a request the user typed or bookmarked', () => {
     expect(post({ 'Content-Type': 'application/json; charset=utf-8' }, '{}')).toBeNull();
@@ -22,7 +22,7 @@ describe('refuseCrossSite', () => {
 
   it('refuses a body sent without a Content-Type', () => {
     // A byte body, unlike a string one, gets no Content-Type from the Request constructor.
-    const request = new Request(`${ORIGIN}/api/confirm`, { method: 'POST', body: new Uint8Array([123, 125]) });
+    const request = new Request(`${ORIGIN}/api/contact`, { method: 'POST', body: new Uint8Array([123, 125]) });
     expect(request.headers.get('Content-Type')).toBeNull();
     expect(refuseCrossSite(request)?.status).toBe(415);
   });

@@ -12,7 +12,6 @@ export interface OutageSummary {
   id: number;
   startTime: string;
   endTime: string | null;
-  confirmations: number;
   /** Announced in advance, e.g. maintenance or upgrades. */
   planned: boolean;
 }
@@ -33,31 +32,8 @@ export interface StatusResponse {
    * has been reported, not that power was measured.
    */
   monitored: boolean;
-  /** "Still off where you are?" reports in the last STILL_OFF_WINDOW_MS; always 0 while OFF. */
-  stillOffReports: number;
   turnstileSiteKey: string;
   generatedAt: string;
-}
-
-export interface ConfirmRequest {
-  /** Turnstile token solved for the 'confirm' action. */
-  token: string;
-  /** The outage the visitor is confirming; if another one is open now, the server answers 409 `outage_changed`. */
-  outageId?: number;
-}
-
-export interface ConfirmResponse {
-  confirmations: number;
-}
-
-export interface StillOffRequest {
-  /** Turnstile token solved for the 'still_off' action. */
-  token: string;
-}
-
-export interface StillOffResponse {
-  /** Reports in the last STILL_OFF_WINDOW_MS, this one included. */
-  reports: number;
 }
 
 export interface AdminOutagesResponse {
@@ -104,13 +80,7 @@ export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 
 /** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
-export type TurnstileAction = 'confirm' | 'login' | 'still_off' | 'contact';
-
-/** How far back "still off" reports are counted. Copy: `stillOff.count` in src/i18n ("last hour"). */
-export const STILL_OFF_WINDOW_MS = HOUR_MS;
-
-/** One "still off" report per client per this long. Copy: `already_reported` in src/i18n, privacy.html. */
-export const STILL_OFF_DEDUPE_MS = 2 * HOUR_MS;
+export type TurnstileAction = 'login' | 'contact';
 
 /** Admin punch clock: punch out when the power goes off, punch in when it comes back. */
 export type TimerAction = 'punch_out' | 'punch_in';

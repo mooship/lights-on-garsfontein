@@ -20,7 +20,6 @@ export const af = {
     csv: 'Onderbrekingsdata (CSV)',
     feed: 'Atom-voer',
     signIn: 'Teken in',
-    licence: 'Onderbrekingsdata:',
     measured: 'Gemeet in Garsfontein Uitb. 16, Pretoria · Wyk 45 · Streek 6, Stad Tshwane',
     operator: 'Onafhanklik bedryf deur ’n inwoner van Garsfontein Uitb. 16.',
   },
@@ -44,7 +43,7 @@ export const af = {
         : 'Gemeet in Garsfontein Uitb. 16. Party strate kan anders wees.',
     why: 'Waarom?',
     whyText:
-      'Die gebied kry sy krag van die Garsfontein-substasie en gaan gewoonlik as geheel af. Party strate is op ’n ander toevoer, en hul krag kan op ander tye afgaan of terugkom. As joune anders is, gebruik die knoppie hieronder.',
+      'Garsfontein word deur die Garsfontein-substasie voorsien, so ’n onderbreking raak gewoonlik die hele gebied. ’n Paar strate kry hul krag deur ’n ander lyn en kan dus op ’n ander tyd afgaan of terugkom.',
   },
   // `report` is the link to site.faultReporting.url.
   safety: {
@@ -59,7 +58,8 @@ export const af = {
     OFF: 'Die krag is af',
     // ON without a fresh live reading: no outage is known, but nothing measured the power as on.
     NONE: 'Geen onderbreking aangemeld nie',
-    noLiveReading: 'Nie intyds gemeet nie.',
+    // Under NONE instead of `for`: `day` is vandag, gister or "op Sa. 17 Okt.".
+    lastEnded: (time: string, day: string) => `Laaste onderbreking het ${day} om ${time} geëindig`,
     for: (duration: string) => `Al ${duration}`,
     loading: 'Laai tans die huidige status…',
     wentOff: (time: string, day: string) => `Die onderbreking het ${day} om ${time} begin.`,
@@ -67,42 +67,10 @@ export const af = {
     noOutages: (date: string) => `Geen onderbrekings sedert die rekord op ${date} begin het nie.`,
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Laaste onderbreking: ${day} van ${from} tot ${to} (${lasted}).`,
-    updated: (time: string) => `Bygewerk om ${time}`,
     stale: (time: string) => `Kan nie die bediener bereik nie. Dit is die status soos om ${time}.`,
     // No reply in time (offline or a slow connection): the last status this browser saw. Without a day it is today's.
     offline: (time: string, day?: string) => `Geen verbinding · status soos ${day ? `${day} ` : ''}om ${time}`,
     unreachable: 'Kan nie die bediener bereik nie. Ons probeer binnekort weer.',
-  },
-  confirm: {
-    helper:
-      'Is jou krag ook af? Een tik, anoniem. Dit wys bure hoe wyd die onderbreking is. Dit stel nie die Stad in kennis nie.',
-    button: 'My krag is ook af',
-    busy: 'Stuur tans…',
-    done: 'Bevestiging aangeteken',
-    first: 'Wees die eerste om te bevestig.',
-    count: (n: number) => `${n} ${n === 1 ? 'gemeenskapsbevestiging' : 'gemeenskapsbevestigings'}.`,
-    errors: {
-      already_confirmed: 'Jy het hierdie onderbreking reeds bevestig.',
-      rate_limited: 'Te veel versoeke. Probeer asseblief oor ’n minuut weer.',
-      no_active_outage: 'Daar is geen onderbreking aan die gang om te bevestig nie.',
-      outage_changed: 'Daardie onderbreking is verby. Die status word binnekort bygewerk.',
-      turnstile_failed: 'Die sekuriteitskontrole kon nie voltooi word nie. Probeer asseblief weer.',
-    },
-    unknown: 'Iets het skeefgeloop. Probeer asseblief weer.',
-  },
-  stillOff: {
-    // The hour and two hours below are STILL_OFF_WINDOW_MS and STILL_OFF_DEDUPE_MS (shared/api.ts).
-    button: 'Steeds af by jou?',
-    busy: 'Stuur tans…',
-    done: 'Dankie, aangeteken.',
-    note: 'Dit verander nie die status nie en stel nie die Stad in kennis nie.',
-    count: (n: number) => `${n} ${n === 1 ? 'inwoner' : 'inwoners'} het die afgelope uur gesê hul krag is steeds af.`,
-    errors: {
-      already_reported: 'Jy het die afgelope twee uur reeds aangemeld.',
-      outage_in_progress: 'Daar is reeds ’n onderbreking aan die gang. Die status word binnekort bygewerk.',
-      rate_limited: 'Te veel versoeke. Probeer asseblief oor ’n minuut weer.',
-      turnstile_failed: 'Die sekuriteitskontrole kon nie voltooi word nie. Probeer asseblief weer.',
-    },
   },
   history: {
     title: 'Onlangse onderbrekings',
@@ -112,7 +80,6 @@ export const af = {
     now: 'nou',
     ongoing: 'Aan die gang',
     planned: 'Beplan',
-    confirmed: (n: number) => `${n} ${n === 1 ? 'bevestiging' : 'bevestigings'}`,
   },
   trends: {
     title: 'Statistiek',
@@ -181,7 +148,6 @@ export const af = {
     signOut: 'Teken uit',
     ongoing: 'aan die gang',
     source: { sensor: 'sensor', manual: 'handmatig' },
-    confirmed: (n: number) => `${n} ${n === 1 ? 'bevestiging' : 'bevestigings'}`,
     plannedTag: ' · beplan',
     falsePositiveTag: ' · vals alarm',
     closeNow: 'Maak nou toe',

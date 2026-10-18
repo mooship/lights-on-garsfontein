@@ -31,6 +31,7 @@ name = "STATUS_LIMITER"
 namespace_id = "4501"
 simple = { limit = 60, period = 60 }
 
+# Per-connection limit on public writes: the privacy page's contact email (/api/contact).
 [[ratelimits]]
 name = "CONFIRM_LIMITER"
 namespace_id = "4502"
@@ -71,12 +72,11 @@ persist = true
 enabled = true
 
 # Secrets (set with `wrangler secret put <NAME>`, see README):
-# ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, IP_SALT, TURNSTILE_SECRET_KEY, CONTACT_EMAIL
+# ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, TURNSTILE_SECRET_KEY, CONTACT_EMAIL
 
 # The Playwright suite only (`wrangler dev --env e2e`, playwright.config.ts); never deployed. The
-# suite loads the page far more often than a reader, so the status limit is out of its way; the
-# confirmation limit stays low enough for its one rate-limit test to reach. Bindings are not
-# inherited by an environment, so each is repeated here. It must never reach production: no route,
+# suite loads the page far more often than a reader, so the status limit is out of its way.
+# Bindings are not inherited by an environment, so each is repeated here. It must never reach production: no route,
 # no workers.dev URL, no crons, and a local-only database id.
 [env.e2e]
 workers_dev = false

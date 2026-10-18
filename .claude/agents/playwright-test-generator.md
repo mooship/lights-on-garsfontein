@@ -67,7 +67,7 @@ Where these differ from the instructions above, these win.
   `readLayoutShift` from `e2e/fixtures.ts`, never `test` from `@playwright/test`, and use the helpers in the spec
   (`login`, `withTime`, `expectShellIn`). Pages are in English unless a block sets `test.use({ appLocale: 'af' })`.
 - The tests run one at a time against one shared local D1 database. The `resetOutages` fixture deletes every outage
-  before each test; "still off" reports and rate-limit counts are not reset, so no test may rely on them being empty.
+  before each test; rate-limit counts are not reset, so no test may rely on them being empty.
 - Cover both locales (`site.locales` in `site.config.ts`). Take copy from the dictionaries (`af` and `en` in
   `src/i18n/`), `HEAD`, `BANNERS` and `site.config.ts` rather than writing the strings out, unless the test is
   about the wording itself.

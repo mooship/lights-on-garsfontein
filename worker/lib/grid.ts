@@ -1,12 +1,10 @@
-import { and, count, desc, eq, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
 import {
   DAY_MS,
   HEARTBEAT_THRESHOLD_MS,
   type OutageSource,
   type OutageSummary,
   type PowerStatus,
-  STILL_OFF_DEDUPE_MS,
-  STILL_OFF_WINDOW_MS,
 } from '../../shared/api';
 import type { Db } from '../db/client';
 import { heartbeats, type Outage, outageConfirmations, outages, sessions, stillOffReports } from '../db/schema';
@@ -63,48 +61,10 @@ function isStale(lastSeen: string, now: Date): boolean {
   return now.getTime() - Date.parse(lastSeen) > HEARTBEAT_THRESHOLD_MS;
 }
 
-/**
- * A correlated subquery: it touches only the outages the outer query returns (via the unique
- * (outage_id, client_hash) index) and binds no parameter per outage (D1 allows 100 per query).
- * Drizzle leaves columns unqualified in a single-table select, where a bare "id" would mean the
- * confirmation's own id, so both sides name their table.
- */
-const qualified = (table: typeof outages | typeof outageConfirmations, column: { name: string }) =>
-  sql`${table}.${sql.identifier(column.name)}`;
-const confirmationCount =
-  sql<number>`(select count(*) from ${outageConfirmations} where ${qualified(outageConfirmations, outageConfirmations.outageId)} = ${qualified(outages, outages.id)})`.mapWith(
-    Number,
-  );
-
-export function outagesWithCounts(db: Db, where?: SQL) {
-  return db
-    .select({
-      id: outages.id,
-      startTime: outages.startTime,
-      endTime: outages.endTime,
-      source: outages.source,
-      isFalsePositive: outages.isFalsePositive,
-      isPlanned: outages.isPlanned,
-      confirmations: confirmationCount,
-    })
-    .from(outages)
-    .where(where);
-}
-
-export async function countConfirmations(db: Db, outageId: number): Promise<number> {
-  const [row] = await db
-    .select({ total: count() })
-    .from(outageConfirmations)
-    .where(eq(outageConfirmations.outageId, outageId));
-  return row?.total ?? 0;
-}
-
 /** The public shape of an outage row. */
-export function summarise(
-  outage: Pick<Outage, 'id' | 'startTime' | 'endTime' | 'isPlanned'> & { confirmations: number },
-): OutageSummary {
-  const { id, startTime, endTime, isPlanned, confirmations } = outage;
-  return { id, startTime, endTime, confirmations, planned: isPlanned };
+export function summarise(outage: Pick<Outage, 'id' | 'startTime' | 'endTime' | 'isPlanned'>): OutageSummary {
+  const { id, startTime, endTime, isPlanned } = outage;
+  return { id, startTime, endTime, planned: isPlanned };
 }
 
 /** Until a sensor reports, the punch clock is the source of truth: no open outage means ON. */
@@ -121,35 +81,16 @@ function powerState(
   return { status: 'ON', since: null };
 }
 
-function stillOffCountQuery(db: Db, now: Date) {
-  const since = new Date(now.getTime() - STILL_OFF_WINDOW_MS).toISOString();
-  return db.select({ total: count() }).from(stillOffReports).where(gte(stillOffReports.createdAt, since));
-}
-
-export async function countStillOffReports(db: Db, now: Date): Promise<number> {
-  const [row] = await stillOffCountQuery(db, now);
-  return row?.total ?? 0;
-}
-
-/**
- * Records a "still off" report unless this client made one within STILL_OFF_DEDUPE_MS, as a
- * single statement so two concurrent requests cannot both insert. Returns whether it was recorded.
- */
-export async function recordStillOff(db: Db, clientHash: string, now: Date): Promise<boolean> {
-  const iso = now.toISOString();
-  const recent = new Date(now.getTime() - STILL_OFF_DEDUPE_MS).toISOString();
-  const { meta } = await db.run(
-    sql`insert into ${stillOffReports} (created_at, client_hash) select ${iso}, ${clientHash} where not exists (select 1 from ${stillOffReports} where ${stillOffReports.clientHash} = ${clientHash} and ${stillOffReports.createdAt} >= ${recent})`,
-  );
-  return meta.changes > 0;
-}
-
 export async function getGridState(db: Db, now: Date) {
-  const [[heartbeat], [open], recentRows, [stillOff]] = await db.batch([
+  const [[heartbeat], [open], recentRows] = await db.batch([
     heartbeatQuery(db),
-    outagesWithCounts(db, isOpen).orderBy(desc(outages.startTime)).limit(1),
-    outagesWithCounts(db, eq(outages.isFalsePositive, false)).orderBy(desc(outages.startTime)).limit(RECENT_LIMIT),
-    stillOffCountQuery(db, now),
+    openOutageQuery(db),
+    db
+      .select()
+      .from(outages)
+      .where(eq(outages.isFalsePositive, false))
+      .orderBy(desc(outages.startTime))
+      .limit(RECENT_LIMIT),
   ]);
   const state = powerState(open?.startTime, heartbeat, now);
   // When ON, the current state began when the last outage ended (outages can overlap, so the latest end).
@@ -164,7 +105,6 @@ export async function getGridState(db: Db, now: Date) {
     recent: recentRows.map(summarise),
     // Whether a sensor is online now; says nothing about how any outage was recorded.
     monitored: heartbeat !== undefined && !isStale(heartbeat.lastSeen, now),
-    stillOffReports: state.status === 'ON' ? (stillOff?.total ?? 0) : 0,
   };
 }
 
@@ -227,10 +167,10 @@ export async function purgeExpiredSessions(db: Db, now: Date): Promise<void> {
 // privacy.html states this period (both languages): change it there too.
 const FINGERPRINT_DAYS = 30;
 
-/**
- * Replaces confirmation fingerprints (salted IP hashes) older than FINGERPRINT_DAYS with a
- * per-row placeholder: the count survives, the link to an address does not.
- */
+// The two purges below blank the salted IP hashes still in the unused outage_confirmations and
+// still_off_reports tables (worker/db/schema.ts); they go with those tables in the next migration.
+
+/** Replaces confirmation fingerprints older than FINGERPRINT_DAYS with a per-row placeholder. */
 export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
   const cutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();
   await db
@@ -239,13 +179,9 @@ export async function purgeOldFingerprints(db: Db, now: Date): Promise<void> {
     .where(and(lt(outageConfirmations.createdAt, cutoff), sql`${outageConfirmations.clientHash} not like 'purged:%'`));
 }
 
-// privacy.html states this period (both languages): change it there too.
 const STILL_OFF_KEEP_DAYS = 90;
 
-/**
- * "Still off" fingerprints go after FINGERPRINT_DAYS, like confirmations, and the rows after
- * STILL_OFF_KEEP_DAYS (they only count for STILL_OFF_WINDOW_MS).
- */
+/** "Still off" fingerprints go after FINGERPRINT_DAYS, like confirmations, and the rows after STILL_OFF_KEEP_DAYS. */
 export async function purgeOldStillOffReports(db: Db, now: Date): Promise<void> {
   const fingerprintCutoff = new Date(now.getTime() - FINGERPRINT_DAYS * DAY_MS).toISOString();
   const rowCutoff = new Date(now.getTime() - STILL_OFF_KEEP_DAYS * DAY_MS).toISOString();

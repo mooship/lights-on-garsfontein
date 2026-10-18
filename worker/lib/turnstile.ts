@@ -19,7 +19,7 @@ const siteverifySchema = z.object({
 
 /**
  * Checks a Turnstile token for this request. It must have been solved on our site for this
- * exact action, so a token from the "me too" button cannot be replayed on the sign-in form
+ * exact action, so a token from the contact button cannot be replayed on the sign-in form
  * (or from another host). Returns a 403 to send back, or null when the token is good.
  */
 export async function checkTurnstile(

@@ -2,8 +2,7 @@
 <!-- FORKERS: review the legal basis for your jurisdiction. This page is written for POPIA (South
      Africa) and describes this deployment's data handling; check every claim against your code,
      your wrangler.toml and your Cloudflare plan. -->
-<!-- The retention periods below mirror FINGERPRINT_DAYS and STILL_OFF_KEEP_DAYS (worker/lib/grid.ts)
-     and the two hours STILL_OFF_DEDUPE_MS (shared/api.ts): change them together. -->
+<!-- The 30 days below mirror FINGERPRINT_DAYS (worker/lib/grid.ts): change them together. -->
 <html lang="af">
   <head>
     <meta charset="UTF-8" />
@@ -37,7 +36,7 @@
 
       <section id="af">
         <h1>Privaatheid en gebruiks&shy;voorwaardes</h1>
-        <p class="updated">Laas bygewerk op 17 Oktober 2026</p>
+        <p class="updated">Laas bygewerk op 18 Oktober 2026</p>
 
         <p>
           Hierdie webwerf hou ’n rekord van kragonderbrekings in Garsfontein, Pretoria. Die toevoer word by een punt in
@@ -65,21 +64,8 @@
         <h3>Wat ons insamel</h3>
         <ul>
           <li>
-            <strong>Gemeenskapsbevestigings.</strong> Wanneer jy op “My krag is ook af” tik, stoor ons die onderbreking,
-            die tyd en ’n onomkeerbare kode wat van jou internetverbinding afgelei word (’n gesoute SHA-256-hash van jou
-            IP-adres, of vir IPv6 van die /64-voorvoegsel). Die kode sorg dat elke verbinding net een keer per
-            onderbreking getel word. Jou IP-adres self word nie in die databasis gestoor nie. Ná 30 dae word die kode
-            uitgevee; die telling bly behoue.
-          </li>
-          <li>
-            <strong>“Steeds af”-verslae.</strong> As die webwerf wys dat die krag aan is, maar jy aandui dat jou krag
-            steeds af is, stoor ons die tyd en dieselfde soort onomkeerbare kode, sodat ’n verbinding hoogstens een verslag
-            elke 2 uur kan stuur. Ná 30 dae word die kode uitgevee, en ná 90 dae word die verslag self geskrap.
-            Bevestigings en verslae is tellings van inwoners; hulle verander nooit die status nie.
-          </li>
-          <li>
-            <strong>Beskerming teen bots.</strong> Bevestigings, verslae en die e-posadres op hierdie bladsy word deur Cloudflare Turnstile beskerm,
-            wat eers laai wanneer jy op die knoppie tik. Turnstile gebruik seine van jou blaaier om mense van outomatiese
+            <strong>Beskerming teen bots.</strong> Die e-posadres op hierdie bladsy en die administrateur se aanmelding
+            word deur Cloudflare Turnstile beskerm, wat eers laai wanneer jy op die knoppie tik. Turnstile gebruik seine van jou blaaier om mense van outomatiese
             verkeer te onderskei, en om die kontrole te voltooi stuur die webwerf jou IP-adres saam met die
             Turnstile-token na Cloudflare. Sien
             <a href="https://www.cloudflare.com/turnstile-privacy-policy/" hreflang="en">Cloudflare se
@@ -99,9 +85,8 @@
             Engels).
           </li>
           <li>
-            <strong>Instellings in jou blaaier.</strong> Jou blaaier stoor jou tema (lig of donker), jou taal, watter
-            kennisgewings jy toegemaak het, of jy ’n onderbreking reeds bevestig het en wanneer jy laas gemeld het dat jou krag steeds af is. Sodat die webwerf sonder ’n verbinding
-            werk, hou jou blaaier ook ’n kopie van die bladsye en die laaste status. Dit bly op jou toestel en word nie
+            <strong>Instellings in jou blaaier.</strong> Jou blaaier stoor jou tema (lig of donker), jou taal en watter
+            kennisgewings jy toegemaak het. Sodat die webwerf sonder ’n verbinding werk, hou jou blaaier ook ’n kopie van die bladsye en die laaste status. Dit bly op jou toestel en word nie
             na ons gestuur nie.
           </li>
         </ul>
@@ -109,8 +94,7 @@
 
         <h3>Doel en regsgrondslag</h3>
         <p>
-          Ons verwerk hierdie inligting om bevestigings en verslae regverdig te tel, die webwerf te laat werk en misbruik
-          te voorkom. Die regsgrondslag is ons regmatige belang daarin (artikel 11(1)(f) van POPIA). Ons gebruik dit vir
+          Ons verwerk hierdie inligting om die webwerf te laat werk en misbruik te voorkom. Die regsgrondslag is ons regmatige belang daarin (artikel 11(1)(f) van POPIA). Ons gebruik dit vir
           niks anders nie.
         </p>
 
@@ -128,18 +112,20 @@
 
         <h3>Hoe lank ons dit hou</h3>
         <ul>
-          <li>Die onomkeerbare kode by bevestigings en verslae: 30 dae.</li>
-          <li>“Steeds af”-verslae: 90 dae.</li>
-          <li>Onderbrekings en hul bevestigingstellings: as ’n openbare rekord, sonder enige kode.</li>
+          <li>Onderbrekings: as ’n openbare rekord.</li>
           <li>Versoeklogs by Cloudflare: tot 7 dae.</li>
         </ul>
+        <p>
+          Inwoners kon voorheen self aandui dat hul krag af is. Die onomkeerbare kodes (gesoute SHA-256-hashes van
+          IP-adresse) wat daarvoor gestoor is, word binne 30 dae uitgevee, en daardie tabelle word uit die databasis
+          verwyder.
+        </p>
 
         <h3>Jou regte</h3>
         <p>
           Jy kan vra om te sien watter inligting ons oor jou hou, en om dit reg te stel of te skrap. Jy kan ook beswaar
-          maak teen die verwerking. Omdat ons net die onomkeerbare kode hou, kan ons ’n bevestiging of verslag slegs aan
-          die hand van die tyd uitken, en net solank die kode bestaan (tot 30 dae). Daarna is dit anoniem en kan dit nie
-          meer aan jou gekoppel word nie. Laat weet ons dus min of meer wanneer jy dit gestuur het.
+          maak teen die verwerking. Die webwerf self stoor niks wat aan jou gekoppel kan word nie, behalwe die
+          versoeklogs en die ou kodes hierbo totdat hulle uitgevee is.
         </p>
 
         <h3>Klagtes</h3>
@@ -194,7 +180,7 @@
 
       <section id="en" lang="en">
         <h1>Privacy and terms of use</h1>
-        <p class="updated">Last updated 17 October 2026</p>
+        <p class="updated">Last updated 18 October 2026</p>
 
         <p>
           This site keeps a record of power outages in Garsfontein, Pretoria. The supply is measured at one point in
@@ -221,20 +207,8 @@
         <h3>What we collect</h3>
         <ul>
           <li>
-            <strong>Community confirmations.</strong> When you tap “My power is off too”, we store the outage, the time
-            and an irreversible code derived from your internet connection (a salted SHA-256 hash of your IP address, or
-            for IPv6 of its /64 prefix). The code makes sure each connection is counted once per outage. Your IP address
-            itself is not stored in the database. After 30 days the code is erased; the count is kept.
-          </li>
-          <li>
-            <strong>“Still off” reports.</strong> If the site shows the power as on but you indicate that your power is
-            still off, we store the time and the same kind of irreversible code, so that a connection can send at most one report
-            every 2 hours. After 30 days the code is erased, and after 90 days the report itself is deleted.
-            Confirmations and reports are counts from residents; they never change the status.
-          </li>
-          <li>
-            <strong>Bot protection.</strong> Confirmations, reports and the email address on this page are protected by Cloudflare Turnstile, which loads
-            only when you tap the button. Turnstile uses signals from your browser to distinguish people from automated
+            <strong>Bot protection.</strong> The email address on this page and the admin sign-in are protected by
+            Cloudflare Turnstile, which loads only when you tap the button. Turnstile uses signals from your browser to distinguish people from automated
             traffic, and to complete the check the site sends your IP address to Cloudflare with the Turnstile token. See
             <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Cloudflare’s Turnstile privacy addendum</a>.
           </li>
@@ -251,8 +225,7 @@
           </li>
           <li>
             <strong>Settings in your browser.</strong> Your browser stores your theme (light or dark), your language,
-            which notices you have dismissed, whether you have already confirmed an outage and when you last reported that your power is still off. So that the site works
-            without a connection, your browser also keeps a copy of the pages and the last status. These stay on your
+            and which notices you have dismissed. So that the site works without a connection, your browser also keeps a copy of the pages and the last status. These stay on your
             device and are not sent to us.
           </li>
         </ul>
@@ -260,7 +233,7 @@
 
         <h3>Purpose and legal basis</h3>
         <p>
-          We process this information to count confirmations and reports fairly, to run the site and to prevent abuse.
+          We process this information to run the site and to prevent abuse.
           The legal basis is our legitimate interest in doing so (section 11(1)(f) of POPIA). We use it for nothing
           else.
         </p>
@@ -278,18 +251,19 @@
 
         <h3>How long we keep it</h3>
         <ul>
-          <li>The irreversible code on confirmations and reports: 30 days.</li>
-          <li>“Still off” reports: 90 days.</li>
-          <li>Outages and their confirmation counts: as a public record, without any code.</li>
+          <li>Outages: as a public record.</li>
           <li>Request logs at Cloudflare: up to 7 days.</li>
         </ul>
+        <p>
+          Residents could previously report that their power was off. The irreversible codes (salted SHA-256 hashes of
+          IP addresses) stored for that are erased within 30 days, and those tables are being removed from the database.
+        </p>
 
         <h3>Your rights</h3>
         <p>
           You can ask to see what information we hold about you, and to have it corrected or deleted. You can also object
-          to the processing. Because we hold only the irreversible code, we can identify a confirmation or report only by
-          its time, and only while the code exists (up to 30 days). After that it is anonymous and can no longer be linked
-          to you. So please tell us approximately when you sent it.
+          to the processing. The site itself stores nothing that can be linked to you, apart from the request logs and the
+          old codes above until they are erased.
         </p>
 
         <h3>Complaints</h3>

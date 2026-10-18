@@ -67,8 +67,6 @@ export const label = style({
 
 export const plainList = style({ listStyle: 'none', margin: 0, padding: 0 });
 
-export const muted = style({ color: vars.color.muted });
-
 export const errorText = style({ color: vars.color.off, fontSize: '0.875rem', fontWeight: 600 });
 
 // iOS centres the picked date and time inside the field; align it like other inputs.

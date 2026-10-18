@@ -216,7 +216,6 @@ test.describe('language', () => {
     await expect(page.getByText(en.masthead.notice, { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: en.lang.switchTo })).toHaveText(en.lang.next);
     await expect(page.getByText(en.scope.measured(site.landmark), { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: en.stillOff.button })).toBeDisabled();
     await context.close();
   });
 });
@@ -226,15 +225,35 @@ test.describe('public page', () => {
     await page.goto('/');
     const status = page.getByRole('status');
     await expect(status).toHaveText('No outage reported');
-    await expect(page.getByText(en.status.noLiveReading)).toBeVisible();
-    // No "for 7 h": nothing measured it on.
+    // No "for 7 h": nothing measured it on. No outage is on record, so no "Last outage ended" either.
     await expect(page.getByText(new RegExp(`^${escapeRegExp(en.status.for(''))}\\d`))).toHaveCount(0);
+    await expect(page.getByText(withTime(en.status.lastEnded(AT, en.day.today)))).toHaveCount(0);
     await expect(page.locator('[data-status="NONE"]')).toBeVisible();
+    // Just the one line of detail: no "Updated HH:MM" while all is well.
+    await expect(page.locator('.gg-status-detail > p')).toHaveCount(1);
     await expect(page).toHaveTitle(NEUTRAL_TITLE);
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon.svg');
     await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0); // never says how outages are recorded
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
   });
+
+  for (const locale of site.locales) {
+    test.describe(locale, () => {
+      test.use({ appLocale: locale });
+
+      test(`without a live reading, says when the last outage ended (${locale})`, async ({ page }) => {
+        const m = DICTIONARIES[locale];
+        await page.route('**/api/status', async (route) => {
+          const response = await route.fetch();
+          const since = new Date().toISOString();
+          await route.fulfill({ response, json: { ...(await response.json()), monitored: false, since } });
+        });
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('status')).toHaveText(m.status.NONE);
+        await expect(page.getByText(withTime(m.status.lastEnded(AT, m.day.today)))).toBeVisible();
+      });
+    });
+  }
 
   test('with a live reading, says the power is on and for how long', async ({ page }) => {
     await page.route('**/api/status', async (route) => {
@@ -277,9 +296,10 @@ test.describe('public page', () => {
     for (const line of en.trends.how) await expect(page.getByText(line, { exact: true })).toBeVisible();
   });
 
-  test('the footer links the data licence and the feed', async ({ page }) => {
+  test('the footer links the feed and the privacy page, and not the data licence', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: site.dataLicence.name })).toHaveAttribute('href', site.dataLicence.url);
+    await expect(page.getByRole('link', { name: en.footer.privacy })).toBeVisible();
+    await expect(page.getByRole('link', { name: site.dataLicence.name })).toHaveCount(0);
     await expect(page.getByRole('link', { name: en.footer.feed })).toHaveAttribute('href', '/feed.xml');
     await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute('href', '/privacy');
   });
@@ -330,7 +350,7 @@ test.describe('public page', () => {
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
-    await expect(page.getByText(withTime(en.status.updated(AT)))).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await page.route('**/api/status', (route) => route.fulfill({ status: 500, json: { error: 'internal_error' } }));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // polls now
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
@@ -377,9 +397,6 @@ test.describe('admin', () => {
 
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText(en.status.OFF);
-    await expect(page.getByText(en.confirm.helper, { exact: true })).toBeVisible();
-    await expect(page.getByText(en.confirm.first)).toBeVisible();
-    await expect(page.getByRole('button', { name: en.stillOff.button })).toHaveCount(0);
     await expect(page).toHaveTitle(outageTitle(en.tab.OFF));
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-off.svg');
     await page.getByRole('button', { name: en.lang.switchTo }).click();
@@ -402,48 +419,6 @@ test.describe('admin', () => {
     await page.getByLabel(en.admin.ended).fill('2026-10-01T20:30');
     await page.getByRole('button', { name: en.admin.log }).click();
     await expect(page.getByText(`2 ${en.units.h} 30 ${en.units.min} · ${en.admin.source.manual}`)).toBeVisible();
-  });
-});
-
-test.describe('still off where you are', () => {
-  // The server takes one report per client every two hours, and the reset cannot clear them: a
-  // retry would find this test's own report.
-  test.describe.configure({ retries: 0 });
-
-  // The suite's first report, so the server accepts it.
-  test('reports once, shows the count and remembers the report', async ({ page, request }) => {
-    await page.goto('/');
-    await expect(page.getByText(en.stillOff.note)).toBeVisible();
-    // Cloudflare's test site key passes Turnstile without a challenge.
-    await page.getByRole('button', { name: en.stillOff.button }).click();
-    await expect(page.getByText(en.stillOff.done)).toBeVisible({ timeout: 20_000 });
-    const count = page.getByText(en.stillOff.count(1));
-    await expect(count).toBeVisible();
-    await expect(page.getByTestId('still-off')).toHaveAttribute('aria-disabled', 'true');
-    await expect(page.getByRole('status')).toHaveText(en.status.NONE); // the status does not change
-
-    // The count now comes from the status, and this browser remembers it reported.
-    await page.reload();
-    await expect(count).toBeVisible();
-    await expect(page.getByTestId('still-off')).toHaveAttribute('aria-disabled', 'true');
-
-    const again = await request.post('/api/still-off', { data: { token: 'XXXX.DUMMY.TOKEN' } });
-    expect(again.status()).toBe(409);
-    expect(await again.json()).toMatchObject({ error: 'already_reported' });
-  });
-
-  test.describe('in Afrikaans', () => {
-    test.use({ appLocale: 'af' });
-
-    test('shows the error when the server says it was already reported', async ({ page, request }) => {
-      // This client's report, whether or not the test above made it.
-      const earlier = await request.post('/api/still-off', { data: { token: 'XXXX.DUMMY.TOKEN' } });
-      expect([201, 409]).toContain(earlier.status());
-      await page.goto('/');
-      await page.getByRole('button', { name: af.stillOff.button }).click();
-      await expect(page.getByText(af.stillOff.errors.already_reported)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByText(af.stillOff.count(1))).toBeVisible();
-    });
   });
 });
 
@@ -496,7 +471,6 @@ test.describe('share', () => {
 });
 
 test.describe('privacy contact', () => {
-  // Before the confirmation test: /api/contact shares CONFIRM_LIMITER, which that test spends.
   test('reveals the contact email after Turnstile', async ({ page }) => {
     const email = exampleVar('CONTACT_EMAIL');
     await page.goto('/privacy');
@@ -508,31 +482,6 @@ test.describe('privacy contact', () => {
     await expect(mail).toBeFocused();
     await expect(section.getByRole('button', { name: 'Show email address' })).toHaveCount(0);
     await expect(section.getByRole('link', { name: 'open an issue on GitHub' })).toBeVisible();
-  });
-});
-
-test.describe('community confirmation', () => {
-  // A retry within the minute would find CONFIRM_LIMITER already spent.
-  test.describe.configure({ retries: 0 });
-
-  test('confirms once, then rate limits', async ({ page, request }) => {
-    await login(page);
-    await page.getByRole('button', { name: en.admin.punchOut }).click();
-    await expect(page.getByRole('button', { name: en.admin.punchIn })).toBeEnabled();
-    await page.goto('/');
-    await page.getByTestId('confirm-outage').click();
-    await expect(page.getByTestId('confirm-outage')).toHaveText(en.confirm.done, { timeout: 20_000 });
-    await expect(page.getByText(en.confirm.count(1))).toBeVisible();
-
-    // Same client again: one confirmation per outage, then CONFIRM_LIMITER's 10 requests a minute
-    // (the e2e environment in wrangler.toml). The limiter counts in fixed one-minute windows, so a
-    // window boundary can reset the count: post until the first 429.
-    const codes: number[] = [];
-    while (codes.length < 25 && !codes.includes(429)) {
-      codes.push((await request.post('/api/confirm', { data: { token: 'XXXX.DUMMY.TOKEN' } })).status());
-    }
-    expect(codes).toContain(429);
-    expect(codes.slice(0, -1).every((code) => code === 409)).toBe(true);
   });
 });
 
@@ -698,7 +647,8 @@ test.describe('offline', () => {
     context,
   }) => {
     await throughServiceWorker(page, '/');
-    await expect(page.getByText(withTime(af.status.updated(AT)))).toBeVisible();
+    await expect(page.getByRole('status')).toContainText(af.status.NONE);
+    await expect(page.getByRole('alert')).toHaveCount(0);
     // This build's shell, named after the build id in sw.js, and the status copy beside it.
     const keys = (await page.evaluate(() => caches.keys())).sort();
     expect(keys).toEqual([STATUS_CACHE, expect.stringMatching(`^${cacheName('')}`)].sort());
@@ -710,7 +660,6 @@ test.describe('offline', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'af');
     await expect(page.getByRole('status')).toContainText(af.status.NONE);
     await expect(page.getByRole('alert')).toHaveText(withTime(af.status.offline(AT)));
-    await expect(page.getByText(withTime(af.status.updated(AT)))).toHaveCount(0); // never presented as current
 
     await page.goto('/en/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -728,7 +677,6 @@ test.describe('offline', () => {
 
     await context.setOffline(false);
     await poll(page);
-    await expect(page.getByText(withTime(en.status.updated(AT)))).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
 
@@ -753,7 +701,6 @@ test.describe('offline', () => {
 
     await context.unroute('**/api/status');
     await poll(page);
-    await expect(page.getByText(withTime(en.status.updated(AT)))).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
 

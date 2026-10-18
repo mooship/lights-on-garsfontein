@@ -89,7 +89,7 @@ describe('housekeeping (hourly cron)', () => {
     expect(rows.results).toHaveLength(1);
   });
 
-  it('replaces confirmation fingerprints after 30 days while the count stays', async () => {
+  it('replaces confirmation fingerprints after 30 days', async () => {
     const id = await insertOutage({});
     await insertConfirmation(id, { createdAt: new Date(Date.now() - 31 * DAY_MS).toISOString(), clientHash: 'aaa' });
     await insertConfirmation(id, { clientHash: 'bbb' });

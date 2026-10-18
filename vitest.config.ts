@@ -24,7 +24,6 @@ export default defineConfig({
                 ADMIN_USERNAME: 'admin',
                 HEARTBEAT_TOKEN: 'test-heartbeat-token',
                 ADMIN_API_TOKEN: 'test-admin-api-token',
-                IP_SALT: 'test-salt',
               },
             },
           })),

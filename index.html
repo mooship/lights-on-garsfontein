@@ -87,7 +87,7 @@
   <body>
     <div id="root">
       <!-- Static loading state. Mirrors the app's masthead, src/components/Skeletons.tsx and the
-           status card's static rows (src/components/StatusNotes.tsx, StillOffPlaceholder) box for box
+           status card's static rows (src/components/StatusNotes.tsx) box for box
            (zero layout shift). The data-i18n* elements are filled from src/i18n in every language at
            build time (staticI18n in vite.config.ts). -->
       <div class="gg-shell">
@@ -119,11 +119,6 @@
             </div>
             <div class="gg-status-detail" aria-hidden="true">
               <span class="gg-skel gg-skel-text gg-w-80"></span>
-              <span class="gg-skel gg-skel-text gg-w-30"></span>
-            </div>
-            <div class="gg-still-off">
-              <button type="button" class="gg-link-button" data-i18n="stillOff.button" disabled></button>
-              <p class="gg-still-off-note" data-i18n="stillOff.note"></p>
             </div>
             <p class="gg-safety"><span data-i18n="safety.live"></span> <a href="%site.faultReporting.url%" data-i18n="safety.report"></a>.</p>
           </section>

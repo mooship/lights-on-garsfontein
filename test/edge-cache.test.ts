@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS } from '../shared/api';
-import { call, EDGE_CACHED, insertOutage, mockTurnstile, ORIGIN, runCron, setHeartbeat } from './helpers';
+import { call, EDGE_CACHED, insertOutage, ORIGIN, runCron, setHeartbeat } from './helpers';
 
 // Every edge-cached route is a view of the outages, so a write that opens, closes or changes one
 // must purge them all; otherwise readers get the old outages until the cached copy expires.
@@ -68,24 +68,6 @@ const WRITES: Write[] = [
     status: 200,
   },
   { name: 'outage detection opening an outage', arrange: staleHeartbeat, act: async () => void (await runCron()) },
-  {
-    name: 'a confirmation that opens an outage',
-    arrange: staleHeartbeat,
-    act: () => {
-      mockTurnstile(true, 'confirm');
-      return call('/api/confirm', { method: 'POST', body: { token: 'turnstile-token' } });
-    },
-    status: 201,
-  },
-  {
-    name: 'a "still off" report refused because it opened an outage',
-    arrange: staleHeartbeat,
-    act: () => {
-      mockTurnstile(true, 'still_off');
-      return call('/api/still-off', { method: 'POST', body: { token: 'turnstile-token' } });
-    },
-    status: 409,
-  },
 ];
 
 describe('edge cache purges', () => {
@@ -105,14 +87,5 @@ describe('edge cache purges', () => {
     expect((await heartbeat()).status).toBe(200);
     expect(await isCached('/api/status')).toBe(false);
     for (const path of EDGE_CACHED.filter((p) => p !== '/api/status')) expect(await isCached(path), path).toBe(true);
-  });
-
-  it('a confirmation purges the CSV, whose confirmation counts it changes', async () => {
-    mockTurnstile(true, 'confirm');
-    await insertOutage({});
-    await call('/api/outages.csv');
-    expect(await isCached('/api/outages.csv')).toBe(true);
-    expect((await call('/api/confirm', { method: 'POST', body: { token: 'turnstile-token' } })).status).toBe(201);
-    expect(await isCached('/api/outages.csv')).toBe(false);
   });
 });

@@ -4,7 +4,7 @@ import { HOUR_MS as H, type StatsResponse, TRACKING_SINCE } from '../shared/api'
 import { site } from '../site.config';
 import { zoned } from '../src/lib/zone';
 import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
-import { call, insertConfirmation, insertOutage, sameWindow, uniqueIp } from './helpers';
+import { call, insertOutage, sameWindow, uniqueIp } from './helpers';
 
 const t = (iso: string) => Date.parse(iso);
 /** The configured zone's UTC offset in ms; days and weeks start at local midnight. */
@@ -228,22 +228,20 @@ describe('GET /api/outages.csv', () => {
       endTime: '2026-10-21T10:00:20.000Z',
       isPlanned: 1,
     });
-    const confirmed = await insertOutage({
+    const closed = await insertOutage({
       startTime: '2026-10-20T10:00:00.000Z',
       endTime: '2026-10-20T11:30:00.000Z',
     });
-    for (const clientHash of ['a', 'b']) await insertConfirmation(confirmed, { clientHash });
-    await insertConfirmation(planned); // planned outages count confirmations too
 
     const res = await call('/api/outages.csv');
     expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
     expect(res.headers.get('Content-Disposition')).toBe(`attachment; filename="${site.slug}-outages.csv"`);
     expect(await res.text()).toBe(
       [
-        'id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations',
-        `${confirmed},2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,no,2`,
-        `${planned},2026-10-21T06:00:00.000Z,2026-10-21T10:00:20.000Z,240,yes,1`,
-        `${open},2026-10-22T10:00:00.000Z,,,no,0`,
+        'id,start_time_utc,end_time_utc,duration_minutes,planned',
+        `${closed},2026-10-20T10:00:00.000Z,2026-10-20T11:30:00.000Z,90,no`,
+        `${planned},2026-10-21T06:00:00.000Z,2026-10-21T10:00:20.000Z,240,yes`,
+        `${open},2026-10-22T10:00:00.000Z,,,no`,
         '',
       ].join('\n'),
     );

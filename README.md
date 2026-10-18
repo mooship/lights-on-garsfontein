@@ -11,7 +11,7 @@ Shows whether the electricity supply is on in Garsfontein, Pretoria, and keeps a
 - **Its limits.** It is one measuring point, so some streets can differ: parts of the network can be back-fed from another substation, and an outage limited to another street or extension will not appear. It records every interruption, planned or not; it is not a load-shedding schedule and does not predict outages.
 - **Independent.** Operated by a resident of Garsfontein Extension 16. Not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
 
-The site shows the status as last recorded and for how long, statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart, and recent outages, with planned outages tagged. During an outage residents can add "My power is off too"; while the status is on, those whose power is still off can say so. Neither changes the status. Without a reporting sensor, the status reads "No outage reported" rather than claiming the power is on.
+The site shows the status as last recorded and for how long, statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart, and recent outages, with planned outages tagged. Without a reporting sensor, the status reads "No outage reported" rather than claiming the power is on.
 
 The code runs on one Cloudflare Worker with a D1 database, and anyone can run it for their own area.
 
@@ -23,38 +23,38 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 
 | Method and path | Returns | Caching | Limits and access |
 | --- | --- | --- | --- |
-| `GET /api/status` | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages, `monitored`, `stillOffReports`, `turnstileSiteKey`, `generatedAt` | `no-store` for browsers; 12 s at the edge | Shared 60/min; CORS |
+| `GET /api/status` | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages, `monitored`, `turnstileSiteKey`, `generatedAt` | `no-store` for browsers; 12 s at the edge | Shared 60/min; CORS |
 | `GET /api/stats` | The last 7, 30 and 365 days, the previous 30 days (`null` until tracked), up to 26 weekly totals | `max-age=60` | Shared 60/min; CORS |
 | `GET /api/outages.csv` | Every outage, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /feed.xml` | Atom feed of the 20 most recent outages, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
-| `POST /api/confirm` | "My power is off too": once per connection per outage | `no-store` | 5/min; same-origin; Turnstile |
-| `POST /api/still-off` | "Still off" report while `ON`: once per connection every 2 hours | `no-store` | 5/min; same-origin; Turnstile |
 | `POST /api/contact` | The privacy contact address | `no-store` | 5/min; same-origin; Turnstile |
 | `POST /api/heartbeat` | Sensor check-in | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Same-origin; login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
-- "Shared 60/min" is one limit per connection across those four endpoints; the three 5/min endpoints share another. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
+- "Shared 60/min" is one limit per connection across those four endpoints; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
 - The edge cache is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh. When it is `false`, `ON` means only that no outage has been reported.
-- `confirmations` (on each outage) and `stillOffReports` (reports in the last hour, always `0` while `OFF`) are counts from residents, not measurements, and never change `status`.
 - Only the admin API exposes an outage's `source`.
-- `POST /api/confirm` takes `{ "token", "outageId"? }` and answers `201` with `{ "confirmations": n }`, or `409` with `no_active_outage`, `outage_changed` or `already_confirmed`. `POST /api/still-off` takes `{ "token" }` and answers `201` with `{ "reports": n }`, or `409` with `outage_in_progress` or `already_reported`. `POST /api/contact` takes `{ "token" }` and answers `200` with `{ "email" }`, or `404` with `not_configured`. Each token is a Turnstile token solved for that action (`confirm`, `still_off`, `contact`).
+- `POST /api/contact` takes `{ "token" }`, a Turnstile token solved for the `contact` action, and answers `200` with `{ "email" }`, or `404` with `not_configured`.
+- 18 October 2026: community confirmations and "still off" reports were removed, with `POST /api/confirm`, `POST /api/still-off`, the `confirmations` field on each outage and `stillOffReports` in the status. Every recorded `confirmations` value was 0.
 
 ### CSV contract
 
 `GET /api/outages.csv` downloads as `<slug>-outages.csv` (here `lights-on-garsfontein-outages.csv`), one row per outage, oldest first:
 
 ```csv
-id,start_time_utc,end_time_utc,duration_minutes,planned,confirmations
+id,start_time_utc,end_time_utc,duration_minutes,planned
 ```
 
 - `start_time_utc` and `end_time_utc` are ISO 8601 UTC; `end_time_utc` and `duration_minutes` (whole minutes) are empty while an outage is open.
-- `planned` is `yes` or `no`; `confirmations` counts community confirmations.
+- `planned` is `yes` or `no`.
 
 Columns are never renamed, reordered or reformatted. New columns are only appended, with a version note here.
+
+- 18 October 2026: the `confirmations` column was removed with community confirmations; every recorded value was 0.
 
 ## Recording outages
 
@@ -169,7 +169,6 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `ADMIN_USERNAME` | Admin sign-in name (case-insensitive) |
    | `ADMIN_PASSWORD_HASH` | PBKDF2 hash of a password of at least 12 characters: `npm run --silent hash-password \| npx wrangler secret put ADMIN_PASSWORD_HASH`. Changing it signs out every session |
    | `TURNSTILE_SECRET_KEY` | The Turnstile widget's secret key |
-   | `IP_SALT` | Salt for the hashed connection fingerprints. A long random string; never change it |
    | `ADMIN_API_TOKEN` | Optional: bearer token for scripts |
    | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor |
    | `CONTACT_EMAIL` | Optional: address for privacy requests, revealed on the privacy page only after a Turnstile check. Until it is set, requests go to public GitHub issues |
@@ -179,7 +178,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 8. **Regenerate the images**: `npm run og` (social card) and `npm run icons` (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand.
 9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and terms, is written for POPIA and describes this deployment's data handling; `FORKERS` comments mark what to check. Do not use utility or municipal logos, and keep the independence disclaimer.
 
-Two crons run the Worker. Every minute it opens an outage for a silent sensor. Every hour it removes expired sessions, blanks connection fingerprints older than 30 days (counts are kept) and deletes "still off" reports older than 90 days.
+Two crons run the Worker. Every minute it opens an outage for a silent sensor. Every hour it removes expired sessions and, until the next migration drops the unused `outage_confirmations` and `still_off_reports` tables, blanks their connection fingerprints after 30 days and deletes "still off" rows after 90.
 
 **Banners.** `src/banners.ts` holds short, dated notices. Append an entry to `BANNERS` with a new, stable `id` (dismissals are remembered by it), `from` and `until` via `zoned('YYYY-MM-DDTHH:mm')` (`until` is exclusive) and the copy (required in the default locale). Expired entries stop showing on their own; at most one shows at a time.
 

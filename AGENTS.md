@@ -4,7 +4,7 @@ Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and 
 
 ## What this is
 
-**Lights On, Garsfontein?** shows the state of the electricity supply in Garsfontein, Pretoria, and keeps a record of outages. It is measured at one home in Garsfontein Extension 16 (Ward 45), near Mediclinic Denmar, by a heartbeat sensor and an admin punch clock, with residents' confirmations and "still off" reports alongside.
+**Lights On, Garsfontein?** shows the state of the electricity supply in Garsfontein, Pretoria, and keeps a record of outages. It is measured at one home in Garsfontein Extension 16 (Ward 45), near Mediclinic Denmar, by a heartbeat sensor and an admin punch clock.
 
 - **Ultra-local, and nothing more.** It exists only to show the supply in Garsfontein. It is not a load-shedding app and must never try to replicate one; do not name other outage products anywhere.
 - **Trust comes first.** Residents must find it reliable. Copy never claims more than is measured or than the code does: the reading is one point and some streets can differ, and statements such as how often figures refresh must match the code (`STATS_POLL_MS`). Unless a sensor heartbeat is within `HEARTBEAT_THRESHOLD_MS` (`shared/api.ts`), the status reads "No outage reported", not "on".
@@ -15,7 +15,7 @@ Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and 
 1. **The best code is the code we don't write.** Before adding anything, ask whether the platform, an existing helper or a config value already does it, and whether it needs to exist at all. Deleting dead code, unused options and speculative abstractions is progress. No dependency for what a few lines do; no abstraction before a second real use.
 2. **Test-driven.** Red, green, refactor: write a failing test that captures the behaviour or the bug, make it pass with the smallest change, then clean up. A bug fix starts with a test that reproduces it. If a reported bug does not reproduce, inject it briefly to prove the test would catch it; keep the test only if it fails where the existing tests pass, and prefer extending an existing test.
 3. **One home per fact.** Deployment identity lives in `site.config.ts`, copy in `src/i18n/`, shared paths and types in `shared/`. Import them; do not repeat literals.
-4. **Small, focused changes.** Commit summaries are short, sentence case and imperative, with no prefix or full stop (for example "Fix horizontal scroll on the privacy page on phones"). Commit each finished task locally (the hooks run); push or open a pull request only when asked. Changes reach `main` through pull requests, and CI must pass. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
+4. **Small, focused changes.** Commit summaries are short, sentence case and imperative, with no prefix or full stop (for example "Fix horizontal scroll on the privacy page on phones"). Commit each finished task (the hooks run). Push straight to `main` once the definition of done passes; CI runs on every push and must stay green. Push only when asked. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
 
 ## Commands
 
@@ -77,7 +77,7 @@ To add an endpoint or a language, follow "Adding an endpoint" and "Adding a lang
 
 - Assert behaviour, not wording: take copy from `src/i18n`, `src/banners.ts` and `site.config.ts` rather than hard-coding it, with one literal smoke string per language.
 - Worker tests run in workerd with real D1. Use the helpers in `test/helpers.ts`: `call`, `createSession`, `login`, `insertOutage`, `runCron`, `uniqueIp` for a fresh rate-limit bucket, and `sameWindow` before a rate-limit loop.
-- e2e uses `e2e/fixtures.ts`, which deletes every outage before each test. "Still off" reports and rate-limit counts carry over, so never assume they are empty. Pages default to English; use `test.use({ appLocale: 'af' })` for Afrikaans, and cover both languages.
+- e2e uses `e2e/fixtures.ts`, which deletes every outage before each test. Rate-limit counts carry over, so never assume they are empty. Pages default to English; use `test.use({ appLocale: 'af' })` for Afrikaans, and cover both languages.
 - Never weaken an assertion, add a fixed wait or skip a test to make it pass; fix the cause.
 - Playwright planner, generator and healer agents are in `.claude/agents/`; plans go in `specs/`, generated tests in `e2e/`, starting from `e2e/seed.spec.ts`. `.mcp.json` runs the Playwright MCP server with `cmd /c` for Windows; on macOS or Linux use `"command": "npx"` with the same arguments.
 

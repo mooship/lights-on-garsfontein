@@ -91,8 +91,7 @@ globalStyle('.gg-card', {
   padding: '1.25rem',
 });
 
-// Sized to its content: the loading skeleton matches the ON state; the OFF state's
-// "me too" button makes the card taller.
+// Sized to its content: the loading skeleton matches every state.
 globalStyle('.gg-status-card', {
   display: 'flex',
   flexDirection: 'column',
@@ -100,7 +99,7 @@ globalStyle('.gg-status-card', {
   overflow: 'hidden',
 });
 
-// Room for one line of detail and the "Updated" line (padding + 0.9375rem × 1.5 + gap + 0.8125rem × 1.5).
+// Room for one line of detail (padding + 0.9375rem × 1.5); a warning below it only follows a failure.
 globalStyle('.gg-status-detail', {
   paddingTop: '1rem',
   borderTop: `1px solid ${vars.color.border}`,
@@ -110,10 +109,10 @@ globalStyle('.gg-status-detail', {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.25rem',
-  minHeight: '3.875rem',
+  minHeight: '2.40625rem',
 });
 
-globalStyle('.gg-status-updated', { fontSize: '0.8125rem' });
+globalStyle('.gg-status-warning', { fontSize: '0.8125rem' });
 
 // The trends body reserves its loaded height; only text that wraps on a narrow or zoomed
 // screen, or the user-opened weekly table below it, may grow the card.
@@ -202,29 +201,13 @@ globalStyle('.gg-why > summary', { minHeight: '2.25rem', width: 'fit-content', f
 
 globalStyle('.gg-why > p', { paddingBottom: '0.25rem' });
 
-globalStyle('.gg-still-off', { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' });
-
-// A secondary action: link-styled, still a 44px touch target.
-globalStyle('.gg-link-button', {
-  minHeight: '2.75rem',
-  padding: 0,
-  border: 'none',
-  background: 'none',
-  fontWeight: 650,
-  textDecoration: 'underline',
-  textUnderlineOffset: '0.2em',
-  cursor: 'pointer',
-});
-
-globalStyle('.gg-link-button:disabled, .gg-link-button[aria-disabled="true"]', {
-  textDecoration: 'none',
+globalStyle('.gg-safety', {
+  fontSize: '0.8125rem',
+  lineHeight: 1.45,
   color: vars.color.muted,
-  cursor: 'default',
+  paddingTop: '0.75rem',
+  borderTop: `1px solid ${vars.color.border}`,
 });
-
-globalStyle('.gg-still-off-note, .gg-safety', { fontSize: '0.8125rem', lineHeight: 1.45, color: vars.color.muted });
-
-globalStyle('.gg-safety', { paddingTop: '0.75rem', borderTop: `1px solid ${vars.color.border}` });
 
 globalStyle('.gg-sr-only', {
   position: 'absolute',
