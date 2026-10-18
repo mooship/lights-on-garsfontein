@@ -19,7 +19,7 @@ tests {
     expect(res.getHeader('cache-control')).to.equal('no-store');
     expect(res.getBody().outages).to.be.an('array');
     for (const outage of res.getBody().outages) {
-      expect(outage).to.have.all.keys('id', 'startTime', 'endTime', 'planned', 'source', 'isFalsePositive');
+      expect(outage).to.have.all.keys('id', 'startTime', 'endTime', 'planned', 'source', 'isFalsePositive', 'dismissedBy');
     }
   });
 }

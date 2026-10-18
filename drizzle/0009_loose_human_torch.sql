@@ -1,0 +1,1 @@
+ALTER TABLE `outages` ADD `dismissed_by` text;

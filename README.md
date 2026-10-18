@@ -87,7 +87,7 @@ curl -X POST "$SITE_URL/api/admin/outages" \
   -d '{"action":"update","id":3,"endTime":"2026-10-17T11:20:00+02:00"}'
 ```
 
-`update` also accepts `isPlanned` and `isFalsePositive` (marking an open outage as a false positive closes it); `delete` takes only an `id`. Keep the URL and token in a git-ignored `.env` (copy `.env.example`).
+`update` also accepts `isPlanned` and `isFalsePositive` (marking an open outage as a false positive closes it); `delete` takes only an `id`. Each listed outage has `dismissedBy`: `"sensor"` when a heartbeat's `poweredFor` showed the power stayed on (see [Sensor](#sensor)), `"admin"` when marked here, and `null` otherwise, including false positives marked before this was recorded. `/admin` tags the sensor's ones. Keep the URL and token in a git-ignored `.env` (copy `.env.example`).
 
 ### Sensor
 

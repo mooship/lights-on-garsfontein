@@ -714,3 +714,26 @@ test.describe('outages by time of day', () => {
     });
   }
 });
+
+test.describe('admin false positives', () => {
+  test('marks the ones the sensor dismissed itself', async ({ page }) => {
+    const outage = (id: number, dismissedBy: 'sensor' | 'admin') => ({
+      id,
+      startTime: new Date(Date.now() - (id + 1) * 60 * MINUTE_MS).toISOString(),
+      endTime: new Date(Date.now() - id * 60 * MINUTE_MS).toISOString(),
+      planned: false,
+      source: 'sensor',
+      isFalsePositive: true,
+      dismissedBy,
+    });
+    await page.route(`**${ADMIN_OUTAGES_PATH}`, (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ json: { outages: [outage(1, 'sensor'), outage(2, 'admin')] } })
+        : route.fallback(),
+    );
+    await login(page);
+    const items = page.getByRole('listitem');
+    await expect(items.filter({ hasText: admin.dismissedBySensorTag.trim() })).toHaveCount(1);
+    await expect(items.filter({ hasText: admin.falsePositiveTag.trim() })).toHaveCount(2);
+  });
+});

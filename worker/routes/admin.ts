@@ -45,6 +45,7 @@ async function listOutages({ db }: RouteContext): Promise<Response> {
       ...summarise(r),
       source: r.source,
       isFalsePositive: r.isFalsePositive,
+      dismissedBy: r.dismissedBy,
     })),
   };
   return json(body);
@@ -105,6 +106,7 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   if (input.isPlanned !== undefined) changes.isPlanned = input.isPlanned;
   if (input.isFalsePositive !== undefined) {
     changes.isFalsePositive = input.isFalsePositive;
+    changes.dismissedBy = input.isFalsePositive ? 'admin' : null;
     // A false positive should not stay open and keep the grid "OFF".
     if (input.isFalsePositive && !existing.endTime && changes.endTime === undefined) {
       changes.endTime = new Date().toISOString();

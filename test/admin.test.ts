@@ -168,6 +168,20 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(await currentStatus()).toBe('ON');
   });
 
+  it('records that the admin dismissed an outage, lists it, and clears it when restored', async () => {
+    const id = await insertOutage({ startTime: '2026-10-01T10:00:00.000Z', endTime: '2026-10-01T11:00:00.000Z' });
+    const listed = async () => {
+      const res = await call(ADMIN_OUTAGES_PATH, { cookie });
+      const { outages } = (await res.json()) as AdminOutagesResponse;
+      return outages.find((o) => o.id === id)?.dismissedBy;
+    };
+    expect(await listed()).toBeNull();
+    await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, isFalsePositive: true });
+    expect(await listed()).toBe('admin');
+    await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, isFalsePositive: false });
+    expect(await listed()).toBeNull();
+  });
+
   it('updates the end time', async () => {
     const id = await insertOutage({ startTime: '2026-10-01T10:00:00.000Z' });
     await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, endTime: '2026-10-01T12:00:00Z' });

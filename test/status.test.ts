@@ -280,6 +280,8 @@ describe('POST /api/heartbeat with poweredFor', () => {
     await insertOutage({ startTime: lastSeen });
     expect((await poweredFor(3600)).status).toBe(200);
     expect(await outageRows()).toEqual([{ start_time: lastSeen, end_time: expect.any(String), is_false_positive: 1 }]);
+    const row = await env.DB.prepare('SELECT dismissed_by FROM outages').first<{ dismissed_by: string | null }>();
+    expect(row?.dismissed_by).toBe('sensor');
     expect(await status()).toMatchObject({ status: 'ON', outage: null, recent: [], monitored: true });
   });
 
