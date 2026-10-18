@@ -125,7 +125,7 @@ globalStyle('.gg-trends-details + .gg-trends-details', { marginTop: 0 });
 
 // Disclosures draw their own ▸/▾: a flex summary loses the browser's marker. The marker has empty
 // alt text so screen readers, which already announce expanded or collapsed, skip it.
-const summaries = '.gg-trends-details > summary, .gg-why > summary';
+const summaries = '.gg-trends-details > summary';
 
 globalStyle(summaries, {
   cursor: 'pointer',
@@ -137,17 +137,17 @@ globalStyle(summaries, {
   listStyle: 'none',
 });
 
-globalStyle('.gg-trends-details > summary::-webkit-details-marker, .gg-why > summary::-webkit-details-marker', {
+globalStyle('.gg-trends-details > summary::-webkit-details-marker', {
   display: 'none',
 });
 
-globalStyle('.gg-trends-details > summary::before, .gg-why > summary::before', {
+globalStyle('.gg-trends-details > summary::before', {
   content: '"▸" / ""',
   width: '0.75em',
   flex: 'none',
 });
 
-globalStyle('.gg-trends-details[open] > summary::before, .gg-why[open] > summary::before', { content: '"▾" / ""' });
+globalStyle('.gg-trends-details[open] > summary::before', { content: '"▾" / ""' });
 
 globalStyle('.gg-trends-details ul', { margin: '0 0 0.5rem', paddingLeft: '1.25rem', lineHeight: 1.45 });
 
@@ -194,12 +194,6 @@ globalStyle('.gg-footer nav a', {
 });
 
 globalStyle('.gg-scope', { fontSize: '0.9375rem', lineHeight: 1.45, color: vars.color.muted });
-
-globalStyle('.gg-why', { marginTop: '0.125rem' });
-
-globalStyle('.gg-why > summary', { minHeight: '2.25rem', width: 'fit-content', fontSize: '0.875rem' });
-
-globalStyle('.gg-why > p', { paddingBottom: '0.25rem' });
 
 globalStyle('.gg-safety', {
   fontSize: '0.8125rem',

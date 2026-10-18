@@ -36,9 +36,6 @@ export const en = {
       landmark
         ? `Measured in Garsfontein Ext. 16, near ${landmark}. Some streets may differ.`
         : 'Measured in Garsfontein Ext. 16. Some streets may differ.',
-    why: 'Why?',
-    whyText:
-      'Garsfontein is supplied by the Garsfontein substation, so an outage usually affects the whole area. A few streets are supplied by a different line, so they can lose or regain power at a different time.',
   },
   safety: {
     live: 'Always treat power lines as live.',

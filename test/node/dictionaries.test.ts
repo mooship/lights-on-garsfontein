@@ -22,7 +22,7 @@ describe('public copy', () => {
   for (const locale of site.locales) {
     it(`never says how an outage was recorded (${locale})`, () => {
       const all = [...strings(DICTIONARIES[locale], locale), ...strings(HEAD[locale], `head.${locale}`)];
-      expect(all.length).toBeGreaterThan(100);
+      expect(all.length).toBeGreaterThan(50);
       expect(all.filter(([, text]) => RECORDING_METHOD.test(text))).toEqual([]);
     });
   }

@@ -41,9 +41,6 @@ export const af = {
       landmark
         ? `Gemeet in Garsfontein Uitb. 16, naby ${landmark}. Party strate kan anders wees.`
         : 'Gemeet in Garsfontein Uitb. 16. Party strate kan anders wees.',
-    why: 'Waarom?',
-    whyText:
-      'Garsfontein word deur die Garsfontein-substasie voorsien, so ’n onderbreking raak gewoonlik die hele gebied. ’n Paar strate kry hul krag deur ’n ander lyn en kan dus op ’n ander tyd afgaan of terugkom.',
   },
   // `report` is the link to site.faultReporting.url.
   safety: {
