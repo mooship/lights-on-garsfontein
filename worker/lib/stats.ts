@@ -92,6 +92,27 @@ export function windowStats(
   };
 }
 
+/**
+ * Minutes without power in each clock hour of the configured zone (index 0 is 00:00 to 01:00),
+ * summed over [from, to) and never counting time before `trackingSince`. `intervals` must not
+ * overlap, as `mergeOutages` returns them.
+ */
+export function hourlyMinutes(intervals: Interval[], from: number, to: number, trackingSince: number): number[] {
+  const start = Math.max(from, trackingSince);
+  const ms = Array<number>(24).fill(0);
+  for (const i of intervals) {
+    const end = Math.min(i.end, to);
+    for (let at = Math.max(i.start, start); at < end; ) {
+      // The next local hour boundary; UTC_OFFSET_MS is fixed, so hours never shift.
+      const next = Math.min(end, (Math.floor((at + UTC_OFFSET_MS) / HOUR) + 1) * HOUR - UTC_OFFSET_MS);
+      const hour = Math.floor((at + UTC_OFFSET_MS) / HOUR) % 24;
+      ms[hour] = (ms[hour] ?? 0) + next - at;
+      at = next;
+    }
+  }
+  return ms.map((total) => Math.round(total / MINUTE_MS));
+}
+
 /** Start (UTC ms) of the calendar day containing `ts`, in the configured zone. */
 function dayStartOf(ts: number): number {
   return Math.floor((ts + UTC_OFFSET_MS) / DAY) * DAY - UTC_OFFSET_MS;

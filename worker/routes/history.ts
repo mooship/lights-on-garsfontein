@@ -12,7 +12,7 @@ import { site } from '../../site.config';
 import { outages } from '../db/schema';
 import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
-import { mergeOutages, weeklyStats, windowStats } from '../lib/stats';
+import { hourlyMinutes, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
 
 async function getStats({ db }: RouteContext): Promise<Response> {
   const now = Date.now();
@@ -38,6 +38,7 @@ async function getStats({ db }: RouteContext): Promise<Response> {
     last365: window(365),
     previous30: now - 60 * DAY_MS >= since ? window(30, 30) : null,
     weeks: weeklyStats(intervals, now, since),
+    last30ByHour: hourlyMinutes(intervals, now - 30 * DAY_MS, now, since),
     generatedAt: new Date(now).toISOString(),
   };
   // Changes only when an outage starts or ends, so a minute of caching is harmless.

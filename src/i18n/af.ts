@@ -96,6 +96,9 @@ export const af = {
     chartTitle: 'Ure sonder krag per week',
     chartLabel:
       'Ure sonder krag per week. Gebruik die pyltjiesleutels om tussen weke te beweeg, of maak die tabel hieronder oop.',
+    byHourTitle: 'Wanneer onderbrekings voorkom (afgelope 30 dae)',
+    byHourEmpty: 'Geen onderbrekings in die afgelope 30 dae nie.',
+    byHourLabel: 'Ure sonder krag volgens die tyd van die dag. Gebruik die pyltjiesleutels om tussen ure te beweeg.',
     weekOf: (day: string) => `Week van ${day}`,
     off: 'af',
     // "keer" keeps the readout on one line on a phone; "onderbrekings" wraps.

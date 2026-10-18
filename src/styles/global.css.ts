@@ -120,7 +120,7 @@ globalStyle('.gg-status-warning', { fontSize: '0.8125rem' });
 
 // The trends body reserves its loaded height; only text that wraps on a narrow or zoomed
 // screen, or the user-opened weekly table below it, may grow the card.
-globalStyle('.gg-trends-body', { minHeight: '32.75rem' });
+globalStyle('.gg-trends-body', { minHeight: '48.25rem' });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
 

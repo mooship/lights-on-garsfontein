@@ -17,6 +17,7 @@ tests {
   });
 
   test('stats shape', () => {
-    expect(res.getBody()).to.have.all.keys('trackingSince', 'last7', 'last30', 'last365', 'previous30', 'weeks', 'generatedAt');
+    expect(res.getBody()).to.have.all.keys('trackingSince', 'last7', 'last30', 'last365', 'previous30', 'weeks', 'last30ByHour', 'generatedAt');
+    expect(res.getBody().last30ByHour).to.have.lengthOf(24);
   });
 }
