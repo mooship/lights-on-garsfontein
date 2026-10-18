@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and `GEMINI.md` import this file; edit only this one. Setup, deployment, the public API, the commands, the directory map and the how-tos are in [README.md](README.md); this file holds the rules for working on the code.
+Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and `GEMINI.md` import this file; put every shared rule here, and in them only what is specific to that tool. Setup, deployment, the public API, the commands, the directory map and the how-tos are in [README.md](README.md); this file holds the rules for working on the code.
 
 ## What this is
 
