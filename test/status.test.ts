@@ -2,9 +2,10 @@ import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, MINUTE_MS, TIMER_ACTION } from '../shared/api';
 import { ERROR } from '../shared/errors';
-import { HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
+import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { createDb } from '../worker/db/client';
 import { getGridState } from '../worker/lib/grid';
+import { MAX_PAUSE_MS } from '../worker/routes/status';
 import {
   asAdmin,
   call,
@@ -245,5 +246,105 @@ describe('POST /api/heartbeat', () => {
       end_time: string | null;
     }>();
     expect(rows.results).toEqual([{ id: manual, end_time: expect.any(String) }]);
+  });
+});
+
+describe('POST /api/heartbeat/pause', () => {
+  const pause = (until: string | null, token = env.HEARTBEAT_TOKEN) =>
+    call(HEARTBEAT_PAUSE_PATH, { method: 'POST', body: { until }, headers: { Authorization: `Bearer ${token}` } });
+  const fromNow = (ms: number) => new Date(Date.now() + ms).toISOString();
+  /** Sets the pause straight in D1, so it can lie in the past. */
+  const setPausedUntil = (until: string) =>
+    env.DB.prepare('UPDATE heartbeats SET paused_until = ? WHERE id = 1').bind(until).run();
+  const pausedUntil = async () =>
+    (await env.DB.prepare('SELECT paused_until FROM heartbeats WHERE id = 1').first<{ paused_until: string | null }>())
+      ?.paused_until;
+  const outageStarts = async () =>
+    (await env.DB.prepare('SELECT start_time FROM outages').all<{ start_time: string }>()).results.map(
+      (r) => r.start_time,
+    );
+
+  it('rejects requests without the sensor token', async () => {
+    expect((await pause(fromNow(HOUR_MS), 'nope')).status).toBe(401);
+  });
+
+  it('rejects a time that is not in the future, not a time, or beyond MAX_PAUSE_MS', async () => {
+    await setHeartbeat(30);
+    for (const until of [fromNow(-MINUTE_MS), 'tomorrow', fromNow(MAX_PAUSE_MS + HOUR_MS)]) {
+      const res = await pause(until);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: ERROR.badRequest });
+    }
+  });
+
+  it('opens no outage while paused, and the status is ON but not monitored', async () => {
+    await setHeartbeat(600);
+    const until = fromNow(HOUR_MS);
+    const res = await pause(until);
+    expect(await res.json()).toEqual({ ok: true, pausedUntil: until });
+    await runCron();
+    expect(await outageStarts()).toEqual([]);
+    expect(await status()).toMatchObject({ status: 'ON', monitored: false });
+  });
+
+  it('is not monitored while paused, even with a fresh heartbeat', async () => {
+    await setHeartbeat(30);
+    await pause(fromNow(HOUR_MS));
+    expect(await status()).toMatchObject({ status: 'ON', monitored: false });
+  });
+
+  it('counts the silence from the end of the pause', async () => {
+    await setHeartbeat(HOUR_MS / 1000);
+    const end = fromNow(-HEARTBEAT_THRESHOLD_MS - MINUTE_MS);
+    await setPausedUntil(end);
+    expect(await status()).toMatchObject({ status: 'OFF', since: end, monitored: false });
+    await runCron();
+    expect(await outageStarts()).toEqual([end]);
+  });
+
+  it('is OFF only once the threshold has passed since the pause ended, and not monitored until a heartbeat', async () => {
+    await setHeartbeat(HOUR_MS / 1000);
+    await setPausedUntil(fromNow(-MINUTE_MS));
+    await runCron();
+    expect(await outageStarts()).toEqual([]);
+    expect(await status()).toMatchObject({ status: 'ON', monitored: false });
+  });
+
+  it('records a missed gap from the end of the pause, not from the last heartbeat', async () => {
+    await setHeartbeat(HOUR_MS / 1000);
+    const end = fromNow(-10 * MINUTE_MS);
+    await setPausedUntil(end);
+    await heartbeat();
+    expect(await outageStarts()).toEqual([end]);
+  });
+
+  it('records no gap when the pause ended within the threshold', async () => {
+    await setHeartbeat(HOUR_MS / 1000);
+    await setPausedUntil(fromNow(-MINUTE_MS));
+    await heartbeat();
+    expect(await outageStarts()).toEqual([]);
+    expect(await status()).toMatchObject({ status: 'ON', monitored: true });
+  });
+
+  it('ends the pause now when until is null, so the silence counts from then', async () => {
+    await setHeartbeat(HOUR_MS / 1000);
+    await pause(fromNow(HOUR_MS));
+    const res = await pause(null);
+    const { pausedUntil: ended } = await res.json<{ pausedUntil: string }>();
+    expect(Math.abs(Date.now() - Date.parse(ended))).toBeLessThan(5_000);
+    expect(await pausedUntil()).toBe(ended);
+    await runCron();
+    expect(await outageStarts()).toEqual([]);
+  });
+
+  it('leaves a pause that already ended alone when resuming', async () => {
+    await setHeartbeat(30);
+    expect(await (await pause(null)).json()).toEqual({ ok: true, pausedUntil: null });
+    expect(await pausedUntil()).toBeNull();
+  });
+
+  it('does nothing before any sensor has reported', async () => {
+    expect((await pause(fromNow(HOUR_MS))).status).toBe(200);
+    expect(await env.DB.prepare('SELECT * FROM heartbeats').first()).toBeNull();
   });
 });

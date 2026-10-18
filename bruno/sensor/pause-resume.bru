@@ -1,0 +1,30 @@
+meta {
+  name: end a sensor pause
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/heartbeat/pause
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{heartbeatToken}}
+}
+
+body:json {
+  {
+    "until": null
+  }
+}
+
+tests {
+  test('200 JSON, not cached', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+    expect(res.getBody().ok).to.equal(true);
+    expect(res.getBody()).to.have.property('pausedUntil');
+  });
+}

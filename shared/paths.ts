@@ -6,6 +6,7 @@ export const STATS_PATH = '/api/stats';
 export const CSV_PATH = '/api/outages.csv';
 export const FEED_PATH = '/feed.xml';
 export const HEARTBEAT_PATH = '/api/heartbeat';
+export const HEARTBEAT_PAUSE_PATH = '/api/heartbeat/pause';
 export const CONTACT_PATH = '/api/contact';
 
 export const ADMIN_API_PREFIX = '/api/admin/';
