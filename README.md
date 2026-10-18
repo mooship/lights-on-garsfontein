@@ -137,6 +137,43 @@ A Raspberry Pi, or an old Android phone with Termux, works too:
 * * * * * curl -fsS -m 20 -X POST -H "Authorization: Bearer YOUR_TOKEN" https://YOUR_DOMAIN/api/heartbeat >/dev/null
 ```
 
+A MacBook that stays on its charger works without extra hardware. It posts only while drawing from AC power, so when it falls back to its battery the heartbeats stop and an outage opens, even if the router is on backup power.
+
+1. Store the token in the login keychain (it prompts for the value):
+
+   ```sh
+   security add-generic-password -a "$USER" -s lights-on-heartbeat -w
+   ```
+
+2. Save this as `~/Library/LaunchAgents/local.lights-on.heartbeat.plist`, replacing `YOUR_DOMAIN`:
+
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+   <plist version="1.0">
+   <dict>
+     <key>Label</key><string>local.lights-on.heartbeat</string>
+     <key>ProgramArguments</key>
+     <array>
+       <string>/bin/sh</string>
+       <string>-c</string>
+       <string>pmset -g batt | grep -q "'AC Power'" &amp;&amp; curl -fsS -m 20 -X POST -H "Authorization: Bearer $(security find-generic-password -s lights-on-heartbeat -w)" https://YOUR_DOMAIN/api/heartbeat</string>
+     </array>
+     <key>StartInterval</key><integer>60</integer>
+     <key>RunAtLoad</key><true/>
+   </dict>
+   </plist>
+   ```
+
+3. Load it, and stop the Mac sleeping while it is on the charger:
+
+   ```sh
+   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.lights-on.heartbeat.plist
+   sudo pmset -c sleep 0
+   ```
+
+Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. To stop it, run `launchctl bootout gui/$(id -u)/local.lights-on.heartbeat`.
+
 ## Run it for your area
 
 You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
