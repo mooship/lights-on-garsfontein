@@ -25,12 +25,12 @@ export const tile = style({
   background: vars.color.bg,
   display: 'flex',
   flexDirection: 'column',
-  justifyContent: 'space-between',
 });
 
 export const tileLabel = style({ fontSize: '0.8125rem', fontWeight: 600, color: vars.color.muted, lineHeight: 1.2 });
 
-export const tileValue = style({ fontSize: '1.625rem', fontWeight: 700, lineHeight: 1.1 });
+// Pushed down with its delta, so the values in a row line up when one label wraps.
+export const tileValue = style({ marginTop: 'auto', fontSize: '1.625rem', fontWeight: 700, lineHeight: 1.1 });
 
 // The units in a duration ("u", "min"), smaller than its numbers.
 export const unit = style({ fontSize: '0.6em', fontWeight: 600 });
@@ -57,8 +57,10 @@ export const chartBlock = style({ marginTop: '1.25rem' });
 
 export const chartTitle = style({ fontWeight: 600, fontSize: '0.9375rem', minHeight: '1.375rem' });
 
+// Two lines on a phone, where a week's note can wrap it, so moving between weeks never moves the chart.
 export const readout = style({
   minHeight: '1.375rem',
+  '@media': { '(max-width: 30rem)': { minHeight: '2.625rem' } },
   fontSize: '0.875rem',
   color: vars.color.muted,
   fontVariantNumeric: 'tabular-nums',

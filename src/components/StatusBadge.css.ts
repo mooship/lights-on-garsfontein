@@ -1,8 +1,8 @@
 import { keyframes, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
-// The same min-height as .gg-skel-row (global.css.ts): a two-line NONE headline fits in it, so
-// every state keeps the loading shell's height.
+// The same min-height as .gg-skel-row (global.css.ts): a NONE headline of up to three lines fits in
+// it, so every state keeps the loading shell's height.
 export const root = style({
   display: 'flex',
   alignItems: 'center',
@@ -47,12 +47,13 @@ export const headline = style({
   fontSize: '2rem',
   lineHeight: 1.15,
   fontWeight: 650,
+  textWrap: 'balance',
 });
 
 export const tone = styleVariants({
   ON: { color: vars.color.on },
   OFF: { color: vars.color.off },
-  // The longer, neutral headline is smaller so it takes at most two lines on a phone.
+  // The longer, neutral headline is smaller so it fits beside the icon on a phone.
   NONE: { color: vars.color.text, fontSize: '1.25rem' },
 });
 
@@ -60,4 +61,6 @@ export const detail = style({
   marginTop: '0.25rem',
   color: vars.color.muted,
   fontVariantNumeric: 'tabular-nums',
+  // NONE has no duration; without the empty line its headline centres on the icon.
+  selectors: { [`${root}[data-status="NONE"] &`]: { display: 'none' } },
 });
