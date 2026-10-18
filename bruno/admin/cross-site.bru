@@ -1,0 +1,28 @@
+meta {
+  name: punch out from another site
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/admin/timer
+  body: json
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+  Origin: https://example.com
+}
+
+body:json {
+  {
+    "action": "punch_out"
+  }
+}
+
+tests {
+  test('403 forbidden', () => {
+    expect(res.getStatus()).to.equal(403);
+    expect(res.getBody()).to.deep.equal({ error: 'forbidden' });
+  });
+}

@@ -1,0 +1,31 @@
+meta {
+  name: status
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/status
+}
+
+tests {
+  const SUMMARY_KEYS = ['id', 'startTime', 'endTime', 'planned'];
+
+  test('200 JSON, never cached by browsers, open to any origin', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('application/json; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+    expect(res.getHeader('access-control-allow-origin')).to.equal('*');
+  });
+
+  test('status shape', () => {
+    const body = res.getBody();
+    expect(body).to.have.all.keys('status', 'since', 'outage', 'recent', 'monitored', 'turnstileSiteKey', 'generatedAt');
+    expect(body.status).to.be.oneOf(['ON', 'OFF']);
+    expect(body.monitored).to.be.a('boolean');
+    expect(body.recent).to.be.an('array');
+    for (const outage of [body.outage, ...body.recent].filter(Boolean)) {
+      expect(outage).to.have.all.keys(...SUMMARY_KEYS);
+    }
+  });
+}

@@ -1,0 +1,27 @@
+meta {
+  name: punch out again
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/admin/timer
+  body: json
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+}
+
+body:json {
+  {
+    "action": "punch_out"
+  }
+}
+
+tests {
+  test('409 outage_already_open', () => {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody()).to.deep.equal({ error: 'outage_already_open' });
+  });
+}

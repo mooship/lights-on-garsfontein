@@ -1,0 +1,18 @@
+meta {
+  name: robots.txt
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/robots.txt
+}
+
+tests {
+  test('200 text, cached for an hour, keeps crawlers off the admin API', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('text/plain; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=3600');
+    expect(res.getBody()).to.include('Disallow: /api/admin/');
+  });
+}

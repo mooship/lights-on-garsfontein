@@ -1,0 +1,27 @@
+meta {
+  type: collection
+}
+
+script:pre-request {
+  // Production is read-only: only public GETs may reach it, whichever file or folder is run.
+  const url = req.getUrl();
+  if (bru.getEnvName() === 'production' && (req.getMethod() !== 'GET' || url.includes('/api/admin/'))) {
+    throw new Error(`Refusing ${req.getMethod()} ${url} against production`);
+  }
+}
+
+tests {
+  // SECURITY_HEADERS in worker/index.ts; every request in this collection is answered by the Worker.
+  test('security headers', () => {
+    // /og.png is a static asset that already has the page CSP from public/_headers, which the Worker keeps.
+    if (!req.getUrl().endsWith('/og.png')) {
+      expect(res.getHeader('content-security-policy')).to.equal("default-src 'none'; frame-ancestors 'none'");
+    }
+    expect(res.getHeader('x-content-type-options')).to.equal('nosniff');
+    expect(res.getHeader('x-frame-options')).to.equal('DENY');
+    expect(res.getHeader('referrer-policy')).to.equal('strict-origin-when-cross-origin');
+    expect(res.getHeader('cross-origin-resource-policy')).to.equal('same-site');
+    // In production, Cloudflare's zone HSTS setting replaces the Worker's value.
+    expect(res.getHeader('strict-transport-security')).to.match(/^max-age=\d+; includeSubDomains/);
+  });
+}

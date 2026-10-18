@@ -1,0 +1,20 @@
+meta {
+  name: logout
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/admin/logout
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+}
+
+tests {
+  test('200, clears the session cookie', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('set-cookie')[0]).to.match(/^__Host-admin_session=; .*Max-Age=0$/);
+  });
+}

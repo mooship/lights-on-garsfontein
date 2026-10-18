@@ -1,0 +1,22 @@
+meta {
+  name: stats
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/stats
+}
+
+tests {
+  test('200 JSON, cached for a minute, open to any origin', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('application/json; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=60');
+    expect(res.getHeader('access-control-allow-origin')).to.equal('*');
+  });
+
+  test('stats shape', () => {
+    expect(res.getBody()).to.have.all.keys('trackingSince', 'last7', 'last30', 'last365', 'previous30', 'weeks', 'generatedAt');
+  });
+}

@@ -1,0 +1,33 @@
+meta {
+  name: login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/admin/login
+  body: json
+}
+
+body:json {
+  {
+    "username": "{{adminUsername}}",
+    "password": "{{adminPassword}}",
+    "token": "test-token"
+  }
+}
+
+script:post-response {
+  // test:api runs with --disable-cookies, so each request carries only the auth its own file shows.
+  const cookie = res.getHeader('set-cookie')?.[0];
+  if (cookie) bru.setVar('sessionCookie', cookie.split(';')[0]);
+}
+
+tests {
+  test('200 with a hardened session cookie', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+    const [cookie] = res.getHeader('set-cookie');
+    expect(cookie).to.match(/^__Host-admin_session=[\w-]{43}; HttpOnly; Secure; SameSite=Strict; Path=\/; Max-Age=\d+$/);
+  });
+}

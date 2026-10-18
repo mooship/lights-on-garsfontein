@@ -1,0 +1,21 @@
+meta {
+  name: list with a bad token
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/admin/outages
+  auth: bearer
+}
+
+auth:bearer {
+  token: wrong-token
+}
+
+tests {
+  test('401 unauthorized', () => {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody()).to.deep.equal({ error: 'unauthorized' });
+  });
+}

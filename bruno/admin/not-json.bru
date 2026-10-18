@@ -1,0 +1,25 @@
+meta {
+  name: punch out with a non-JSON body
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/admin/timer
+  body: text
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+}
+
+body:text {
+  action=punch_out
+}
+
+tests {
+  test('415 unsupported_media_type', () => {
+    expect(res.getStatus()).to.equal(415);
+    expect(res.getBody()).to.deep.equal({ error: 'unsupported_media_type' });
+  });
+}

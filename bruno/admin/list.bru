@@ -1,0 +1,25 @@
+meta {
+  name: list
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/admin/outages
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+}
+
+tests {
+  test('200 JSON, not cached, with the admin-only fields', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('application/json; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+    expect(res.getBody().outages).to.be.an('array');
+    for (const outage of res.getBody().outages) {
+      expect(outage).to.have.all.keys('id', 'startTime', 'endTime', 'planned', 'source', 'isFalsePositive');
+    }
+  });
+}

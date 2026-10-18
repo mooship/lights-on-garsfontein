@@ -1,0 +1,17 @@
+meta {
+  name: og.png
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/og.png
+}
+
+tests {
+  test('200 PNG, cached for a minute', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('image/png');
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=60');
+  });
+}

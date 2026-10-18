@@ -1,0 +1,21 @@
+meta {
+  name: removed /api/confirm
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/confirm
+  body: json
+}
+
+body:json {
+  {}
+}
+
+tests {
+  test('404 not_found', () => {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody()).to.deep.equal({ error: 'not_found' });
+  });
+}

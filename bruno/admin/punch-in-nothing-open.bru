@@ -1,0 +1,27 @@
+meta {
+  name: punch in with nothing open
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/admin/timer
+  body: json
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+}
+
+body:json {
+  {
+    "action": "punch_in"
+  }
+}
+
+tests {
+  test('409 no_open_outage', () => {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody()).to.deep.equal({ error: 'no_open_outage' });
+  });
+}

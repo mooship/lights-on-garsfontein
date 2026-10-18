@@ -1,0 +1,18 @@
+meta {
+  name: sitemap.xml
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/sitemap.xml
+}
+
+tests {
+  test('200 XML sitemap, cached for an hour', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('application/xml; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=3600');
+    expect(res.getBody()).to.include('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"');
+  });
+}

@@ -28,6 +28,7 @@ Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and 
 | `npm run build` | Production build into `dist/` |
 | `npm test` | Vitest: the `worker` project (workerd + D1) and the `node` project (`test/node/`); `CHECK_DIST=1` also checks `dist/` (CI does) |
 | `npm run test:e2e` | Playwright against `wrangler dev --env e2e` |
+| `npm run test:api` / `test:api:prod` | Bruno (`bruno/`), by hand: every folder against a local server (README) / the read-only `public` folder against production |
 | `npm run test:coverage` | Istanbul coverage for the Worker, on demand |
 | `npm run db:generate` | New migration from `worker/db/schema.ts` |
 | `npm run db:migrate:local` | Apply migrations to the local D1 |
@@ -57,7 +58,7 @@ Lefthook runs Biome and the typecheck on commit and `npm test` on push. CI runs 
 | `test/`, `test/node/`, `e2e/` | Worker tests, Node tests (pure logic, build helpers, built output), Playwright |
 | `drizzle/` | Migrations (generated) |
 
-To add an endpoint or a language, follow "Adding an endpoint" and "Adding a language" in the README. Public reads use `limiter: 'STATUS_LIMITER'` and `cors: true`; update the README API table with them. A new banner gets a test in `test/node/banners.test.ts` that it shows from `from` and is gone at `until` (e2e covers only the first entry).
+To add an endpoint or a language, follow "Adding an endpoint" and "Adding a language" in the README. Public reads use `limiter: 'STATUS_LIMITER'` and `cors: true`; update the README API table with them. A new or changed endpoint gets a matching request with assertions in `bruno/`. A new banner gets a test in `test/node/banners.test.ts` that it shows from `from` and is gone at `until` (e2e covers only the first entry).
 
 ## Hard rules
 

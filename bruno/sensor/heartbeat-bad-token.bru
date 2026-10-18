@@ -1,0 +1,21 @@
+meta {
+  name: heartbeat with a bad token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/heartbeat
+  auth: bearer
+}
+
+auth:bearer {
+  token: wrong-token
+}
+
+tests {
+  test('401 unauthorized', () => {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody()).to.deep.equal({ error: 'unauthorized' });
+  });
+}

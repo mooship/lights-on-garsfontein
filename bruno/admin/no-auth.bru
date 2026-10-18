@@ -1,0 +1,16 @@
+meta {
+  name: list without auth
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/admin/outages
+}
+
+tests {
+  test('401 unauthorized', () => {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody()).to.deep.equal({ error: 'unauthorized' });
+  });
+}

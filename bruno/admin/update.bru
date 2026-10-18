@@ -1,0 +1,31 @@
+meta {
+  name: mark it planned
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/admin/outages
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminApiToken}}
+}
+
+body:json {
+  {
+    "action": "update",
+    "id": {{createdId}},
+    "isPlanned": true
+  }
+}
+
+tests {
+  test('200, now planned', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().outage.id).to.equal(bru.getVar('createdId'));
+    expect(res.getBody().outage.isPlanned).to.equal(true);
+  });
+}

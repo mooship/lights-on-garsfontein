@@ -1,0 +1,23 @@
+meta {
+  name: outages.csv
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/outages.csv
+}
+
+tests {
+  test('200 CSV download, cached for five minutes, open to any origin', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('text/csv; charset=utf-8');
+    expect(res.getHeader('content-disposition')).to.match(/^attachment; filename=".+-outages\.csv"$/);
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=300');
+    expect(res.getHeader('access-control-allow-origin')).to.equal('*');
+  });
+
+  test('header row is the public contract', () => {
+    expect(res.getBody().split('\n')[0]).to.equal('id,start_time_utc,end_time_utc,duration_minutes,planned');
+  });
+}

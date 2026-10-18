@@ -1,0 +1,28 @@
+meta {
+  name: punch in
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/admin/timer
+  body: json
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+}
+
+body:json {
+  {
+    "action": "punch_in"
+  }
+}
+
+tests {
+  test('200, closes the punched outage', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().outage.id).to.equal(bru.getVar('punchedId'));
+    expect(res.getBody().outage.endTime).to.be.a('string');
+  });
+}

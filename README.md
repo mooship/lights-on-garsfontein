@@ -255,6 +255,22 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
+### API tests (Bruno)
+
+`bruno/` is a [Bruno](https://www.usebruno.com) collection: one request per endpoint, each with assertions. It runs by hand, not in CI. Start a local server with the e2e rate limits and its own database, then run the suite in a second terminal:
+
+```sh
+cp .dev.vars.example .dev.vars   # if you have not already
+cp bruno/.env.example bruno/.env
+npm run build
+npx wrangler d1 migrations apply DB --local --env e2e --persist-to .wrangler/bruno-state
+npx wrangler dev --env e2e --port 8787 --persist-to .wrangler/bruno-state
+npm run test:api
+```
+
+- The local suite uses only the test credentials from `.dev.vars.example` and deletes every outage it creates. Each run makes four of the five sign-in attempts allowed per minute, so wait a minute between runs.
+- `npm run test:api:prod` runs only the `public` folder against the live site, with no credentials. The collection's pre-request script refuses anything but a public `GET` in the `production` environment.
+
 ## Contributing
 
 Issues and pull requests are welcome on [GitHub](https://github.com/mooship/lights-on-garsfontein); please open an issue before a larger change. [AGENTS.md](AGENTS.md) holds the rules for changing the code, for people and AI tools alike. Before opening a pull request, run:

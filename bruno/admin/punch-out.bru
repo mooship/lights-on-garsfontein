@@ -1,0 +1,32 @@
+meta {
+  name: punch out
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/admin/timer
+  body: json
+}
+
+headers {
+  Cookie: {{sessionCookie}}
+}
+
+body:json {
+  {
+    "action": "punch_out"
+  }
+}
+
+vars:post-response {
+  punchedId: res.body.outage.id
+}
+
+tests {
+  test('201 with an open manual outage', () => {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().outage.endTime).to.equal(null);
+    expect(res.getBody().outage.source).to.equal('manual');
+  });
+}

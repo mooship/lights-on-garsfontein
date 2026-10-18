@@ -1,0 +1,19 @@
+meta {
+  name: feed.xml
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/feed.xml
+}
+
+tests {
+  test('200 Atom, cached for five minutes, open to any origin', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('application/atom+xml; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=300');
+    expect(res.getHeader('access-control-allow-origin')).to.equal('*');
+    expect(res.getBody()).to.include('<feed xmlns="http://www.w3.org/2005/Atom">');
+  });
+}
