@@ -137,42 +137,13 @@ A Raspberry Pi, or an old Android phone with Termux, works too:
 * * * * * curl -fsS -m 20 -X POST -H "Authorization: Bearer YOUR_TOKEN" https://YOUR_DOMAIN/api/heartbeat >/dev/null
 ```
 
-A MacBook that stays on its charger works without extra hardware. It posts only while drawing from AC power, so when it falls back to its battery the heartbeats stop and an outage opens, even if the router is on backup power.
+A MacBook that stays on its charger works without extra hardware. It posts only while drawing from AC power, so when it falls back to its battery the heartbeats stop and an outage opens, even if the router is on backup power. On the Mac, from a clone of this repository:
 
-1. Store the token in the login keychain (it prompts for the value):
+```sh
+sh scripts/mac-sensor.sh install https://YOUR_DOMAIN
+```
 
-   ```sh
-   security add-generic-password -a "$USER" -s lights-on-heartbeat -w
-   ```
-
-2. Save this as `~/Library/LaunchAgents/local.lights-on.heartbeat.plist`, replacing `YOUR_DOMAIN`:
-
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-   <plist version="1.0">
-   <dict>
-     <key>Label</key><string>local.lights-on.heartbeat</string>
-     <key>ProgramArguments</key>
-     <array>
-       <string>/bin/sh</string>
-       <string>-c</string>
-       <string>pmset -g batt | grep -q "'AC Power'" &amp;&amp; curl -fsS -m 20 -X POST -H "Authorization: Bearer $(security find-generic-password -s lights-on-heartbeat -w)" https://YOUR_DOMAIN/api/heartbeat</string>
-     </array>
-     <key>StartInterval</key><integer>60</integer>
-     <key>RunAtLoad</key><true/>
-   </dict>
-   </plist>
-   ```
-
-3. Load it, and stop the Mac sleeping while it is on the charger:
-
-   ```sh
-   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.lights-on.heartbeat.plist
-   sudo pmset -c sleep 0
-   ```
-
-Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. To stop it, run `launchctl bootout gui/$(id -u)/local.lights-on.heartbeat`.
+It asks for `HEARTBEAT_TOKEN` and keeps it in the login keychain, then starts a launch agent that keeps the Mac awake only while it is on the charger. Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. Errors go to `~/Library/Logs/lights-on-heartbeat.log`; `sh scripts/mac-sensor.sh uninstall` removes everything.
 
 ## Run it for your area
 
@@ -231,7 +202,7 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 | `shared/` | Types and constants for both the app and the Worker: `api.ts` (API types, `OUTAGE_SOURCES`, `UTC_OFFSET_MS`, `localDate`), `paths.ts`, `errors.ts`, `locale.ts` (`LOCALES`, `DEFAULT_LOCALE`, `pageLocale`) |
 | `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload, service worker |
 | `index.html`, `privacy.html`, `templates/` | Static pages, `llms.txt` and `site.webmanifest`, filled from `site.config.ts` at build time |
-| `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the service worker kill switch |
+| `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the service worker kill switch, the MacBook sensor |
 | `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 
 **Adding an endpoint.** Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/routes/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in `src/admin/copy.ts` (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `limiter`, `authorize`, `cors`, `edgeCache` and `purges`. The cross-site and JSON checks on writes apply to every route.
