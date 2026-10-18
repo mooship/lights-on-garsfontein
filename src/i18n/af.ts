@@ -64,8 +64,6 @@ export const af = {
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Laaste onderbreking: ${day} van ${from} tot ${to} (${lasted}).`,
     stale: (time: string) => `Kan nie die bediener bereik nie. Dit is die status soos om ${time}.`,
-    // No reply in time (offline or a slow connection): the last status this browser saw. Without a day it is today's.
-    offline: (time: string, day?: string) => `Geen verbinding · status soos ${day ? `${day} ` : ''}om ${time}`,
     unreachable: 'Kan nie die bediener bereik nie. Ons probeer binnekort weer.',
   },
   history: {

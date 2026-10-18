@@ -55,7 +55,6 @@ export const en = {
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Last outage: ${from} to ${to} ${day} (${lasted}).`,
     stale: (time: string) => `Unable to reach the server. Showing the status as at ${time}.`,
-    offline: (time: string, day?: string) => `No connection · status as at ${time}${day ? ` ${day}` : ''}`,
     unreachable: 'Unable to reach the server. Retrying shortly.',
   },
   history: {

@@ -13,8 +13,8 @@ import { StatusBadge } from './components/StatusBadge';
 import { SafetyLine, Scope } from './components/StatusNotes';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Trends } from './components/Trends';
-import { api, type Status } from './lib/api';
-import { formatDate, formatDuration, formatRelativeDay, formatTime, offlineLabel } from './lib/format';
+import { api } from './lib/api';
+import { formatDate, formatDuration, formatRelativeDay, formatTime } from './lib/format';
 import { t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll } from './lib/poll';
@@ -29,7 +29,7 @@ const STATS_POLL_MS = 5 * MINUTE_MS;
 const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
 
 export interface InitialData {
-  status: Promise<Status>;
+  status: Promise<StatusResponse>;
   stats: Promise<StatsResponse>;
 }
 
@@ -119,14 +119,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
   useStatusTab(data, minute);
   // The last poll failed, so the status shown may be out of date. A tab back from the background
   // is not stale: it refetches at once.
-  const stale = () => status.error() !== undefined;
-  // The service worker's last copy is labelled with when the server produced it, until a fresh one arrives.
-  const warning = (s: Status) =>
-    s.fromCache
-      ? offlineLabel(s.generatedAt, minute())
-      : stale()
-        ? t().status.stale(clockTime(status.updatedAt()))
-        : undefined;
+  const warning = () => (status.error() !== undefined ? t().status.stale(clockTime(status.updatedAt())) : undefined);
 
   return (
     <>
@@ -143,7 +136,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <div class="gg-status-detail">
                   <p>{statusDetail(s(), minute())}</p>
                   {/* Only when something is wrong; the loading shell has no line for it. */}
-                  <Show when={warning(s())}>
+                  <Show when={warning()}>
                     {(text) => (
                       <p class={`gg-status-warning ${css.warning}`} role="alert">
                         {text()}
