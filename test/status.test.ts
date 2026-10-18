@@ -249,6 +249,73 @@ describe('POST /api/heartbeat', () => {
   });
 });
 
+describe('POST /api/heartbeat with poweredFor', () => {
+  const poweredFor = (seconds: unknown) => heartbeat({ body: { poweredFor: seconds } });
+  const outageRows = async () =>
+    (
+      await env.DB.prepare('SELECT start_time, end_time, is_false_positive FROM outages ORDER BY id').all<{
+        start_time: string;
+        end_time: string | null;
+        is_false_positive: number;
+      }>()
+    ).results;
+  /** Whether `iso` is `secondsAgo` in the past, give or take the test's own run time. */
+  const isAgo = (iso: string | null, secondsAgo: number) =>
+    Math.abs(Date.now() - secondsAgo * 1000 - Date.parse(iso ?? '')) < 5_000;
+
+  it('still accepts a heartbeat without a body', async () => {
+    expect((await heartbeat()).status).toBe(200);
+  });
+
+  it('rejects a poweredFor that is not a whole number of seconds from 0', async () => {
+    for (const bad of [-1, 1.5, '60', null]) {
+      const res = await poweredFor(bad);
+      expect(res.status, String(bad)).toBe(400);
+      expect(await res.json()).toMatchObject({ error: ERROR.badRequest });
+    }
+  });
+
+  it('dismisses an open sensor outage when the sensor had power throughout: the connection dropped', async () => {
+    const lastSeen = await setHeartbeat(600);
+    await insertOutage({ startTime: lastSeen });
+    expect((await poweredFor(3600)).status).toBe(200);
+    expect(await outageRows()).toEqual([{ start_time: lastSeen, end_time: expect.any(String), is_false_positive: 1 }]);
+    expect(await status()).toMatchObject({ status: 'ON', outage: null, recent: [], monitored: true });
+  });
+
+  it('records no outage for a gap the sensor had power through', async () => {
+    await setHeartbeat(600);
+    await poweredFor(3600);
+    expect(await outageRows()).toEqual([]);
+  });
+
+  it('ends a real outage when the power came back, not when the connection did', async () => {
+    const lastSeen = await setHeartbeat(1200);
+    await insertOutage({ startTime: lastSeen });
+    await poweredFor(300);
+    const [row] = await outageRows();
+    expect(row).toMatchObject({ start_time: lastSeen, is_false_positive: 0 });
+    expect(isAgo(row?.end_time ?? null, 300)).toBe(true);
+  });
+
+  it('ends a missed gap when the power came back', async () => {
+    const lastSeen = await setHeartbeat(1200);
+    await poweredFor(300);
+    const [row] = await outageRows();
+    expect(row).toMatchObject({ start_time: lastSeen, is_false_positive: 0 });
+    expect(isAgo(row?.end_time ?? null, 300)).toBe(true);
+  });
+
+  it('closes a manual outage but never dismisses it', async () => {
+    await setHeartbeat(30);
+    await insertOutage({ startTime: new Date(Date.now() - 10 * MINUTE_MS).toISOString(), source: 'manual' });
+    await poweredFor(3600);
+    const [row] = await outageRows();
+    expect(row).toMatchObject({ is_false_positive: 0 });
+    expect(isAgo(row?.end_time ?? null, 0)).toBe(true);
+  });
+});
+
 describe('POST /api/heartbeat/pause', () => {
   const pause = (until: string | null, token = env.HEARTBEAT_TOKEN) =>
     call(HEARTBEAT_PAUSE_PATH, { method: 'POST', body: { until }, headers: { Authorization: `Bearer ${token}` } });
