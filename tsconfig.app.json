@@ -1,12 +1,23 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2024",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "types": ["vite/client"]
+    "types": [
+      "vite/client"
+    ]
   },
-  "include": ["src", "shared"],
+  "include": [
+    "src",
+    "shared"
+  ],
   // The service worker has its own globals (tsconfig.sw.json).
-  "exclude": ["src/sw/sw.ts"]
+  "exclude": [
+    "src/sw/sw.ts"
+  ]
 }
