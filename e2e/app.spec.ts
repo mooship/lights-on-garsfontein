@@ -313,9 +313,9 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(site.brand.full);
     await expect(page.locator('.gg-eyebrow')).toHaveText(en.masthead.eyebrow);
-    await expect(page.getByText(en.scope.measured(site.landmark), { exact: true })).toBeVisible();
-    await page.getByText(en.scope.why, { exact: true }).click();
-    await expect(page.getByText(en.scope.whyText, { exact: true })).toBeVisible();
+    const scope = page.getByText(en.scope.measured(site.landmark), { exact: true });
+    await expect(scope).toBeVisible();
+    await expect(scope.locator('xpath=..').locator('details')).toHaveCount(0);
   });
 
   test('links fault reports to the configured page', async ({ page }) => {
