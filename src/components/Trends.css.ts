@@ -1,7 +1,7 @@
 import { globalStyle, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
-/** Width of the weekly chart's y-axis labels, shared by the SVG and the x-label row. */
+/** Width of a chart's y-axis labels, shared by the SVG and the x-label row. */
 export const AXIS_WIDTH = 32;
 
 export const subtitle = style({
@@ -83,7 +83,7 @@ export const bar = style({ fill: vars.color.chartOff });
 
 export const barGroup = style({});
 
-// The active (hovered, tapped or arrow-key selected) week stands out; the others recede.
+// The active (hovered, tapped or arrow-key selected) bar stands out; the others recede.
 globalStyle(`${barGroup}:not([data-active]) ${bar}`, { opacity: 0.55 });
 
 export const activeMarker = style({ fill: vars.color.text });
@@ -128,8 +128,9 @@ export const download = style({
   minHeight: '2.75rem',
 });
 
-// Takes the place of both charts at about their height (the two .gg-skel-chart in the shell and the gap
-// between them), so the card does not look broken.
+// Takes the place of both charts at about their height: in the shell, two .gg-skel-chart (11.5rem
+// each), the 0.625rem gap between them and the second one's 1.25rem top margin,
+// so the card does not look broken.
 export const chartEmpty = style({
   marginTop: '1.25rem',
   minHeight: '24.875rem',

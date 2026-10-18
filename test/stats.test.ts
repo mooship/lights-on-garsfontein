@@ -169,8 +169,7 @@ describe('hourlyMinutes', () => {
   const from = since;
   const to = t(zoned('2026-11-30T00:00:00'));
   const span = (a: string, b: string) => [{ start: t(zoned(a)), end: t(zoned(b)) }];
-  const only = (entries: Record<number, number>) =>
-    Array.from({ length: 24 }, (_, hour) => entries[hour] ?? 0);
+  const only = (entries: Record<number, number>) => Array.from({ length: 24 }, (_, hour) => entries[hour] ?? 0);
 
   it('splits an outage across the local clock hours it covers', () => {
     expect(hourlyMinutes(span('2026-10-20T17:30:00', '2026-10-20T19:15:00'), from, to, since)).toEqual(

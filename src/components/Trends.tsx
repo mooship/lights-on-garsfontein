@@ -118,8 +118,11 @@ const hourLabel = (hour: number) => `${pad2(hour % 24)}:00`;
 /** "18:00–19:00" for the hour starting at `hour`. */
 const hourRange = (hour: number) => `${hourLabel(hour)}–${hourLabel(hour + 1)}`;
 
-/** The hour with the most minutes off, the earliest of any tie. */
-const peakHour = (minutes: number[]) => minutes.indexOf(Math.max(...minutes));
+/** The hour with the most minutes off, the earliest of any tie; -1 when no hour had any. */
+const peakHour = (minutes: number[]) => {
+  const most = Math.max(0, ...minutes);
+  return most > 0 ? minutes.indexOf(most) : -1;
+};
 
 const CHART_HEIGHT = 144;
 const TOP_PAD = 6;
@@ -130,10 +133,11 @@ interface BarChartProps {
   label: string;
   /** Each bar's height in hours, and its readout. */
   bars: { hours: number; readout: ReadoutParts }[];
-  /** The bar the readout starts on. */
+  /** The bar the readout starts on; -1 starts on none and shows `empty` instead. */
   initial: number;
   /** Under the first and the last bar. */
   xLabels: [string, string];
+  empty?: string;
 }
 
 const BarChart: Component<BarChartProps> = (props) => {
@@ -185,7 +189,7 @@ const BarChart: Component<BarChartProps> = (props) => {
     <div class={css.chartBlock}>
       <h3 class={css.chartTitle}>{props.title}</h3>
       <p class={css.readout}>
-        <Show when={parts()}>
+        <Show when={parts()} fallback={props.empty}>
           {(p) => (
             <>
               {p().lead}: <span class={css.readoutValue}>{p().value}</span> {p().rest}
@@ -281,6 +285,18 @@ export const Trends: Component<TrendsProps> = (props) => {
     };
   };
   const anyOutage = () => props.stats.weeks.some((w) => w.hoursOff > 0 || w.outages > 0);
+  // Memos: the charts read their bars on every pointer move, and each readout formats dates.
+  const weekBars = createMemo(() =>
+    props.stats.weeks.map((w, i) => ({ hours: w.hoursOff, readout: weekReadout(w, place(i)) })),
+  );
+  // Absent from a /api/stats response cached by the browser from before the field existed.
+  const byHour = () => props.stats.last30ByHour as number[] | undefined;
+  const hourBars = createMemo(() =>
+    (byHour() ?? []).map((minutes, hour) => ({
+      hours: minutes / 60,
+      readout: { lead: hourRange(hour), value: tileDuration(minutes / 60), rest: t().trends.off },
+    })),
+  );
   const subtitle = () => {
     if (!started()) return t().trends.startsOn(formatDate(props.stats.trackingSince));
     return s().trackedHours < 30 * 24 ? t().trends.since(formatDate(props.stats.trackingSince)) : t().trends.last30;
@@ -331,7 +347,7 @@ export const Trends: Component<TrendsProps> = (props) => {
           <BarChart
             title={t().trends.chartTitle}
             label={t().trends.chartLabel}
-            bars={props.stats.weeks.map((w, i) => ({ hours: w.hoursOff, readout: weekReadout(w, place(i)) }))}
+            bars={weekBars()}
             initial={props.stats.weeks.length - 1}
             xLabels={[
               props.stats.weeks.length > 1 && props.stats.weeks[0]
@@ -340,16 +356,16 @@ export const Trends: Component<TrendsProps> = (props) => {
               t().trends.thisWeek,
             ]}
           />
-          <BarChart
-            title={t().trends.byHourTitle}
-            label={t().trends.byHourLabel}
-            bars={props.stats.last30ByHour.map((minutes, hour) => ({
-              hours: minutes / 60,
-              readout: { lead: hourRange(hour), value: tileDuration(minutes / 60), rest: t().trends.off },
-            }))}
-            initial={peakHour(props.stats.last30ByHour)}
-            xLabels={[hourLabel(0), hourLabel(23)]}
-          />
+          <Show when={hourBars().length === 24}>
+            <BarChart
+              title={t().trends.byHourTitle}
+              label={t().trends.byHourLabel}
+              bars={hourBars()}
+              initial={peakHour(byHour() ?? [])}
+              xLabels={[hourLabel(0), hourLabel(23)]}
+              empty={t().trends.byHourEmpty}
+            />
+          </Show>
         </Show>
       </div>
       <details class="gg-trends-details">

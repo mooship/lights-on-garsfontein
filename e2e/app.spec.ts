@@ -1,6 +1,6 @@
 import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
-import { MINUTE_MS, type StatsResponse } from '../shared/api';
+import { DAY_MS, MINUTE_MS, type StatsResponse } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
 import {
@@ -634,15 +634,46 @@ test.describe('narrow screens', () => {
 });
 
 test.describe('outages by time of day', () => {
-  /** Serves the real statistics with 90 minutes off at 18:00, 30 at 19:00 and an outage this week. */
-  const withOutages = (page: Page) =>
+  /**
+   * Serves the real statistics with two weeks (3 outages, then 1 this week) and, unless `byHour`
+   * says otherwise, 90 minutes off at 18:00 and 30 at 19:00.
+   */
+  const withOutages = (page: Page, byHour: Record<number, number> = { 18: 90, 19: 30 }) =>
     page.route(`**${STATS_PATH}`, async (route) => {
       const response = await route.fetch();
       const body = (await response.json()) as StatsResponse;
-      const last30ByHour = Array.from({ length: 24 }, (_, hour) => ({ 18: 90, 19: 30 })[hour] ?? 0);
-      const weeks = body.weeks.map((w, i, all) => (i === all.length - 1 ? { ...w, hoursOff: 2, outages: 1 } : w));
+      const last30ByHour = Array.from({ length: 24 }, (_, hour) => byHour[hour] ?? 0);
+      const first = body.weeks[0] ?? { weekStart: '2026-10-12', hoursOff: 0, outages: 0 };
+      const next = new Date(Date.parse(first.weekStart) + 7 * DAY_MS).toISOString().slice(0, 10);
+      const weeks = [
+        { ...first, hoursOff: 1, outages: 3 },
+        { weekStart: next, hoursOff: 2, outages: 1 },
+      ];
       await route.fulfill({ response, json: { ...body, weeks, last30ByHour } });
     });
+
+  test('the weekly chart opens on this week, and Home and the arrow keys move between weeks', async ({ page }) => {
+    await withOutages(page);
+    await page.goto('/en/');
+    const readout = (outages: number) =>
+      page.locator('p', { hasText: `${en.trends.off} · ${en.trends.outageCount(outages)}` });
+    await expect(page.getByRole('heading', { name: en.trends.chartTitle })).toBeVisible();
+    await expect(readout(1).filter({ hasText: en.trends.soFar.trim() })).toHaveCount(1);
+    await expect(page.getByText(en.trends.thisWeek, { exact: true })).toBeVisible();
+    await page.getByRole('img', { name: en.trends.chartLabel }).focus();
+    await page.keyboard.press('Home');
+    // The visible readout, and the announcement for screen readers.
+    await expect(readout(3)).toHaveCount(2);
+    await page.keyboard.press('ArrowRight');
+    await expect(readout(1).and(page.locator('[aria-live]'))).toHaveCount(1);
+  });
+
+  test('says when the last 30 days had no outages, instead of opening on an empty hour', async ({ page }) => {
+    await withOutages(page, {});
+    await page.goto('/en/');
+    await expect(page.getByRole('heading', { name: en.trends.byHourTitle })).toBeVisible();
+    await expect(page.getByText(en.trends.byHourEmpty, { exact: true })).toBeVisible();
+  });
 
   test('opens on the hour with the most time off, and the arrow keys move between hours', async ({ page }) => {
     await withOutages(page);
