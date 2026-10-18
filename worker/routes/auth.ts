@@ -122,6 +122,6 @@ async function logout({ request, db }: RouteContext): Promise<Response> {
 }
 
 export const authRoutes: Routes = {
-  [`POST ${LOGIN_PATH}`]: { handler: login, sameOrigin: true, limiter: 'LOGIN_LIMITER' },
-  [`POST ${LOGOUT_PATH}`]: { handler: logout, sameOrigin: true },
+  [`POST ${LOGIN_PATH}`]: { handler: login, limiter: 'LOGIN_LIMITER' },
+  [`POST ${LOGOUT_PATH}`]: { handler: logout },
 };

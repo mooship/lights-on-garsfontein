@@ -1,7 +1,15 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { DAY_MS } from '../shared/api';
 import { HOURLY_CRON } from '../worker/crons';
-import { getStatus, insertOutage, openOutageCount, runCron, setHeartbeat } from './helpers';
+import { createSession, getStatus, insertOutage, openOutageCount, runCron, setHeartbeat } from './helpers';
+
+const EXPIRED = { createdAt: Date.parse('2000-01-01T00:00:00Z'), expiresAt: Date.parse('2000-01-02T00:00:00Z') };
+
+const sessionExpiries = async () =>
+  (await env.DB.prepare('SELECT expires_at FROM sessions').all<{ expires_at: string }>()).results.map(
+    (r) => r.expires_at,
+  );
 
 const outages = async () =>
   (
@@ -59,24 +67,16 @@ describe('scheduled outage detection', () => {
 
 describe('housekeeping (hourly cron)', () => {
   it('purges expired sessions', async () => {
-    await env.DB.prepare(
-      "INSERT INTO sessions (id, user_id, expires_at, created_at, password_fingerprint) VALUES (?, ?, ?, '', ''), (?, ?, ?, '', '')",
-    )
-      .bind('old', 'admin', '2000-01-01T00:00:00.000Z', 'new', 'admin', '2999-01-01T00:00:00.000Z')
-      .run();
+    const expiresAt = Date.now() + DAY_MS;
+    await createSession(EXPIRED);
+    await createSession({ expiresAt });
     await runCron(HOURLY_CRON);
-    const rows = await env.DB.prepare('SELECT id FROM sessions').all<{ id: string }>();
-    expect(rows.results.map((r) => r.id)).toEqual(['new']);
+    expect(await sessionExpiries()).toEqual([new Date(expiresAt).toISOString()]);
   });
 
   it('does not run on the per-minute cron', async () => {
-    await env.DB.prepare(
-      "INSERT INTO sessions (id, user_id, expires_at, created_at, password_fingerprint) VALUES (?, ?, ?, '', '')",
-    )
-      .bind('old', 'admin', '2000-01-01T00:00:00.000Z')
-      .run();
+    await createSession(EXPIRED);
     await runCron();
-    const rows = await env.DB.prepare('SELECT id FROM sessions').all<{ id: string }>();
-    expect(rows.results).toHaveLength(1);
+    expect(await sessionExpiries()).toHaveLength(1);
   });
 });

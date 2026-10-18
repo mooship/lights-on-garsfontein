@@ -1,5 +1,5 @@
 import { createDb, type Db } from '../db/client';
-import { clientIp, errors, isRateLimited, rateLimitKey, refuseCrossSite } from './http';
+import { bearerToken, clientIp, errors, isRateLimited, rateLimitKey, refuseCrossSite } from './http';
 
 export interface RouteContext {
   request: Request;
@@ -13,16 +13,17 @@ export interface RouteContext {
   headers: Headers;
 }
 
+/** The name of every rate-limit binding in Env. */
+type Limiter = { [K in keyof Env]: Env[K] extends RateLimit ? K : never }[keyof Env];
+
 /**
  * One API endpoint. Guards are declared here and applied by `dispatch` in a fixed order
- * (same-origin, rate limit, admin auth), so handlers contain only their own logic.
+ * (cross-site, rate limit, admin auth), so handlers contain only their own logic.
  */
 export interface Route {
   handler: (ctx: RouteContext) => Promise<Response> | Response;
-  /** Reject cross-site requests and non-JSON bodies (cookie-authenticated writes). */
-  sameOrigin?: boolean;
   /** Per-connection rate limit, checked before auth and the handler. */
-  limiter?: 'STATUS_LIMITER' | 'CONFIRM_LIMITER' | 'LOGIN_LIMITER';
+  limiter?: Limiter;
   /** Return a Response to refuse the request, or null to let it through (e.g. admin auth). */
   authorize?: (ctx: RouteContext) => Promise<Response | null>;
   /** Open data: any site's browser may read the response. */
@@ -84,6 +85,13 @@ async function fromEdgeCache(ctx: RouteContext, handler: Route['handler'], ttl: 
   return response;
 }
 
+/**
+ * Every write without a bearer token gets refuseCrossSite, as only a browser attaches cookies
+ * on its own. Bearer requests (scripts, the sensor) are exempt; their token is the check.
+ */
+const needsSameSite = (request: Request) =>
+  request.method !== 'GET' && request.method !== 'HEAD' && bearerToken(request) === null;
+
 /** Runs a matched route: its guards, the handler (or edge cache), purges, then CORS and `ctx.headers`. */
 export async function dispatch(route: Route, request: Request, env: Env): Promise<Response> {
   const ip = clientIp(request);
@@ -95,7 +103,7 @@ export async function dispatch(route: Route, request: Request, env: Env): Promis
     limitKey: rateLimitKey(ip),
     headers: new Headers(),
   };
-  let response = route.sameOrigin ? refuseCrossSite(request) : null;
+  let response = needsSameSite(request) ? refuseCrossSite(request) : null;
   if (!response && route.limiter && (await isRateLimited(env[route.limiter], ctx.limitKey))) {
     response = errors.rateLimited();
   }

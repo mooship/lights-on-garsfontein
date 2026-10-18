@@ -26,5 +26,5 @@ async function postContact(ctx: RouteContext): Promise<Response> {
 }
 
 export const contactRoutes: Routes = {
-  [`POST ${CONTACT_PATH}`]: { handler: postContact, sameOrigin: true, limiter: 'CONFIRM_LIMITER' },
+  [`POST ${CONTACT_PATH}`]: { handler: postContact, limiter: 'CONTACT_LIMITER' },
 };

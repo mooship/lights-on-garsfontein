@@ -1,15 +1,13 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { HOUR_MS as H, MINUTE_MS, type StatsResponse, TRACKING_SINCE } from '../shared/api';
+import { HOUR_MS as H, MINUTE_MS, type StatsResponse, TRACKING_SINCE, UTC_OFFSET_MS } from '../shared/api';
 import { CSV_PATH, STATS_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import { zoned } from '../src/lib/zone';
 import { mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
-import { call, insertOutage, sameWindow, uniqueIp } from './helpers';
+import { call, insertOutage, stubLimiter } from './helpers';
 
 const t = (iso: string) => Date.parse(iso);
-/** The configured zone's UTC offset in ms; days and weeks start at local midnight. */
-const OFFSET = site.utcOffsetMinutes * MINUTE_MS;
 
 describe('mergeOutages', () => {
   it('merges overlapping outages so time is never double counted', () => {
@@ -112,7 +110,7 @@ describe('windowStats', () => {
       // Reference: the plain per-day scan that windowStats's single forward pass replaces.
       const start = Math.max(from, since);
       let expected = 0;
-      for (let day = Math.floor((start + OFFSET) / D) * D - OFFSET; day < to; day += D) {
+      for (let day = Math.floor((start + UTC_OFFSET_MS) / D) * D - UTC_OFFSET_MS; day < to; day += D) {
         const dayFrom = Math.max(day, start);
         const dayTo = Math.min(day + D, to);
         if (intervals.some((i) => Math.min(i.end, dayTo) - Math.max(i.start, dayFrom) > 0)) expected += 1;
@@ -160,9 +158,9 @@ describe('weekly stats', () => {
     expect(weeklyStats([], since - 1000, since)).toEqual([]);
   });
 
-  it('caps the series at the requested number of weeks', () => {
+  it('caps the series at 26 weeks', () => {
     const since = t(TRACKING_SINCE);
-    expect(weeklyStats([], since + 400 * 24 * H, since, 26)).toHaveLength(26);
+    expect(weeklyStats([], since + 400 * 24 * H, since)).toHaveLength(26);
   });
 });
 
@@ -192,17 +190,16 @@ describe('GET /api/stats', () => {
     const week = weekStartOf(now);
     const inWeek = outages.map((o) => Math.max(0, (o.endTime ? t(o.endTime) : now) - Math.max(t(o.startTime), week)));
     expect(body.weeks.at(-1)).toEqual({
-      weekStart: new Date(week + OFFSET).toISOString().slice(0, 10),
+      weekStart: new Date(week + UTC_OFFSET_MS).toISOString().slice(0, 10),
       hoursOff: Math.round((inWeek.reduce((a, b) => a + b, 0) / H) * 10) / 10,
       outages: inWeek.filter((ms) => ms > 0).length,
     });
   });
 
   it('shares the status rate limit', async () => {
-    const ip = uniqueIp();
-    await sameWindow();
-    for (let i = 0; i < 60; i++) await call(STATS_PATH, { ip });
-    expect((await call(STATS_PATH, { ip })).status).toBe(429);
+    const limiter = stubLimiter();
+    expect((await call(STATS_PATH, { env: { ...env, STATUS_LIMITER: limiter } })).status).toBe(429);
+    expect(limiter.limit).toHaveBeenCalledOnce();
   });
 });
 

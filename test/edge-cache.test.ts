@@ -1,20 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
-import { ADMIN_OUTAGES_PATH, HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
-import { call, EDGE_CACHED, insertOutage, ORIGIN, runCron, setHeartbeat } from './helpers';
+import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, STATUS_PATH, TIMER_PATH } from '../shared/paths';
+import { asAdmin, call, EDGE_CACHED, heartbeat, insertOutage, ORIGIN, runCron, setHeartbeat } from './helpers';
 
 // Every edge-cached route is a view of the outages, so a write that opens, closes or changes one
 // must purge them all; otherwise readers get the old outages until the cached copy expires.
 
 const isCached = async (path: string) => (await caches.default.match(`${ORIGIN}${path}`)) !== undefined;
 
-const admin = (path: string, body: unknown) =>
-  call(path, { method: 'POST', body, headers: { Authorization: 'Bearer test-admin-api-token' } });
-
 const openOutage = () => insertOutage({});
-
-const heartbeat = () =>
-  call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
 
 /** A silent sensor with nothing on record yet: the next check opens an outage. */
 async function staleHeartbeat(): Promise<undefined> {
@@ -32,34 +26,34 @@ interface Write {
 }
 
 const WRITES: Write[] = [
-  { name: 'punching out', act: () => admin(TIMER_PATH, { action: TIMER_ACTION.punchOut }), status: 201 },
+  { name: 'punching out', act: () => asAdmin(TIMER_PATH, { action: TIMER_ACTION.punchOut }), status: 201 },
   {
     name: 'punching in',
     arrange: openOutage,
-    act: () => admin(TIMER_PATH, { action: TIMER_ACTION.punchIn }),
+    act: () => asAdmin(TIMER_PATH, { action: TIMER_ACTION.punchIn }),
     status: 200,
   },
   {
     name: 'logging an outage',
-    act: () => admin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.create, startTime: '2026-10-17T08:00:00Z' }),
+    act: () => asAdmin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.create, startTime: '2026-10-17T08:00:00Z' }),
     status: 201,
   },
   {
     name: 'flagging a false positive',
     arrange: openOutage,
-    act: (id) => admin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, isFalsePositive: true }),
+    act: (id) => asAdmin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, isFalsePositive: true }),
     status: 200,
   },
   {
     name: 'deleting an outage',
     arrange: openOutage,
-    act: (id) => admin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id }),
+    act: (id) => asAdmin(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id }),
     status: 200,
   },
   {
     name: 'a heartbeat that closes an outage',
     arrange: openOutage,
-    act: () => call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } }),
+    act: () => heartbeat(),
     status: 200,
   },
   {
@@ -72,6 +66,11 @@ const WRITES: Write[] = [
 ];
 
 describe('edge cache purges', () => {
+  it('every edge-cached route is an outage view, so outage writes purge it', () => {
+    expect(EDGE_CACHED.length).toBeGreaterThan(0);
+    for (const path of EDGE_CACHED) expect(OUTAGE_VIEWS, path).toContain(path);
+  });
+
   it.each(WRITES)('$name purges every cached view', async ({ arrange, act, status }) => {
     const id = (await arrange?.()) ?? 0;
     for (const path of EDGE_CACHED) {

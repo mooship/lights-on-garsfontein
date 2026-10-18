@@ -53,7 +53,7 @@ simple = { limit = 60, period = 60 }
 
 # Per-connection limit on the privacy page's contact button (/api/contact).
 [[ratelimits]]
-name = "CONFIRM_LIMITER"
+name = "CONTACT_LIMITER"
 namespace_id = "4502"
 simple = { limit = 5, period = 60 }
 
@@ -121,7 +121,7 @@ namespace_id = "4511"
 simple = { limit = 10000, period = 60 }
 
 [[env.e2e.ratelimits]]
-name = "CONFIRM_LIMITER"
+name = "CONTACT_LIMITER"
 namespace_id = "4512"
 simple = { limit = 10, period = 60 }
 

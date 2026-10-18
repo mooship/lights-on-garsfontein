@@ -104,4 +104,10 @@ describe('GET /feed.xml', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
   });
+
+  it('answers HEAD like GET', async () => {
+    const res = await call(FEED_PATH, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('application/atom+xml; charset=utf-8');
+  });
 });

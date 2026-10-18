@@ -12,8 +12,8 @@ import {
   STATUS_PATH,
 } from '../shared/paths';
 import { cacheName, isOldShell, STATUS_CACHE, strategyFor, strayAssets } from '../src/sw/strategy';
+import { ORIGIN } from './helpers';
 
-const ORIGIN = 'https://garsfontein.example';
 const PAGES = ['/', '/en/', PRIVACY_PAGE_PATH];
 const strategy = (path: string, method = 'GET', origin = ORIGIN) =>
   strategyFor(method, new URL(path, origin), ORIGIN, PAGES);

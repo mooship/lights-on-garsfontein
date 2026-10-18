@@ -5,15 +5,17 @@ import { ERROR } from '../shared/errors';
 import { ADMIN_OUTAGES_PATH, LOGIN_PATH, LOGOUT_PATH, TIMER_PATH } from '../shared/paths';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { sha256Hex } from '../worker/lib/crypto';
-import { SESSION_TTL_MS } from '../worker/routes/auth';
-import { call, createSession, login, mockTurnstile, sameWindow, uniqueIp } from './helpers';
-
-const attempt = (password: string, extra: Parameters<typeof call>[1] = {}) =>
-  call(LOGIN_PATH, {
-    method: 'POST',
-    body: { username: 'admin', password, token: 'turnstile-token' },
-    ...extra,
-  });
+import { ADMIN_USER_ID, SESSION_TTL_MS } from '../worker/routes/auth';
+import {
+  ADMIN_PASSWORD,
+  asAdmin,
+  call,
+  createSession,
+  login,
+  loginAttempt,
+  mockTurnstile,
+  stubLimiter,
+} from './helpers';
 
 const sessionCount = async () =>
   (await env.DB.prepare('SELECT COUNT(*) AS count FROM sessions').first<{ count: number }>())?.count;
@@ -21,31 +23,24 @@ const sessionCount = async () =>
 describe('admin auth', () => {
   it('refuses all logins while no password hash is configured', async () => {
     mockTurnstile(true, TURNSTILE_ACTION.login);
-    const res = await attempt('test-password', { env: { ...env, ADMIN_PASSWORD_HASH: '' } as Env });
+    const res = await loginAttempt(ADMIN_PASSWORD, { env: { ...env, ADMIN_PASSWORD_HASH: '' } as Env });
     expect(res.status).toBe(401);
   });
 
   it('requires a passing Turnstile check before checking the password', async () => {
     mockTurnstile(false, TURNSTILE_ACTION.login);
-    const res = await attempt('test-password');
+    const res = await loginAttempt(ADMIN_PASSWORD);
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: ERROR.turnstileFailed });
-    const noToken = await call(LOGIN_PATH, { method: 'POST', body: { password: 'test-password' } });
+    const noToken = await call(LOGIN_PATH, { method: 'POST', body: { password: ADMIN_PASSWORD } });
     expect(noToken.status).toBe(400);
-  });
-
-  it('rejects a Turnstile token solved for another action or host', async () => {
-    mockTurnstile(true, TURNSTILE_ACTION.contact);
-    expect((await attempt('test-password')).status).toBe(403);
-    mockTurnstile(true, TURNSTILE_ACTION.login, 'evil.example');
-    expect((await attempt('test-password')).status).toBe(403);
   });
 
   it('rejects a wrong username with the same answer as a wrong password', async () => {
     mockTurnstile(true, TURNSTILE_ACTION.login);
     const res = await call(LOGIN_PATH, {
       method: 'POST',
-      body: { username: 'someone', password: 'test-password', token: 'turnstile-token' },
+      body: { username: 'someone', password: ADMIN_PASSWORD, token: 'turnstile-token' },
     });
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: ERROR.unauthorized });
@@ -55,30 +50,30 @@ describe('admin auth', () => {
     mockTurnstile(true, TURNSTILE_ACTION.login);
     const res = await call(LOGIN_PATH, {
       method: 'POST',
-      body: { username: ' Admin ', password: 'test-password', token: 'turnstile-token' },
+      body: { username: ` ${env.ADMIN_USERNAME.toUpperCase()} `, password: ADMIN_PASSWORD, token: 'turnstile-token' },
     });
     expect(res.status).toBe(200);
   });
 
   it('rejects a wrong password', async () => {
     mockTurnstile(true, TURNSTILE_ACTION.login);
-    const res = await attempt('wrong');
+    const res = await loginAttempt('wrong');
     expect(res.status).toBe(401);
     expect(res.headers.get('Set-Cookie')).toBeNull();
   });
 
   it('sets a hardened session cookie and stores only its hash', async () => {
     mockTurnstile(true, TURNSTILE_ACTION.login);
-    const res = await attempt('test-password');
+    const res = await loginAttempt(ADMIN_PASSWORD);
     expect(res.status).toBe(200);
     const cookie = res.headers.get('Set-Cookie') ?? '';
-    expect(cookie).toMatch(/^__Host-admin_session=[\w-]{43};/);
+    expect(cookie).toMatch(new RegExp(`^${SESSION_COOKIE}=[\\w-]{43};`));
     for (const flag of ['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/']) expect(cookie).toContain(flag);
 
     const token = cookie.split(';')[0]?.split('=')[1] ?? '';
     const row = await env.DB.prepare('SELECT id, user_id FROM sessions').first<{ id: string; user_id: string }>();
     expect(row?.id).toBe(await sha256Hex(token));
-    expect(row?.user_id).toBe('admin');
+    expect(row?.user_id).toBe(ADMIN_USER_ID);
   });
 
   it('protects admin endpoints', async () => {
@@ -150,32 +145,44 @@ describe('admin auth', () => {
     expect(await sessionCount()).toBe(0);
   });
 
-  it('rate limits login attempts at 5 per minute per IP', async () => {
+  it('rate limits sign-in per connection, grouping IPv6 by /64, before checking Turnstile', async () => {
+    const siteverify = mockTurnstile(true, TURNSTILE_ACTION.login);
+    const limiter = stubLimiter();
+    const res = await loginAttempt(ADMIN_PASSWORD, {
+      ip: '2001:db8:abcd:12:1:2:3:4',
+      env: { ...env, LOGIN_LIMITER: limiter },
+    });
+    expect(res.status).toBe(429);
+    expect(limiter.limit).toHaveBeenCalledWith({ key: '2001:db8:abcd:12::/64' });
+    expect(siteverify).not.toHaveBeenCalled();
+  });
+
+  it('caps sign-in site-wide, counting only attempts that pass Turnstile', async () => {
+    const cap = stubLimiter();
+    const capped = { ...env, LOGIN_GLOBAL_LIMITER: cap };
+    mockTurnstile(false, TURNSTILE_ACTION.login);
+    expect((await loginAttempt(ADMIN_PASSWORD, { env: capped })).status).toBe(403);
+    expect(cap.limit).not.toHaveBeenCalled();
     mockTurnstile(true, TURNSTILE_ACTION.login);
-    const ip = uniqueIp();
-    const codes: number[] = [];
-    await sameWindow();
-    for (let i = 0; i < 6; i++) codes.push((await attempt('nope', { ip })).status);
-    expect(codes).toEqual([401, 401, 401, 401, 401, 429]);
+    // Even the right password is refused once the cap is reached.
+    expect((await loginAttempt(ADMIN_PASSWORD, { env: capped })).status).toBe(429);
+    expect(cap.limit).toHaveBeenCalledOnce();
   });
 
   it('accepts the admin API token so agents can log outages', async () => {
-    const headers = { Authorization: 'Bearer test-admin-api-token' };
-    const out = await call(TIMER_PATH, { method: 'POST', body: { action: TIMER_ACTION.punchOut }, headers });
-    expect(out.status).toBe(201);
+    expect((await asAdmin(TIMER_PATH, { action: TIMER_ACTION.punchOut })).status).toBe(201);
+    const headers = { Authorization: `Bearer ${env.ADMIN_API_TOKEN}` };
     expect((await call(ADMIN_OUTAGES_PATH, { headers })).status).toBe(200);
   });
 
   it('rejects a wrong API token without falling back to cookies, and rate limits guesses', async () => {
     const cookie = await createSession();
-    const ip = uniqueIp();
-    const codes: number[] = [];
-    await sameWindow();
-    for (let i = 0; i < 6; i++) {
-      const res = await call(ADMIN_OUTAGES_PATH, { cookie, ip, headers: { Authorization: 'Bearer nope' } });
-      codes.push(res.status);
-    }
-    expect(codes).toEqual([401, 401, 401, 401, 401, 429]);
+    const headers = { Authorization: 'Bearer nope' };
+    expect((await call(ADMIN_OUTAGES_PATH, { cookie, headers })).status).toBe(401);
+    const limiter = stubLimiter();
+    const limited = await call(ADMIN_OUTAGES_PATH, { cookie, headers, env: { ...env, LOGIN_LIMITER: limiter } });
+    expect(limited.status).toBe(429);
+    expect(limiter.limit).toHaveBeenCalledOnce();
   });
 
   it('refuses API tokens when none is configured', async () => {
@@ -184,15 +191,5 @@ describe('admin auth', () => {
       env: { ...env, ADMIN_API_TOKEN: '' } as Env,
     });
     expect(res.status).toBe(401);
-  });
-
-  it('rejects cross-site admin writes', async () => {
-    const res = await call(TIMER_PATH, {
-      method: 'POST',
-      cookie: await createSession(),
-      body: { action: TIMER_ACTION.punchOut },
-      headers: { Origin: 'https://evil.example' },
-    });
-    expect(res.status).toBe(403);
   });
 });

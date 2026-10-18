@@ -6,7 +6,10 @@ import { site } from '../site.config';
 // only the admin API exposes `source`.
 
 export type PowerStatus = 'ON' | 'OFF';
-export type OutageSource = 'sensor' | 'manual';
+
+/** How an outage was recorded: by the heartbeat sensor or by an admin. */
+export const OUTAGE_SOURCES = ['sensor', 'manual'] as const;
+export type OutageSource = (typeof OUTAGE_SOURCES)[number];
 
 /** All times in the public API are ISO 8601 in UTC; clients convert to the local zone. */
 export interface OutageSummary {
@@ -88,7 +91,7 @@ export interface StatsResponse {
   last365: WindowStats;
   /** The 30 days before `last30`, or null until that whole period was tracked. */
   previous30: WindowStats | null;
-  /** Up to 26 weeks, oldest first, starting no earlier than the tracking start. */
+  /** Up to WEEKS_SHOWN (worker/lib/stats.ts) weeks, oldest first, starting no earlier than the tracking start. */
   weeks: WeekStats[];
   generatedAt: string;
 }
@@ -96,6 +99,12 @@ export interface StatsResponse {
 export const MINUTE_MS = 60_000;
 export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
+
+/** The configured zone's fixed UTC offset; days and weeks start at its local midnight. */
+export const UTC_OFFSET_MS = site.utcOffsetMinutes * MINUTE_MS;
+
+/** The calendar date of `ms` in the configured zone, as YYYY-MM-DD. */
+export const localDate = (ms: number) => new Date(ms + UTC_OFFSET_MS).toISOString().slice(0, 10);
 
 /** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
 export const TURNSTILE_ACTION = { login: 'login', contact: 'contact' } as const;
@@ -114,7 +123,7 @@ export function outageDurationMs(outage: { startTime: string; endTime: string | 
 }
 
 /** A sensor heartbeat older than this means the power is off at the measuring point. */
-export const HEARTBEAT_THRESHOLD_MS = 180_000;
+export const HEARTBEAT_THRESHOLD_MS = 3 * MINUTE_MS;
 
 /** Statistics never count time before this. */
 export const TRACKING_SINCE = site.trackingSince;

@@ -24,9 +24,9 @@ async function getStatus({ env, db }: RouteContext): Promise<Response> {
 
 async function postHeartbeat({ db, request }: RouteContext): Promise<Response> {
   const { closed, changed } = await recordHeartbeat(db, new Date());
-  // The route purges the status (its live reading); the other views only when an outage changed,
-  // so a sensor posting every minute does not keep emptying them.
-  if (changed) await purgeEdgeCache(new URL(request.url).origin, OUTAGE_VIEWS);
+  // The status always, as its live reading changed; the other views only when an outage did, so a
+  // sensor posting every minute does not keep emptying them.
+  await purgeEdgeCache(new URL(request.url).origin, changed ? OUTAGE_VIEWS : [STATUS_PATH]);
   return json({ ok: true, closedOutages: closed });
 }
 
@@ -41,6 +41,5 @@ export const statusRoutes: Routes = {
   [`POST ${HEARTBEAT_PATH}`]: {
     handler: postHeartbeat,
     authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),
-    purges: [STATUS_PATH],
   },
 };

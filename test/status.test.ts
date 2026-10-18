@@ -1,10 +1,20 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, MINUTE_MS, TIMER_ACTION } from '../shared/api';
+import { ERROR } from '../shared/errors';
 import { HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { createDb } from '../worker/db/client';
 import { getGridState } from '../worker/lib/grid';
-import { call, insertOutage, runCron, sameWindow, setHeartbeat, getStatus as status, uniqueIp } from './helpers';
+import {
+  asAdmin,
+  call,
+  heartbeat,
+  insertOutage,
+  runCron,
+  setHeartbeat,
+  getStatus as status,
+  stubLimiter,
+} from './helpers';
 
 describe('GET /api/status', () => {
   it('is ON in manual mode before any sensor heartbeat arrives', async () => {
@@ -103,6 +113,13 @@ describe('GET /api/status', () => {
     expect(await status()).toMatchObject({ status: 'ON', since: lastEnd });
   });
 
+  it('answers HEAD with the JSON headers', async () => {
+    const res = await call(STATUS_PATH, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('application/json; charset=utf-8');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
   it('is never cached by browsers, from the edge cache or not', async () => {
     for (let i = 0; i < 2; i++) {
       const res = await call(STATUS_PATH);
@@ -111,22 +128,17 @@ describe('GET /api/status', () => {
     }
   });
 
-  it('rate limits at 60 requests per minute per IP', async () => {
-    const ip = uniqueIp();
-    await sameWindow();
-    for (let i = 0; i < 60; i++) {
-      expect((await call(STATUS_PATH, { ip })).status).toBe(200);
-    }
-    expect((await call(STATUS_PATH, { ip })).status).toBe(429);
-    expect((await call(STATUS_PATH)).status).toBe(200);
+  it('is rate limited per connection by STATUS_LIMITER', async () => {
+    const limiter = stubLimiter();
+    const ip = '196.25.1.9';
+    const res = await call(STATUS_PATH, { ip, env: { ...env, STATUS_LIMITER: limiter } });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: ERROR.rateLimited });
+    expect(limiter.limit).toHaveBeenCalledWith({ key: ip });
   });
 });
 
 describe('GET /api/status edge cache', () => {
-  const heartbeat = () =>
-    call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer test-heartbeat-token' } });
-  const admin = { Authorization: 'Bearer test-admin-api-token' };
-
   it('serves a repeat request within the TTL from the edge cache', async () => {
     const first = await status();
     // Written straight to D1, so nothing purges the cached copy.
@@ -140,24 +152,15 @@ describe('GET /api/status edge cache', () => {
     expect(await (await call('/api/status?x=1')).json()).toEqual(first);
   });
 
-  it('is purged by a heartbeat', async () => {
-    expect((await status()).monitored).toBe(false);
-    expect((await heartbeat()).status).toBe(200);
-    expect((await status()).monitored).toBe(true);
-  });
-
   it('is not purged by a refused admin write', async () => {
     const first = await status();
     await insertOutage({ source: 'manual' });
-    const res = await call(TIMER_PATH, { method: 'POST', body: { action: TIMER_ACTION.punchOut }, headers: admin });
-    expect(res.status).toBe(409);
+    expect((await asAdmin(TIMER_PATH, { action: TIMER_ACTION.punchOut })).status).toBe(409);
     expect(await status()).toEqual(first);
   });
 });
 
 describe('POST /api/heartbeat', () => {
-  const auth = { Authorization: 'Bearer test-heartbeat-token' };
-
   it('rejects requests without the sensor token', async () => {
     expect((await call(HEARTBEAT_PATH, { method: 'POST' })).status).toBe(401);
     const wrong = await call(HEARTBEAT_PATH, { method: 'POST', headers: { Authorization: 'Bearer nope' } });
@@ -181,7 +184,7 @@ describe('POST /api/heartbeat', () => {
   });
 
   it('records the heartbeat', async () => {
-    const res = await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
+    const res = await heartbeat();
     expect(res.status).toBe(200);
     const row = await env.DB.prepare('SELECT last_seen FROM heartbeats WHERE id = 1').first<{ last_seen: string }>();
     expect(Date.now() - Date.parse(row?.last_seen ?? '')).toBeLessThan(5_000);
@@ -189,7 +192,7 @@ describe('POST /api/heartbeat', () => {
 
   it('records an outage that began and ended between two cron runs', async () => {
     const lastSeen = await setHeartbeat(240);
-    const res = await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
+    const res = await heartbeat();
     expect(await res.json()).toEqual({ ok: true, closedOutages: 0 });
     const rows = await env.DB.prepare('SELECT start_time, end_time, source FROM outages').all<{
       start_time: string;
@@ -201,10 +204,10 @@ describe('POST /api/heartbeat', () => {
 
   it('records no extra outage after a fresh heartbeat, or when the silence is already on record', async () => {
     await setHeartbeat(30);
-    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
+    await heartbeat();
     const lastSeen = await setHeartbeat(240);
     await insertOutage({ startTime: lastSeen, endTime: new Date().toISOString(), isFalsePositive: 1 });
-    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
+    await heartbeat();
     const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
     expect(n).toBe(1);
   });
@@ -212,7 +215,7 @@ describe('POST /api/heartbeat', () => {
   it('closes every open outage, manual ones included', async () => {
     await insertOutage({ source: 'sensor' });
     await insertOutage({ source: 'manual' });
-    const res = await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
+    const res = await heartbeat();
     expect(await res.json()).toEqual({ ok: true, closedOutages: 2 });
     const rows = await env.DB.prepare('SELECT end_time FROM outages').all<{ end_time: string | null }>();
     expect(rows.results.map((r) => r.end_time)).toEqual([expect.any(String), expect.any(String)]);
@@ -225,7 +228,7 @@ describe('POST /api/heartbeat', () => {
       startTime: new Date(Date.parse(lastSeen) + MINUTE_MS).toISOString(),
       source: 'manual',
     });
-    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
+    await heartbeat();
     const rows = await env.DB.prepare('SELECT id, end_time FROM outages').all<{
       id: number;
       end_time: string | null;
@@ -236,20 +239,11 @@ describe('POST /api/heartbeat', () => {
   it('closes a manual outage that began before the last heartbeat, with no gap outage', async () => {
     const manual = await insertOutage({ startTime: new Date(Date.now() - HOUR_MS).toISOString(), source: 'manual' });
     await setHeartbeat(600);
-    await call(HEARTBEAT_PATH, { method: 'POST', headers: auth });
+    await heartbeat();
     const rows = await env.DB.prepare('SELECT id, end_time FROM outages').all<{
       id: number;
       end_time: string | null;
     }>();
     expect(rows.results).toEqual([{ id: manual, end_time: expect.any(String) }]);
-  });
-});
-
-describe('community reports', () => {
-  it('has no public endpoints for residents to report their power', async () => {
-    for (const path of ['/api/confirm', '/api/still-off']) {
-      const res = await call(path, { method: 'POST', body: { token: 'turnstile-token' } });
-      expect(res.status, path).toBe(404);
-    }
   });
 });

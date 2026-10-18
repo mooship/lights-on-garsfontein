@@ -1,28 +1,35 @@
 import { createScheduledController, env } from 'cloudflare:test';
 import { expect, vi } from 'vitest';
-import { MINUTE_MS, type StatusResponse, TURNSTILE_ACTION, type TurnstileAction } from '../shared/api';
-import { CSV_PATH, FEED_PATH, LOGIN_PATH, STATS_PATH, STATUS_PATH } from '../shared/paths';
+import {
+  MINUTE_MS,
+  type OutageSource,
+  type StatusResponse,
+  TURNSTILE_ACTION,
+  type TurnstileAction,
+} from '../shared/api';
+import { HEARTBEAT_PATH, LOGIN_PATH, STATUS_PATH } from '../shared/paths';
 import { MINUTE_CRON } from '../worker/crons';
 import worker from '../worker/index';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { randomToken, sha256Hex } from '../worker/lib/crypto';
 import { CLIENT_IP_HEADER } from '../worker/lib/http';
+import { routes } from '../worker/routes';
 import { ADMIN_USER_ID, passwordFingerprint, SESSION_TTL_MS } from '../worker/routes/auth';
 
 /** The test SITE_URL (set once in vitest.config.ts). */
 export const ORIGIN = env.SITE_URL;
 
-/** Every route with `edgeCache`; test/setup.ts empties their cached copies before each test. */
-export const EDGE_CACHED = [STATUS_PATH, STATS_PATH, CSV_PATH, FEED_PATH];
+/** The path of every route with `edgeCache`; test/setup.ts empties their cached copies before each test. */
+export const EDGE_CACHED = Object.entries(routes)
+  .filter(([, route]) => route.edgeCache)
+  .map(([key]) => key.slice(key.indexOf(' ') + 1));
 
 /**
- * Waits for a new rate-limit window when this one has under 10 s left. Miniflare counts in
- * one-minute windows on the wall clock, so a loop that crosses a boundary starts counting again.
- * Call it right before a loop that expects to reach a limit.
+ * A rate-limit binding that refuses (or, with `success`, allows) every request, to pass in
+ * `call`'s `env`; its `limit` is a spy, so a test can check the key it was asked about.
  */
-export async function sameWindow(): Promise<void> {
-  const elapsed = Date.now() % MINUTE_MS;
-  if (elapsed > 50_000) await new Promise((resolve) => setTimeout(resolve, MINUTE_MS - elapsed));
+export function stubLimiter(success = false) {
+  return { limit: vi.fn(async (_options: RateLimitOptions) => ({ success })) };
 }
 
 let ipCounter = 0;
@@ -92,7 +99,7 @@ export async function setHeartbeat(secondsAgo: number): Promise<string> {
 export async function insertOutage(values: {
   startTime?: string;
   endTime?: string | null;
-  source?: 'sensor' | 'manual';
+  source?: OutageSource;
   isFalsePositive?: 0 | 1;
   isPlanned?: 0 | 1;
 }): Promise<number> {
@@ -137,16 +144,39 @@ export async function createSession({
   return `${SESSION_COOKIE}=${token}`;
 }
 
-/** Signs in through the login route; prefer createSession unless the test is about signing in. */
-export async function login(password = 'test-password'): Promise<string> {
-  mockTurnstile(true, TURNSTILE_ACTION.login);
-  const res = await call(LOGIN_PATH, {
+/** The password whose hash is ADMIN_PASSWORD_HASH in vitest.config.ts. */
+export const ADMIN_PASSWORD = 'test-password';
+
+/** One sign-in attempt as the admin user, whatever its answer; the caller mocks Turnstile. */
+export function loginAttempt(password: string, options: CallOptions = {}): Promise<Response> {
+  return call(LOGIN_PATH, {
     method: 'POST',
-    body: { username: 'admin', password, token: 'turnstile-token' },
+    body: { username: env.ADMIN_USERNAME, password, token: 'turnstile-token' },
+    ...options,
   });
+}
+
+/** Signs in through the login route; prefer createSession unless the test is about signing in. */
+export async function login(password = ADMIN_PASSWORD): Promise<string> {
+  mockTurnstile(true, TURNSTILE_ACTION.login);
+  const res = await loginAttempt(password);
   if (res.status !== 200) throw new Error(`login failed: ${res.status}`);
   const cookie = res.headers.get('Set-Cookie') ?? '';
   return cookie.split(';')[0] ?? '';
+}
+
+/** A sensor heartbeat with the right token. */
+export function heartbeat(options: CallOptions = {}): Promise<Response> {
+  return call(HEARTBEAT_PATH, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.HEARTBEAT_TOKEN}` },
+    ...options,
+  });
+}
+
+/** An admin API write with ADMIN_API_TOKEN, as a script or agent sends it. */
+export function asAdmin(path: string, body: unknown): Promise<Response> {
+  return call(path, { method: 'POST', body, headers: { Authorization: `Bearer ${env.ADMIN_API_TOKEN}` } });
 }
 
 /** Runs the Worker's scheduled handler, by default as the outage-detection cron. */

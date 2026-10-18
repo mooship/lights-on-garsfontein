@@ -6,7 +6,7 @@ import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, TIMER_PATH } from '../../shared/paths
 import { outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
 import { getOpenOutage, openOutage, summarise } from '../lib/grid';
-import { errors, json, parseBody, refuseCrossSite } from '../lib/http';
+import { errors, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkSession } from './auth';
 
@@ -120,17 +120,13 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
 
 /**
  * Admin auth: `Authorization: Bearer <ADMIN_API_TOKEN>` (scripts and AI agents) or, without a
- * bearer header, a session cookie on a same-site request.
+ * bearer header, a session cookie (dispatch has already refused cross-site writes).
  */
 async function authorizeAdmin(ctx: RouteContext): Promise<Response | null> {
   const { request, env } = ctx;
   const token = await checkBearer(request, env.ADMIN_API_TOKEN);
   if (token === false) return refuseBadToken(ctx);
-  if (token === null) {
-    const refused = request.method === 'GET' ? null : refuseCrossSite(request);
-    if (refused) return refused;
-    if (!(await checkSession(ctx))) return errors.unauthorized();
-  }
+  if (token === null && !(await checkSession(ctx))) return errors.unauthorized();
   return null;
 }
 

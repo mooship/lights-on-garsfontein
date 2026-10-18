@@ -105,16 +105,14 @@ export async function getGridState(db: Db, now: Date) {
 }
 
 /**
- * Opens a sensor outage when the heartbeat has gone stale and nothing is open yet. Returns the
- * open outage, if any, and whether this call opened it. Safe to call repeatedly and concurrently.
+ * Opens a sensor outage when the heartbeat has gone stale and nothing is open yet. Returns whether
+ * this call opened one. Safe to call repeatedly and concurrently.
  */
-export async function detectOutage(db: Db, now: Date): Promise<{ outage?: Outage; opened: boolean }> {
+export async function detectOutage(db: Db, now: Date): Promise<boolean> {
   const [[heartbeat], [open]] = await db.batch([heartbeatQuery(db), openOutageQuery(db)]);
-  if (open) return { outage: open, opened: false };
-  if (!heartbeat || heartbeat.onRecord || !isStale(heartbeat.lastSeen, now)) return { opened: false };
+  if (open || !heartbeat || heartbeat.onRecord || !isStale(heartbeat.lastSeen, now)) return false;
   // The insert re-checks both conditions, in case another request got there first.
-  const opened = await openOutage(db, heartbeat.lastSeen, 'sensor', gte(outages.startTime, heartbeat.lastSeen));
-  return { outage: await getOpenOutage(db), opened };
+  return openOutage(db, heartbeat.lastSeen, 'sensor', gte(outages.startTime, heartbeat.lastSeen));
 }
 
 /**

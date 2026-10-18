@@ -1,9 +1,16 @@
-import { DAY_MS as DAY, HOUR_MS as HOUR, MINUTE_MS, type WeekStats, type WindowStats } from '../../shared/api';
-import { site } from '../../site.config';
+import {
+  DAY_MS as DAY,
+  HOUR_MS as HOUR,
+  localDate,
+  MINUTE_MS,
+  UTC_OFFSET_MS,
+  type WeekStats,
+  type WindowStats,
+} from '../../shared/api';
 
 const WEEK = 7 * DAY;
-/** Days and weeks are calendar ones in the configured zone (fixed offset). */
-const OFFSET = site.utcOffsetMinutes * MINUTE_MS;
+/** The length of StatsResponse.weeks. */
+const WEEKS_SHOWN = 26;
 
 interface Interval {
   start: number;
@@ -87,24 +94,20 @@ export function windowStats(
 
 /** Start (UTC ms) of the calendar day containing `ts`, in the configured zone. */
 function dayStartOf(ts: number): number {
-  return Math.floor((ts + OFFSET) / DAY) * DAY - OFFSET;
+  return Math.floor((ts + UTC_OFFSET_MS) / DAY) * DAY - UTC_OFFSET_MS;
 }
 
 /** Start (UTC ms) of the Monday-to-Sunday week containing `ts`, in the configured zone. */
 export function weekStartOf(ts: number): number {
-  const day = Math.floor((ts + OFFSET) / DAY);
+  const day = Math.floor((ts + UTC_OFFSET_MS) / DAY);
   const dayOfWeek = (day + 3) % 7; // 1970-01-01 was a Thursday; Monday = 0.
-  return (day - dayOfWeek) * DAY - OFFSET;
+  return (day - dayOfWeek) * DAY - UTC_OFFSET_MS;
 }
 
-function localDate(ts: number): string {
-  return new Date(ts + OFFSET).toISOString().slice(0, 10);
-}
-
-/** Weekly hours off from the tracking start's week to the current week (at most `limit`). */
-export function weeklyStats(intervals: Interval[], now: number, trackingSince: number, limit = 26): WeekStats[] {
+/** Weekly hours off from the tracking start's week to the current week (at most WEEKS_SHOWN). */
+export function weeklyStats(intervals: Interval[], now: number, trackingSince: number): WeekStats[] {
   if (now < trackingSince) return [];
-  const first = Math.max(weekStartOf(trackingSince), weekStartOf(now) - (limit - 1) * WEEK);
+  const first = Math.max(weekStartOf(trackingSince), weekStartOf(now) - (WEEKS_SHOWN - 1) * WEEK);
   const weeks: WeekStats[] = [];
   for (let start = first; start <= now; start += WEEK) {
     const stats = windowStats(intervals, start, Math.min(start + WEEK, now), trackingSince);

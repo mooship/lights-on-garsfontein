@@ -29,8 +29,10 @@ describe('Turnstile check', () => {
     expect(form.get('remoteip')).toBe(ip);
   });
 
-  it('rejects a token solved for another action', async () => {
+  it('rejects a token solved for another action or host', async () => {
     mockTurnstile(true, TURNSTILE_ACTION.login);
+    expect((await reveal()).status).toBe(403);
+    mockTurnstile(true, TURNSTILE_ACTION.contact, 'evil.example');
     expect((await reveal()).status).toBe(403);
   });
 

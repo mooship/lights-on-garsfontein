@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { OUTAGE_SOURCES } from '../../shared/api';
 
 /**
  * The sensor's last report. One row (id 1), so one sensor per instance: a second sensor needs its
@@ -18,10 +19,10 @@ export const outages = sqliteTable(
     startTime: text('start_time').notNull(),
     /** Null while the outage is open. */
     endTime: text('end_time'),
-    // Adding a source: extend this enum, `OutageSource` in shared/api.ts and the admin `source`
-    // labels in the dictionaries together, then run `npm run db:generate`. The enum is type-level
-    // only (SQLite gets no CHECK constraint), so existing rows need no migration.
-    source: text('source', { enum: ['sensor', 'manual'] }).notNull(),
+    // Adding a source: extend OUTAGE_SOURCES (shared/api.ts) and the admin `source` labels in the
+    // dictionaries together, then run `npm run db:generate`. The enum is type-level only (SQLite
+    // gets no CHECK constraint), so existing rows need no migration.
+    source: text('source', { enum: OUTAGE_SOURCES }).notNull(),
     isFalsePositive: integer('is_false_positive', { mode: 'boolean' }).notNull().default(sql`0`),
     isPlanned: integer('is_planned', { mode: 'boolean' }).notNull().default(sql`0`),
   },

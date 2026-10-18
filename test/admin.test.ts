@@ -64,15 +64,15 @@ describe('admin request checks', () => {
     expect(await res.json()).toEqual({ error: ERROR.invalidJson });
   });
 
-  it('refuses cookie writes the browser marks as cross-site or same-site', async () => {
-    for (const site of ['cross-site', 'same-site']) {
-      const res = await call(TIMER_PATH, {
-        method: 'POST',
-        body: { action: TIMER_ACTION.punchOut },
-        cookie,
-        headers: { 'Sec-Fetch-Site': site },
-      });
-      expect(res.status).toBe(403);
+  it('refuses cookie writes from another origin, or the browser marks as cross-site or same-site', async () => {
+    const refused: Record<string, string>[] = [
+      { Origin: 'https://evil.example' },
+      { 'Sec-Fetch-Site': 'cross-site' },
+      { 'Sec-Fetch-Site': 'same-site' },
+    ];
+    for (const headers of refused) {
+      const res = await call(TIMER_PATH, { method: 'POST', body: { action: TIMER_ACTION.punchOut }, cookie, headers });
+      expect(res.status, JSON.stringify(headers)).toBe(403);
     }
     const same = await call(TIMER_PATH, {
       method: 'POST',
@@ -101,7 +101,7 @@ describe('admin request checks', () => {
       method: 'POST',
       rawBody: JSON.stringify({ action: TIMER_ACTION.punchOut }),
       headers: {
-        Authorization: 'Bearer test-admin-api-token',
+        Authorization: `Bearer ${env.ADMIN_API_TOKEN}`,
         'Sec-Fetch-Site': 'cross-site',
         'Content-Type': 'text/plain',
       },

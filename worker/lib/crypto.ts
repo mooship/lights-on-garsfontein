@@ -39,9 +39,12 @@ export async function safeEqual(a: string, b: string): Promise<boolean> {
   return constantTimeEqual(new Uint8Array(ha), new Uint8Array(hb));
 }
 
-/** Base64url, unpadded: 32 bytes give the 43 characters SESSION_TOKEN (worker/routes/auth.ts) expects. */
-export function randomToken(byteLength = 32): string {
-  return toBase64Url(crypto.getRandomValues(new Uint8Array(byteLength)));
+/** 256 bits; base64url gives the 43 characters SESSION_TOKEN (worker/routes/auth.ts) expects. */
+const TOKEN_BYTES = 32;
+
+/** Base64url, unpadded. */
+export function randomToken(): string {
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(TOKEN_BYTES)));
 }
 
 async function pbkdf2(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<Uint8Array> {

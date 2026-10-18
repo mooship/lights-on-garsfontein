@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { TURNSTILE_ACTION } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { CONTACT_PATH } from '../shared/paths';
-import { call, mockTurnstile, ORIGIN, sameWindow, uniqueIp } from './helpers';
+import { call, mockTurnstile, ORIGIN, stubLimiter } from './helpers';
 
 const EMAIL = 'contact@example.invalid';
 const configured = { ...env, CONTACT_EMAIL: EMAIL } as Env;
 
-const reveal = (options: { ip?: string; body?: unknown; env?: Env; headers?: Record<string, string> } = {}) =>
+const reveal = (options: { body?: unknown; env?: Env; headers?: Record<string, string> } = {}) =>
   call(CONTACT_PATH, { method: 'POST', body: { token: 'turnstile-token' }, env: configured, ...options });
 
 describe('POST /api/contact', () => {
@@ -46,15 +46,6 @@ describe('POST /api/contact', () => {
     expect(await res.json()).toEqual({ error: ERROR.turnstileFailed });
   });
 
-  it('rejects a token solved for another action', async () => {
-    for (const action of [TURNSTILE_ACTION.login]) {
-      mockTurnstile(true, action);
-      const res = await reveal();
-      expect(res.status).toBe(403);
-      expect(await res.json()).toEqual({ error: ERROR.turnstileFailed });
-    }
-  });
-
   it('validates the body', async () => {
     mockTurnstile(true, TURNSTILE_ACTION.contact);
     expect((await reveal({ body: {} })).status).toBe(400);
@@ -79,13 +70,14 @@ describe('POST /api/contact', () => {
     expect(same.headers.has('Access-Control-Allow-Origin')).toBe(false);
   });
 
-  it('rate limits at 5 requests per minute per IP', async () => {
-    mockTurnstile(true, TURNSTILE_ACTION.contact);
-    const ip = uniqueIp();
-    const codes: number[] = [];
-    await sameWindow();
-    for (let i = 0; i < 6; i++) codes.push((await reveal({ ip })).status);
-    expect(codes).toEqual([200, 200, 200, 200, 200, 429]);
+  it('is rate limited per connection by CONTACT_LIMITER, before Turnstile', async () => {
+    const siteverify = mockTurnstile(true, TURNSTILE_ACTION.contact);
+    const limiter = stubLimiter();
+    const res = await reveal({ env: { ...configured, CONTACT_LIMITER: limiter } });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: ERROR.rateLimited });
+    expect(limiter.limit).toHaveBeenCalledOnce();
+    expect(siteverify).not.toHaveBeenCalled();
   });
 
   it('is POST only', async () => {

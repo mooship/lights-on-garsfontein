@@ -32,8 +32,6 @@ export default defineConfig({
           name: 'worker',
           include: ['test/*.test.ts'],
           setupFiles: ['./test/setup.ts'],
-          // sameWindow() (test/helpers.ts) can wait up to 10 s before a rate-limit loop.
-          testTimeout: 20_000,
         },
       },
       {

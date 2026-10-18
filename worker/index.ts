@@ -3,27 +3,8 @@ import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
 import { errors } from './lib/http';
-import { dispatch, purgeEdgeCache, type Routes } from './lib/router';
-import { adminRoutes } from './routes/admin';
-import { authRoutes } from './routes/auth';
-import { contactRoutes } from './routes/contact';
-import { historyRoutes } from './routes/history';
-import { seoRoutes } from './routes/seo';
-import { statusRoutes } from './routes/status';
-
-/**
- * Every Worker endpoint. Adding one means: its path in shared/paths.ts, its handler in a file
- * under routes/, its route map spread here and, if it is outside API_PREFIX, the path in
- * WORKER_PAGES and in wrangler's `assets.run_worker_first`.
- */
-const routes: Routes = {
-  ...statusRoutes,
-  ...historyRoutes,
-  ...authRoutes,
-  ...adminRoutes,
-  ...seoRoutes,
-  ...contactRoutes,
-};
+import { dispatch, purgeEdgeCache } from './lib/router';
+import { routes } from './routes';
 
 // public/_headers only covers static assets; Worker responses (API, SEO) get these.
 // None of them is HTML, so the CSP can forbid everything.
@@ -47,7 +28,9 @@ function withSecurityHeaders(routed: Response): Response {
 
 async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  const match = routes[`${request.method} ${url.pathname}`];
+  // HEAD runs the GET route; the runtime drops the body.
+  const method = request.method === 'HEAD' ? 'GET' : request.method;
+  const match = routes[`${method} ${url.pathname}`];
   if (match) return dispatch(match, request, env);
   if (url.pathname.startsWith(API_PREFIX)) return errors.notFound();
   return env.ASSETS.fetch(request);
@@ -70,8 +53,7 @@ export default {
     if (controller.cron === HOURLY_CRON) {
       await purgeExpiredSessions(db, now);
     } else {
-      const { opened } = await detectOutage(db, now);
-      if (opened) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);
+      if (await detectOutage(db, now)) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);
     }
   },
 } satisfies ExportedHandler<Env>;
