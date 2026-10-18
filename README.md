@@ -154,7 +154,7 @@ A MacBook that stays on its charger works without extra hardware. It posts only 
 curl -fsSL -o /tmp/lights-on.sh https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scripts/mac-sensor.sh && sh /tmp/lights-on.sh install https://YOUR_DOMAIN
 ```
 
-It asks for `HEARTBEAT_TOKEN` (hidden as you paste it, and never on a command line) and keeps it in a file only your account can read. It then starts a launch agent that keeps the Mac awake only while it is on the charger, and adds a `lights-on` command:
+It asks for `HEARTBEAT_TOKEN` (hidden as you paste it, and never on a command line) and keeps it in a file only your account can read. It then starts a launch agent that keeps the Mac awake only while it is on the charger. Where the Mac supports it, it also sets `pmset acwake 1`, so a Mac that fell asleep on battery during an outage wakes when the charger comes back and reports again. `uninstall` leaves that setting on; `sudo pmset -a acwake 0` turns it off. Finally it adds a `lights-on` command:
 
 | Command | Does |
 | --- | --- |

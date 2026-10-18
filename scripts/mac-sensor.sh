@@ -59,6 +59,16 @@ send_pause() {
   post -H 'Content-Type: application/json' -d "{\"until\":$1}" "$(cat "$URL_FILE")/api/heartbeat/pause" >/dev/null
 }
 
+# On battery the Mac may sleep, and by default it stays asleep when the charger returns, so after an
+# outage nothing would report until someone woke it. acwake wakes it when the power source changes.
+# Skipped where pmset lacks it, and when already on, so an update does not ask for a password.
+enable_acwake() {
+  pmset -g cap | grep -qw acwake || return 0
+  pmset -g | grep -Eq '^ *acwake +1' && return 0
+  echo "Setting the Mac to wake when the charger is connected (asks for your Mac password)."
+  sudo pmset -a acwake 1
+}
+
 # Installs this file as the agent and (re)starts it.
 start_agent() {
   # Stopped before the copy: sh reads a script as it runs, so overwriting it mid-loop breaks it.
@@ -109,6 +119,7 @@ case "${1:-}" in
     echo "Adding the lights-on command to $(dirname "$COMMAND") (asks for your Mac password)."
     sudo mkdir -p "$(dirname "$COMMAND")"
     sudo ln -sf "$INSTALLED" "$COMMAND"
+    enable_acwake
     echo "Installed. Try: lights-on status"
     ;;
   pause)
@@ -167,6 +178,7 @@ case "${1:-}" in
     fi
     start_agent
     [ -L "$COMMAND" ] || sudo ln -sf "$INSTALLED" "$COMMAND"
+    enable_acwake
     echo "Updated and reporting again. Try: lights-on status"
     ;;
   uninstall)
