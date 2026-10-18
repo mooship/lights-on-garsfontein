@@ -44,17 +44,20 @@ migrations_dir = "drizzle"
 
 # Workers Rate Limiting API. Each namespace_id is a positive integer that must be unique in your
 # account: change these if another Worker there already uses them.
+#
+# Per-connection limit on the public reads: status, statistics, CSV and feed.
 [[ratelimits]]
 name = "STATUS_LIMITER"
 namespace_id = "4501"
 simple = { limit = 60, period = 60 }
 
-# Per-connection limit on public writes: the privacy page's contact email (/api/contact).
+# Per-connection limit on the privacy page's contact button (/api/contact).
 [[ratelimits]]
 name = "CONFIRM_LIMITER"
 namespace_id = "4502"
 simple = { limit = 5, period = 60 }
 
+# Per-connection limit on sign-in attempts, which wrong bearer tokens share (worker/lib/auth.ts).
 [[ratelimits]]
 name = "LOGIN_LIMITER"
 namespace_id = "4503"
@@ -67,7 +70,7 @@ namespace_id = "4504"
 simple = { limit = 30, period = 60 }
 
 [triggers]
-# Outage detection every minute; housekeeping (session and fingerprint purges) hourly.
+# Outage detection every minute; housekeeping (purging expired sessions) hourly.
 # The same as MINUTE_CRON and HOURLY_CRON in worker/crons.ts; change them together.
 crons = ["* * * * *", "0 * * * *"]
 
@@ -95,8 +98,8 @@ enabled = true
 
 # The Playwright suite only (`wrangler dev --env e2e`, playwright.config.ts); never deployed. The
 # suite loads the page far more often than a reader, so the status limit is out of its way.
-# Bindings are not inherited by an environment, so each is repeated here. It must never reach production: no route,
-# no workers.dev URL, no crons, and a local-only database id.
+# Bindings are not inherited by an environment, so each is repeated here. It must never reach
+# production: no route, no workers.dev URL, no crons, and a local-only database id.
 [env.e2e]
 workers_dev = false
 routes = []

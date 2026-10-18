@@ -11,6 +11,7 @@ import { FROM_CACHE_HEADER } from '../sw/strategy';
 /** A status, flagged when the service worker answered from its cache because the network failed. */
 export type Status = StatusResponse & { fromCache?: true };
 
+/** A non-2xx reply: `code` is the body's ErrorCode, or `http_<status>` when it has none. */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -33,6 +34,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 
+/** The app's calls to the Worker; each rejects with ApiError on a non-2xx reply. */
 export const api = {
   status: () => request<Status>(STATUS_PATH),
   stats: () => request<StatsResponse>(STATS_PATH),

@@ -34,6 +34,7 @@ function openOutageQuery(db: Db) {
   return db.select().from(outages).where(isOpen).orderBy(desc(outages.startTime)).limit(1);
 }
 
+/** The newest open outage that is not a false positive. */
 export async function getOpenOutage(db: Db): Promise<Outage | undefined> {
   const [open] = await openOutageQuery(db);
   return open;
@@ -75,6 +76,7 @@ function powerState(
   return { status: 'ON', since: null };
 }
 
+/** The D1-backed part of StatusResponse, read in one batch. */
 export async function getGridState(db: Db, now: Date) {
   const [[heartbeat], [open], recentRows] = await db.batch([
     heartbeatQuery(db),
@@ -97,7 +99,7 @@ export async function getGridState(db: Db, now: Date) {
     since: state.since ?? lastEnd,
     outage: open ? summarise(open) : null,
     recent: recentRows.map(summarise),
-    // Whether a sensor is online now; says nothing about how any outage was recorded.
+    // Whether a sensor is reporting now; says nothing about how any outage was recorded.
     monitored: heartbeat !== undefined && !isStale(heartbeat.lastSeen, now),
   };
 }
@@ -154,6 +156,7 @@ export async function recordHeartbeat(db: Db, now: Date): Promise<{ closed: numb
   return { closed: closed.length, changed: closed.length > 0 || missed.meta.changes > 0 };
 }
 
+/** Deletes sessions past `expiresAt`; run by HOURLY_CRON, as checkSession deletes only the ones it meets. */
 export async function purgeExpiredSessions(db: Db, now: Date): Promise<void> {
   await db.delete(sessions).where(lt(sessions.expiresAt, now.toISOString()));
 }

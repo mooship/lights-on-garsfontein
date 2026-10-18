@@ -39,6 +39,7 @@ export async function safeEqual(a: string, b: string): Promise<boolean> {
   return constantTimeEqual(new Uint8Array(ha), new Uint8Array(hb));
 }
 
+/** Base64url, unpadded: 32 bytes give the 43 characters SESSION_TOKEN (worker/routes/auth.ts) expects. */
 export function randomToken(byteLength = 32): string {
   return toBase64Url(crypto.getRandomValues(new Uint8Array(byteLength)));
 }
@@ -56,6 +57,7 @@ export async function hashPassword(password: string): Promise<string> {
   return `pbkdf2_sha256$${PBKDF2_ITERATIONS}$${toBase64(salt)}$${toBase64(hash)}`;
 }
 
+/** False for a malformed hash, or one with more iterations than the Workers cap allows. */
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const [scheme, iter, salt, expected] = stored.split('$');
   const iterations = Number(iter);

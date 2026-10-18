@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { MINUTE_MS } from '../../shared/api';
 import { ERROR, type ErrorCode } from '../../shared/errors';
 
+/** A JSON response, `no-store` unless `headers` sets its own Cache-Control. */
 export function json(data: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -16,6 +17,7 @@ export function json(data: unknown, status = 200, headers: HeadersInit = {}): Re
 /** Cache-Control for a public response that any cache may keep for `ms`. */
 export const publicCache = (ms: number) => `public, max-age=${ms / 1000}`;
 
+/** Every API error response: `{ error }` with an ErrorCode, plus the zod issues as `details` on a bad request. */
 export const errors = {
   badRequest: (error: ErrorCode = ERROR.badRequest, details?: unknown) => json({ error, details }, 400),
   unauthorized: () => json({ error: ERROR.unauthorized }, 401),
@@ -35,6 +37,7 @@ export function bearerToken(request: Request): string | null {
 
 export const CLIENT_IP_HEADER = 'CF-Connecting-IP';
 
+/** For rate limits and Turnstile only; never stored. */
 export function clientIp(request: Request): string {
   return request.headers.get(CLIENT_IP_HEADER) ?? '127.0.0.1';
 }
@@ -60,7 +63,7 @@ export async function isRateLimited(limiter: RateLimit, key: string): Promise<bo
   return !success;
 }
 
-/** Parses a JSON body against a schema; returns a 400 Response on failure. */
+/** Parses a JSON body against a schema; on failure returns the 400 to send instead. */
 export async function parseBody<T extends z.ZodType>(
   request: Request,
   schema: T,

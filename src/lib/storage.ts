@@ -26,7 +26,9 @@ export function readStored(key: string): string | null {
 export function writeStored(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
-  } catch {}
+  } catch {
+    // Unavailable: the choice lasts only for this visit.
+  }
 }
 
 /** A remembered yes/no, stored as '1'. */

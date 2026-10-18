@@ -5,7 +5,7 @@ export interface Poll<T> {
   data: Accessor<T | undefined>;
   /** The latest failure, cleared by the next success. */
   error: Accessor<unknown>;
-  /** When `data` last arrived, in ms. */
+  /** When `data` last arrived (Date.now() ms); 0 until it first does. */
   updatedAt: Accessor<number>;
   refetch: () => void;
 }

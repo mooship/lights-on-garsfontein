@@ -12,7 +12,7 @@ import { ADMIN_USER_ID, passwordFingerprint, SESSION_TTL_MS } from '../worker/ro
 /** The test SITE_URL (set once in vitest.config.ts). */
 export const ORIGIN = env.SITE_URL;
 
-/** Routes with `edgeCache`. */
+/** Every route with `edgeCache`; test/setup.ts empties their cached copies before each test. */
 export const EDGE_CACHED = [STATUS_PATH, STATS_PATH, CSV_PATH, FEED_PATH];
 
 /**
@@ -43,6 +43,7 @@ interface CallOptions {
   env?: Env;
 }
 
+/** Sends a request through the Worker's fetch handler, from a fresh uniqueIp() unless `ip` is given. */
 export async function call(path: string, options: CallOptions = {}): Promise<Response> {
   const headers = new Headers(options.headers);
   headers.set(CLIENT_IP_HEADER, options.ip ?? uniqueIp());
@@ -80,12 +81,14 @@ export async function getStatus(): Promise<StatusResponse> {
   return res.json();
 }
 
+/** Writes the sensor's last heartbeat straight to D1, `secondsAgo` in the past; returns it as ISO. */
 export async function setHeartbeat(secondsAgo: number): Promise<string> {
   const lastSeen = new Date(Date.now() - secondsAgo * 1000).toISOString();
   await env.DB.prepare('INSERT OR REPLACE INTO heartbeats (id, last_seen) VALUES (1, ?)').bind(lastSeen).run();
   return lastSeen;
 }
 
+/** Writes an outage straight to D1, so nothing purges the edge cache; by default an open sensor outage. */
 export async function insertOutage(values: {
   startTime?: string;
   endTime?: string | null;
@@ -146,6 +149,7 @@ export async function login(password = 'test-password'): Promise<string> {
   return cookie.split(';')[0] ?? '';
 }
 
+/** Runs the Worker's scheduled handler, by default as the outage-detection cron. */
 export async function runCron(cron = MINUTE_CRON, scheduledTime = Date.now()): Promise<void> {
   await worker.scheduled(createScheduledController({ scheduledTime, cron }), env);
 }

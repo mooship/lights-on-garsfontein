@@ -32,7 +32,7 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return loader;
 }
 
-/** Runs a Turnstile challenge in `container` and resolves with the token. */
+/** Runs a Turnstile challenge in `container` and resolves with the token; the widget is removed either way. */
 export async function getTurnstileToken(
   container: HTMLElement,
   siteKey: string,

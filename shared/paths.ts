@@ -1,6 +1,3 @@
-// Every URL path the Worker serves or the app links to, shared by the Worker routes, the app's
-// api client, the service worker, the sitemap and the dev proxy in vite.config.ts.
-
 /** A request under this that no route matches gets the Worker's JSON 404, not the app's page. */
 export const API_PREFIX = '/api/';
 

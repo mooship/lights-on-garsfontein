@@ -74,6 +74,7 @@ async function status(event: FetchEvent): Promise<Response> {
     return response;
   });
   // Registered now, while the event accepts it, so a reply that loses to the timeout is still kept.
+  // A failure is answered below from the cache.
   event.waitUntil(network.catch(() => {}));
   const fresh = await inTime(network);
   if (fresh?.ok) return fresh;

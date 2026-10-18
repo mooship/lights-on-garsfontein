@@ -296,6 +296,7 @@ const Dashboard: Component<{
   };
 
   const logout = async () => {
+    // The view signs out whatever the server says; a failed call leaves a session that expires.
     await api.logout().catch(() => {});
     props.onLoggedOut();
   };

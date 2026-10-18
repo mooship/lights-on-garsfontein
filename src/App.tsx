@@ -123,8 +123,8 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
 
   const data = status.data;
   useStatusTab(data, minute);
-  // The last poll failed, so the status shown may be out of date. (A tab back from the background
-  // is not stale: it refetches at once, and "Updated HH:MM" shows the age meanwhile.)
+  // The last poll failed, so the status shown may be out of date. A tab back from the background
+  // is not stale: it refetches at once.
   const stale = () => status.error() !== undefined;
 
   return (

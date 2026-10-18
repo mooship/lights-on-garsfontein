@@ -9,12 +9,15 @@ import { errors, isRateLimited, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkTurnstile } from '../lib/turnstile';
 
+/** The shape of randomToken()'s output. */
 const SESSION_TOKEN = /^[\w-]{43}$/;
-// Stay signed in for 30 days after the last visit; renewing at most daily keeps writes rare.
+/** A session ends this long after it was last renewed. */
 export const SESSION_TTL_MS = 30 * DAY_MS;
+/** Renewing at most this often keeps session writes rare. */
 const RENEW_AFTER_MS = DAY_MS;
-// However often it is used, a session ends 90 days after sign-in.
+/** However often it is used, a session ends this long after sign-in. */
 const SESSION_MAX_AGE_MS = 90 * DAY_MS;
+/** The single admin account's id in `sessions.user_id`. */
 export const ADMIN_USER_ID = 'admin';
 
 const loginSchema = z.object({
@@ -46,9 +49,10 @@ export const passwordFingerprint = async (env: Env) =>
   (await sha256Hex(`session:${env.ADMIN_PASSWORD_HASH}`)).slice(0, 16);
 
 /**
- * True when the request carries a valid, unexpired session cookie. Sessions slide: once a
- * day of the 30 has been used, the expiry and the cookie are pushed back out to 30 days, up to
- * 90 days after sign-in. Sessions signed in under another password are deleted.
+ * True when the request carries a valid, unexpired session cookie. Sessions slide: once
+ * RENEW_AFTER_MS has passed, the expiry and the cookie (via `ctx.headers`) are pushed back out to
+ * SESSION_TTL_MS, up to SESSION_MAX_AGE_MS after sign-in. Expired sessions, and those signed in
+ * under another password, are deleted.
  */
 export async function checkSession({ request, env, db, headers }: RouteContext): Promise<boolean> {
   const token = readCookie(request, SESSION_COOKIE);

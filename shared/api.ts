@@ -8,9 +8,12 @@ import { site } from '../site.config';
 export type PowerStatus = 'ON' | 'OFF';
 export type OutageSource = 'sensor' | 'manual';
 
+/** All times in the public API are ISO 8601 in UTC; clients convert to the local zone. */
 export interface OutageSummary {
+  /** Stable for the life of the record; also the CSV `id` and the feed entry's `#outage-<id>`. */
   id: number;
   startTime: string;
+  /** Null while the outage is still in progress. */
   endTime: string | null;
   /** Announced in advance, e.g. maintenance or upgrades. */
   planned: boolean;
@@ -18,21 +21,27 @@ export interface OutageSummary {
 
 export interface AdminOutage extends OutageSummary {
   source: OutageSource;
+  /** Dismissed by an admin: left out of every public view, the status, statistics, CSV and feed. */
   isFalsePositive: boolean;
 }
 
 export interface StatusResponse {
+  /** OFF while an outage is open or the sensor heartbeat is older than HEARTBEAT_THRESHOLD_MS. */
   status: PowerStatus;
-  /** When the current state began, if known. */
+  /** When the current state began: the outage start or last heartbeat when OFF, the latest end in `recent` when ON. */
   since: string | null;
+  /** The open outage; null when ON, and briefly when OFF from a stale heartbeat before the cron records it. */
   outage: OutageSummary | null;
+  /** The latest outages, newest first, at most RECENT_LIMIT (worker/lib/grid.ts), the open one included. */
   recent: OutageSummary[];
   /**
    * A sensor has reported and its last heartbeat is fresh. When false, ON only means no outage
    * has been reported, not that power was measured.
    */
   monitored: boolean;
+  /** Public key for the Turnstile widget on the sign-in form and the privacy page's contact button. */
   turnstileSiteKey: string;
+  /** When the Worker built it; an edge-cached copy can lag by STATUS_EDGE_TTL_SECONDS (worker/routes/status.ts). */
   generatedAt: string;
 }
 
@@ -40,13 +49,17 @@ export interface AdminOutagesResponse {
   outages: AdminOutage[];
 }
 
+/** One window of time. Overlapping outage records count once, and an outage still in progress counts up to now. */
 export interface WindowStats {
-  /** Hours of the window that fall after tracking began. */
+  /** Hours of the window that fall after tracking began, to one decimal. */
   trackedHours: number;
+  /** Hours without power in the window, to one decimal. */
   hoursOff: number;
+  /** Outages that overlap the window, including ones that began before it. */
   outages: number;
-  /** Share of tracked time with power (0–1), or null before any time was tracked. */
+  /** Share of tracked time with power (0–1, four decimals), or null before any time was tracked. */
   availability: number | null;
+  /** The longest outage, in whole minutes, counting only the part inside the window. */
   longestMinutes: number;
   /** South African calendar days the window covers since tracking began. */
   daysTracked: number;
@@ -56,15 +69,20 @@ export interface WindowStats {
   plannedOutages: number;
 }
 
+/** One Monday-to-Sunday week; the current week runs only until now. */
 export interface WeekStats {
   /** Monday of the week in South African time, as YYYY-MM-DD. */
   weekStart: string;
+  /** As in WindowStats. */
   hoursOff: number;
+  /** As in WindowStats. */
   outages: number;
 }
 
 export interface StatsResponse {
+  /** No statistic counts time before this (TRACKING_SINCE). */
   trackingSince: string;
+  /** The 7, 30 and 365 days up to `generatedAt`. */
   last7: WindowStats;
   last30: WindowStats;
   last365: WindowStats;
@@ -95,7 +113,7 @@ export function outageDurationMs(outage: { startTime: string; endTime: string | 
   return (outage.endTime ? Date.parse(outage.endTime) : now) - Date.parse(outage.startTime);
 }
 
-/** Heartbeats older than this mean the grid is off. */
+/** A sensor heartbeat older than this means the power is off at the measuring point. */
 export const HEARTBEAT_THRESHOLD_MS = 180_000;
 
 /** Statistics never count time before this. */

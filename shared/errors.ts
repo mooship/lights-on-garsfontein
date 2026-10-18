@@ -1,4 +1,7 @@
-/** The `error` field of every API error response: sent by worker/lib/http.ts, explained by `admin.errors` in src/i18n. */
+/**
+ * The `error` field of every API error response. A new code needs a message in `admin.errors` in
+ * both dictionaries, or a place in `Unexplained` (src/i18n/af.ts) if the admin page never meets it.
+ */
 export const ERROR = {
   badRequest: 'bad_request',
   invalidJson: 'invalid_json',

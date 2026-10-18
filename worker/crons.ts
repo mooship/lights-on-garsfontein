@@ -3,5 +3,5 @@
 
 /** Outage detection. */
 export const MINUTE_CRON = '* * * * *';
-/** Housekeeping: session and fingerprint purges. */
+/** Housekeeping: purges expired admin sessions. */
 export const HOURLY_CRON = '0 * * * *';

@@ -7,12 +7,14 @@ import { DICTIONARIES } from '../src/i18n/index.ts';
 const LOCALES: readonly Locale[] = site.locales;
 const [DEFAULT_LOCALE] = site.locales;
 
+/** For HTML text and double-quoted attributes; single quotes are left alone. */
 export const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** `text` as the inside of a JSON string, with < escaped so it cannot close a <script>. */
 export const jsonString = (text: string) => JSON.stringify(text).slice(1, -1).replace(/</g, '\\u003c');
 
+/** How `fill` escapes a value: for HTML, inside a JSON string, or not at all. */
 export type Mode = 'html' | 'json' | 'text';
 
 /** The value behind a placeholder name: `site.<path>` or `since.<locale>`. */

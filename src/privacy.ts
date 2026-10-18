@@ -7,7 +7,7 @@ import { getTurnstileToken } from './lib/turnstile';
 // secret and is fetched only after a Turnstile check, so it is never in the HTML or this bundle.
 // Without JavaScript the blocks stay hidden and the GitHub link is the way to get in touch.
 
-/** POST /api/contact: the address, or null when the deploy has none (404 not_configured). */
+/** The address from CONTACT_PATH, or null when the deploy has none (404 not_configured). */
 async function fetchEmail(token: string): Promise<string | null> {
   const res = await fetch(CONTACT_PATH, {
     method: 'POST',

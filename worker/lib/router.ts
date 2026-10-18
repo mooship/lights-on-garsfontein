@@ -5,6 +5,7 @@ export interface RouteContext {
   request: Request;
   env: Env;
   db: Db;
+  /** The client's address, for rate limits and Turnstile only; never stored. */
   ip: string;
   /** Key for per-connection rate limits (IPv6 grouped by /64). */
   limitKey: string;
@@ -83,6 +84,7 @@ async function fromEdgeCache(ctx: RouteContext, handler: Route['handler'], ttl: 
   return response;
 }
 
+/** Runs a matched route: its guards, the handler (or edge cache), purges, then CORS and `ctx.headers`. */
 export async function dispatch(route: Route, request: Request, env: Env): Promise<Response> {
   const ip = clientIp(request);
   const ctx: RouteContext = {

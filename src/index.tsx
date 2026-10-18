@@ -13,6 +13,7 @@ function start() {
   let initial: InitialData | undefined;
   if (!isAdmin) {
     initial = { status: api.status(), stats: api.stats() };
+    // createPoll reports failures; these only stop an unhandled rejection before it subscribes.
     initial.status.catch(() => {});
     initial.stats.catch(() => {});
   }

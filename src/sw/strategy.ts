@@ -34,8 +34,8 @@ export const strayAssets = (html: string, assets: readonly string[]) =>
 
 /**
  * An allowlist: `pages` (the worker's precached HTML), the hashed assets and the status. Everything
- * else goes to the network untouched, including every write, /admin, the admin and report APIs,
- * the CSV, feed and social card, /cdn-cgi/ and other origins (Turnstile).
+ * else goes to the network untouched, including every write, /admin, the admin API, the CSV,
+ * feed and social card, /cdn-cgi/ and other origins (Turnstile).
  */
 export function strategyFor(method: string, url: URL, origin: string, pages: readonly string[]): Strategy {
   if (method !== 'GET' || url.origin !== origin) return 'network';

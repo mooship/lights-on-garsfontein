@@ -50,7 +50,7 @@ const ADMIN_PASSWORD = 'test-password';
 // Public copy never says how an outage was recorded, in either language.
 const RECORDING_METHOD = /by hand|sensor|met die hand|handmatig|voeler/i;
 
-// Log in through the UI once and reuse the cookie: the login endpoint allows 5 attempts a minute.
+// Log in through the UI once and reuse the cookie: LOGIN_LIMITER (wrangler.toml) allows only a few a minute.
 let sessionCookies: Cookie[] = [];
 
 async function login(page: Page) {
@@ -243,7 +243,7 @@ test.describe('public page', () => {
     // No "for 7 h": nothing measured it on.
     await expect(page.getByText(new RegExp(`^${escapeRegExp(en.status.for(''))}\\d`))).toHaveCount(0);
     await expect(page.locator('[data-status="NONE"]')).toBeVisible();
-    // Just the one line of detail: no "Updated HH:MM" while all is well.
+    // Just the one line of detail: no warning while all is well.
     await expect(page.locator('.gg-status-detail > p')).toHaveCount(1);
     await expect(page).toHaveTitle(NEUTRAL_TITLE);
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon.svg');

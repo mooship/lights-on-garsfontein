@@ -37,6 +37,7 @@ const outageSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal(OUTAGE_ACTION.delete), id: z.number().int().positive() }),
 ]);
 
+/** The newest 50 outages, false positives included, with how each was recorded. */
 async function listOutages({ db }: RouteContext): Promise<Response> {
   const rows = await db.select().from(outages).orderBy(desc(outages.startTime)).limit(50);
   const body: AdminOutagesResponse = {
@@ -49,6 +50,7 @@ async function listOutages({ db }: RouteContext): Promise<Response> {
   return json(body);
 }
 
+/** Punch out opens a manual outage now, punch in closes the open one; 409 when there is nothing to do. */
 async function timer({ request, db }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, timerSchema);
   if ('response' in parsed) return parsed.response;

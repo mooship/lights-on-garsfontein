@@ -14,7 +14,9 @@ export const outages = sqliteTable(
   'outages',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
+    /** ISO 8601 UTC, like every time in this schema, so text order is time order. */
     startTime: text('start_time').notNull(),
+    /** Null while the outage is open. */
     endTime: text('end_time'),
     // Adding a source: extend this enum, `OutageSource` in shared/api.ts and the admin `source`
     // labels in the dictionaries together, then run `npm run db:generate`. The enum is type-level
@@ -32,7 +34,8 @@ export const outages = sqliteTable(
 );
 
 export const sessions = sqliteTable('sessions', {
-  id: text('id').primaryKey(), // Hashed session token
+  /** SHA-256 of the cookie's token, so a copy of this table cannot sign anyone in. */
+  id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
   expiresAt: text('expires_at').notNull(),
   /** Sign-in time; the absolute session lifetime counts from here, however often it is renewed. */

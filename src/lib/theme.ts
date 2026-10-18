@@ -24,6 +24,7 @@ function applyTheme(next: Theme): void {
   syncThemeColor(next);
 }
 
+/** The visitor's own choice: remembered, and from then on it overrides the OS setting. */
 export function setTheme(next: Theme): void {
   applyTheme(next);
   writeStored(STORAGE_KEYS.theme, next);
