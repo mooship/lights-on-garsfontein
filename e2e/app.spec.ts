@@ -24,6 +24,7 @@ import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
 import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
+import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
 import { expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
@@ -36,6 +37,8 @@ const BRAND = site.brand.short;
 /** The tab title without a live reading: it claims no status. */
 const NEUTRAL_TITLE = site.brand.full;
 
+/** "rgb(179, 58, 43)" for "#B33A2B", as computed styles report a colour. */
+const rgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Stands for a clock time in a message, for `withTime`. */
 const AT = '@@:@@';
@@ -382,6 +385,19 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('alert')).toHaveText(en.status.unreachable);
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
+    // Where it is measured holds in every state, and red stays for measured outages only.
+    await expect(page.getByText(en.scope.measured(site.landmark), { exact: true })).toBeVisible();
+    await expect(page.getByRole('alert')).not.toHaveCSS('color', rgb(PALETTE.light.off));
+  });
+
+  test('keeps the statistics card’s shape and disclosures when the statistics fail to load', async ({ page }) => {
+    await page.route(`**${STATS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
+    await page.goto('/en/');
+    const failed = page.getByText(en.trends.loadFailed, { exact: true });
+    await expect(failed).toBeVisible();
+    await expect(failed).not.toHaveCSS('color', rgb(PALETTE.light.off));
+    await expect(page.locator('.gg-trends-body')).toBeVisible();
+    await expect(page.getByText(en.trends.howTitle, { exact: true })).toBeVisible();
   });
 
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
@@ -872,6 +888,37 @@ test.describe('outages by time of day', () => {
         await expect(card.locator('.gg-skel-row')).toBeVisible();
         expect(await height()).toBe(loaded);
       });
+
+      // Below 340px text wraps the most and varies most with the data, so the reserve leaves more room.
+      for (const [width, maxGap] of [
+        [320, 60],
+        [360, 36],
+        [1280, 36],
+      ]) {
+        test(`reserves the statistics their loaded height, without a gap, at ${width}px (${locale})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width, height: 900 });
+          await withOutages(page);
+          const body = page.locator('.gg-trends-body');
+          const measure = () =>
+            body.evaluate(async (el) => {
+              await document.fonts.ready;
+              const box = el.getBoundingClientRect();
+              const last = el.lastElementChild?.getBoundingClientRect();
+              return { height: box.height, gap: box.bottom - (last?.bottom ?? box.bottom) };
+            });
+          await page.goto(localePath(locale));
+          await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
+          const loaded = await measure();
+          // The reserve is the tallest body in its width range, so a shorter one leaves some room.
+          expect(loaded.gap).toBeLessThanOrEqual(maxGap);
+          await page.route('**/assets/*.js', (route) => route.abort());
+          await page.reload();
+          await expect(body.locator('.gg-skel')).not.toHaveCount(0);
+          expect((await measure()).height).toBe(loaded.height);
+        });
+      }
     });
   }
 });

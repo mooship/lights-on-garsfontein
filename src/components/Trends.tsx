@@ -422,12 +422,17 @@ export const Trends: Component<TrendsProps> = (props) => {
           <Download size={14} aria-hidden="true" /> {t().trends.download}
         </a>
       </details>
-      <details class="gg-trends-details">
-        <summary>{t().trends.howTitle}</summary>
-        <ul>
-          <For each={t().trends.how}>{(point) => <li>{point}</li>}</For>
-        </ul>
-      </details>
+      <HowWeMeasure />
     </>
   );
 };
+
+/** How the figures are measured; shown even when they fail to load. */
+export const HowWeMeasure: Component = () => (
+  <details class="gg-trends-details">
+    <summary>{t().trends.howTitle}</summary>
+    <ul>
+      <For each={t().trends.how}>{(point) => <li>{point}</li>}</For>
+    </ul>
+  </details>
+);

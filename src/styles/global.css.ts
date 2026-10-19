@@ -119,9 +119,17 @@ globalStyle('.gg-status-detail', {
 
 globalStyle('.gg-status-warning', { fontSize: '0.8125rem' });
 
-// The trends body reserves its loaded height; only text that wraps on a narrow or zoomed
-// screen, or the user-opened weekly table below it, may grow the card.
-globalStyle('.gg-trends-body', { minHeight: '48.25rem' });
+// The trends body reserves its loaded height, which depends on how many lines its text wraps to, so
+// it steps with the width: the tallest loaded body in each range, in either language. Only text that
+// wraps further on a zoomed screen, or the user-opened weekly table below it, may grow the card.
+globalStyle('.gg-trends-body', {
+  minHeight: '53.25rem',
+  '@media': {
+    'screen and (min-width: 21.25rem)': { minHeight: '49.6875rem' },
+    'screen and (min-width: 26.25rem)': { minHeight: '48.875rem' },
+    'screen and (min-width: 33.75rem)': { minHeight: '46.4375rem' },
+  },
+});
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
 

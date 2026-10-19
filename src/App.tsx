@@ -19,7 +19,7 @@ import { HistorySkeleton, StatusSkeleton, TrendsCardSkeleton } from './component
 import { StatusBadge } from './components/StatusBadge';
 import { SafetyLine, Scope } from './components/StatusNotes';
 import { ThemeToggle } from './components/ThemeToggle';
-import { Trends } from './components/Trends';
+import { HowWeMeasure, Trends } from './components/Trends';
 import { api } from './lib/api';
 import { formatDate, formatDuration, formatRelativeDay, formatTime } from './lib/format';
 import { t } from './lib/i18n';
@@ -165,6 +165,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             <p class={css.error} role="alert">
               {t().status.unreachable}
             </p>
+            <Scope />
             <SafetyLine />
           </Match>
           <Match when={true}>
@@ -188,10 +189,14 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             )}
           </Match>
           <Match when={stats.error() !== undefined}>
-            <h2 id="trends-heading" class="gg-card-title">
-              {t().trends.title}
-            </h2>
-            <p class={css.warning}>{t().trends.loadFailed}</p>
+            {/* The body keeps the card's reserved height, so the cards below stay put. */}
+            <div class="gg-trends-body">
+              <h2 id="trends-heading" class="gg-card-title">
+                {t().trends.title}
+              </h2>
+              <p class={css.warning}>{t().trends.loadFailed}</p>
+            </div>
+            <HowWeMeasure />
           </Match>
           <Match when={true}>
             <TrendsCardSkeleton />
