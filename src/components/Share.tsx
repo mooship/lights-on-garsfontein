@@ -45,7 +45,9 @@ export const Share: Component = () => {
   async function share() {
     setResult(null);
     try {
-      await navigator.share({ title: site.brand.full, text: t().share.text, url: shareUrl() });
+      // The link goes in the text, not `url`: several targets, such as Copy on Windows and Android, keep
+      // only the text and would drop it.
+      await navigator.share({ title: site.brand.full, text: `${t().share.text} ${shareUrl()}` });
     } catch (error) {
       // Closing the share sheet is not a failure; anything else falls back to copying.
       if (!(error instanceof DOMException && error.name === 'AbortError')) await copy();
