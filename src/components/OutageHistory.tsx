@@ -51,24 +51,30 @@ interface OutageHistoryProps {
 /** The recent outages and, on request, every outage in pages. */
 export const OutageHistory: Component<OutageHistoryProps> = (props) => {
   let showAll: HTMLButtonElement | undefined;
+  let pager: HTMLElement | undefined;
   const [all, setAll] = createSignal<OutageSummary[]>([]);
   const [page, setPage] = createSignal(0);
   const [loading, setLoading] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
+  // Bumped by every load and by closing the list, so an answer that comes later is ignored.
   let latest = 0;
 
-  const load = () => {
+  /** `opening`: the reader asked for the list, so the focus follows it once it shows. */
+  const load = (opening: boolean) => {
     const id = ++latest;
     setLoading(true);
     api.allOutages().then(
-      ({ outages }) =>
-        id === latest &&
+      ({ outages }) => {
+        if (id !== latest) return;
         batch(() => {
           setAll(outages);
           setLoading(false);
           setFailed(false);
           props.onExpandedChange(true);
-        }),
+        });
+        // The button pressed is gone, so the focus would drop to the page.
+        if (opening) pager?.focus();
+      },
       () =>
         id === latest &&
         batch(() => {
@@ -80,16 +86,28 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
 
   // The status poll brings the recent outages; when one starts, ends or changes, so has the full list.
   const recentKey = () => props.recent.map((o) => `${o.id}:${o.endTime}:${o.planned}`).join();
-  createEffect(on(recentKey, () => props.expanded && load(), { defer: true }));
+  createEffect(on(recentKey, () => props.expanded && load(false), { defer: true }));
 
   const current = () => pageOf(all(), page());
   const turn = (to: number) => to >= 0 && to < current().count && setPage(to);
   const collapse = () => {
-    setPage(0);
-    props.onExpandedChange(false);
+    latest++;
+    batch(() => {
+      setPage(0);
+      setLoading(false);
+      setFailed(false);
+      props.onExpandedChange(false);
+    });
     // The button the reader came from takes the focus back, as the pager it was in is gone.
     queueMicrotask(() => showAll?.focus());
   };
+  const failure = () => (
+    <Show when={failed()}>
+      <p class={css.empty} role="alert">
+        {t().history.failed}
+      </p>
+    </Show>
+  );
 
   return (
     <Show
@@ -97,11 +115,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
       fallback={
         <>
           <OutageList outages={props.recent} now={props.now} />
-          <Show when={failed()}>
-            <p class={css.empty} role="alert">
-              {t().history.failed}
-            </p>
-          </Show>
+          {failure()}
           {/* A full recent list may not be all of them. */}
           <Show when={props.recent.length >= RECENT_LIMIT}>
             <button
@@ -109,7 +123,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
               type="button"
               class={`${button.ghost} ${css.more}`}
               aria-disabled={loading()}
-              onClick={() => !loading() && load()}
+              onClick={() => !loading() && load(true)}
             >
               {loading() ? t().loading : t().history.showAll}
             </button>
@@ -118,7 +132,9 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
       }
     >
       <OutageList outages={current().items} now={props.now} />
-      <nav class={css.pager} aria-label={t().history.pages}>
+      {/* A failed reload keeps the last list, and says so. */}
+      {failure()}
+      <nav ref={pager} class={css.pager} aria-label={t().history.pages} tabindex="-1">
         <button
           type="button"
           class={button.ghost}

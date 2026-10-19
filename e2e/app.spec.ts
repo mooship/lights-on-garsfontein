@@ -1091,14 +1091,74 @@ test.describe('all outages', () => {
           client: document.documentElement.clientWidth,
         }));
         expect(scroll).toBeLessThanOrEqual(client);
-        // One row: the page label never wraps under the buttons.
-        const heights = await pager
-          .getByRole('button')
-          .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
-        expect(new Set(heights).size).toBe(1);
+        // One row: the buttons and the page label all share one line.
+        const boxes = await pager.locator(':scope > *').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+        expect(boxes).toHaveLength(3);
+        // Boxes on one line overlap vertically; a wrapped one starts below another's bottom.
+        expect(Math.max(...boxes.map((b) => b.top))).toBeLessThan(Math.min(...boxes.map((b) => b.bottom)));
+      });
+
+      test(`has zero cumulative layout shift while loading a full recent list (${locale})`, async ({
+        page,
+        request,
+      }) => {
+        await logOutages(request, RECENT_LIMIT);
+        await trackLayoutShift(page);
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('button', { name: DICTIONARIES[locale].history.showAll })).toBeVisible();
+        expect(await readLayoutShift(page)).toBe(0);
       });
     });
   }
+
+  test('moves the focus to the pages it opens, then keeps the list shut once it is closed', async ({
+    page,
+    request,
+  }) => {
+    const [newest] = await logOutages(request, RECENT_LIMIT);
+    await page.goto('/');
+    await page.getByRole('button', { name: en.history.showAll }).click();
+    await expect(page.getByRole('navigation', { name: en.history.pages })).toBeFocused();
+
+    // A reload the status sets off is still on its way when the reader closes the list.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(`**${OUTAGES_PATH}`, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    const outagesRequested = page.waitForRequest(`**${OUTAGES_PATH}`);
+    await request.post(ADMIN_OUTAGES_PATH, {
+      headers: ADMIN_API,
+      data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
+    });
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await outagesRequested;
+    await page.getByRole('button', { name: en.history.showRecent }).click();
+    const outagesAnswered = page.waitForResponse(`**${OUTAGES_PATH}`);
+    release();
+    await outagesAnswered;
+    await expect(page.getByRole('heading', { name: en.history.title })).toBeVisible();
+    await expect(page.getByRole('button', { name: en.history.showAll })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  test('says so when a reload of the open list fails, and not once it is closed', async ({ page, request }) => {
+    const [newest] = await logOutages(request, RECENT_LIMIT);
+    await page.goto('/');
+    await page.getByRole('button', { name: en.history.showAll }).click();
+    await expect(page.getByRole('heading', { name: en.history.allTitle })).toBeVisible();
+    await page.route(`**${OUTAGES_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
+    await request.post(ADMIN_OUTAGES_PATH, {
+      headers: ADMIN_API,
+      data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
+    });
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(history(page).getByText(en.history.failed)).toBeVisible();
+    await page.getByRole('button', { name: en.history.showRecent }).click();
+    await expect(history(page).getByText(en.history.failed)).toHaveCount(0);
+  });
 
   test('offers no full list while the recent one holds every outage', async ({ page, request }) => {
     await logOutages(request, RECENT_LIMIT - 1);
