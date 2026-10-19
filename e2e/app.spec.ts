@@ -657,11 +657,11 @@ test.describe('outages by time of day', () => {
       const response = await route.fetch();
       const body = (await response.json()) as StatsResponse;
       const last30ByHour = Array.from({ length: 24 }, (_, hour) => byHour[hour] ?? 0);
-      const first = body.weeks[0] ?? { weekStart: '2026-10-12', hoursOff: 0, outages: 0 };
+      const first = body.weeks[0] ?? { weekStart: '2026-10-12', hoursOff: 0, minutesOff: 0, outages: 0 };
       const next = new Date(Date.parse(first.weekStart) + 7 * DAY_MS).toISOString().slice(0, 10);
       const weeks = [
-        { ...first, hoursOff: 1, outages: 3 },
-        { weekStart: next, hoursOff: 2, outages: 1 },
+        { ...first, hoursOff: 1, minutesOff: 60, outages: 3 },
+        { weekStart: next, hoursOff: 2, minutesOff: 120, outages: 1 },
       ];
       const stats: StatsResponse = {
         ...body,
@@ -701,7 +701,7 @@ test.describe('outages by time of day', () => {
       return {
         ...stats,
         trackingSince: new Date(Date.parse(`${firstDay}T00:00:00Z`) - UTC_OFFSET_MS).toISOString(),
-        weeks: [first, { ...current, hoursOff: 0, outages: 0 }],
+        weeks: [first, { ...current, hoursOff: 0, minutesOff: 0, outages: 0 }],
       };
     });
     await page.goto('/en/');
@@ -713,14 +713,25 @@ test.describe('outages by time of day', () => {
   });
 
   test('gives the time off to the minute, the same as the longest of a single outage', async ({ page }) => {
-    await withOutages(page, undefined, (stats) => ({
-      ...stats,
-      last30: { ...stats.last30, hoursOff: 5.4, minutesOff: 323, longestMinutes: 323, outages: 1 },
-    }));
+    const single = { hoursOff: 5.4, minutesOff: 323, outages: 1 };
+    await withOutages(page, undefined, (stats) => {
+      const [first, current] = stats.weeks;
+      if (!first || !current) throw new Error('withOutages serves two weeks');
+      return {
+        ...stats,
+        last30: { ...stats.last30, ...single, longestMinutes: 323 },
+        weeks: [
+          { ...first, ...single },
+          { ...current, hoursOff: 0, minutesOff: 0, outages: 0 },
+        ],
+      };
+    });
     await page.goto('/en/');
+    const lasted = `5 ${en.units.h} 23 ${en.units.min}`;
     const tiles = page.locator('.gg-trends-body');
-    await expect(tiles).toContainText(`${en.trends.longest}5 ${en.units.h} 23 ${en.units.min}`);
-    await expect(tiles).toContainText(`${en.trends.withoutPower}5 ${en.units.h} 23 ${en.units.min}`);
+    await expect(tiles).toContainText(`${en.trends.longest}${lasted}`);
+    await expect(tiles).toContainText(`${en.trends.withoutPower}${lasted}`);
+    await expect(page.locator('p', { hasText: en.trends.outageCount(1) })).toContainText(`${lasted} ${en.trends.off}`);
   });
 
   test('names the period and the outages the time-of-day chart is based on, until 30 days are on record', async ({

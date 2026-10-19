@@ -133,7 +133,12 @@ export function weeklyStats(intervals: Interval[], now: number, trackingSince: n
   const weeks: WeekStats[] = [];
   for (let start = first; start <= now; start += WEEK) {
     const stats = windowStats(intervals, start, Math.min(start + WEEK, now), trackingSince);
-    weeks.push({ weekStart: localDate(start), hoursOff: stats.hoursOff, outages: stats.outages });
+    weeks.push({
+      weekStart: localDate(start),
+      hoursOff: stats.hoursOff,
+      minutesOff: stats.minutesOff,
+      outages: stats.outages,
+    });
   }
   return weeks;
 }
