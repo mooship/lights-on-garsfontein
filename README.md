@@ -24,7 +24,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | Method and path | Returns | Caching | Limits and access |
 | --- | --- | --- | --- |
 | `GET /api/status` | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages, `monitored`, `turnstileSiteKey`, `generatedAt` | `no-store` for browsers; 12 s at the edge | Shared 60/min; CORS |
-| `GET /api/stats` | The last 7, 30 and 365 days, the previous 30 days (`null` until tracked), each with the time without power as `hoursOff` (to 0.1 h) and `minutesOff` (to the minute), up to 26 weekly totals, and `last30ByHour`: the minutes without power in each hour of the day (local time, index 0 is 00:00) over the last 30 days | `max-age=60` | Shared 60/min; CORS |
+| `GET /api/stats` | The last 7, 30 and 365 days, the previous 30 days (`null` until tracked), each with the time without power as `hoursOff` (to 0.1 h) and `minutesOff` (to the minute), up to 26 weekly totals with the same two fields, and `last30ByHour`: the minutes without power in each hour of the day (local time, index 0 is 00:00) over the last 30 days | `max-age=60` | Shared 60/min; CORS |
 | `GET /api/outages.csv` | Every outage, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /feed.xml` | Atom feed of the 20 most recent outages, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |

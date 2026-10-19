@@ -154,9 +154,9 @@ describe('weekly stats', () => {
     const weeks = weeklyStats(intervals, t(zoned('2026-10-28T12:00:00')), since);
     // Tracking began on Saturday 17 Oct, so the first week is the one starting Monday 12 Oct.
     expect(weeks).toEqual([
-      { weekStart: '2026-10-12', hoursOff: 0, outages: 0 },
-      { weekStart: '2026-10-19', hoursOff: 2, outages: 1 },
-      { weekStart: '2026-10-26', hoursOff: 3, outages: 1 },
+      { weekStart: '2026-10-12', hoursOff: 0, minutesOff: 0, outages: 0 },
+      { weekStart: '2026-10-19', hoursOff: 2, minutesOff: 120, outages: 1 },
+      { weekStart: '2026-10-26', hoursOff: 3, minutesOff: 180, outages: 1 },
     ]);
   });
 
@@ -256,6 +256,7 @@ describe('GET /api/stats', () => {
     expect(body.weeks.at(-1)).toEqual({
       weekStart: new Date(week + UTC_OFFSET_MS).toISOString().slice(0, 10),
       hoursOff: Math.round((inWeek.reduce((a, b) => a + b, 0) / H) * 10) / 10,
+      minutesOff: Math.round(inWeek.reduce((a, b) => a + b, 0) / MINUTE_MS),
       outages: inWeek.filter((ms) => ms > 0).length,
     });
   });

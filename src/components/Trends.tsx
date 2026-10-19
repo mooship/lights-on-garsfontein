@@ -23,7 +23,7 @@ const { AXIS_WIDTH } = css;
 const tileDuration = (minutes: number) => (minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `0 ${t().units.min}`);
 
 /** To the minute, like `longestMinutes`: `hoursOff` is rounded to 6 minutes, so one outage could disagree with itself. */
-const minutesOff = (w: WindowStats) =>
+const minutesOff = (w: WindowStats | WeekStats) =>
   // Absent from a /api/stats response cached by the browser from before the field existed.
   (w.minutesOff as number | undefined) ?? Math.round(w.hoursOff * 60);
 
@@ -121,7 +121,7 @@ function weekReadout(w: WeekStats, place: WeekPlace): ReadoutParts {
   const m = t().trends;
   return {
     lead: m.weekOf(formatCalendarDay(w.weekStart)),
-    value: formatHours(w.hoursOff),
+    value: tileDuration(minutesOff(w)),
     rest: `${m.off} · ${m.outageCount(w.outages)}${weekNote(place)}`,
   };
 }

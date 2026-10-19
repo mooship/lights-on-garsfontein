@@ -87,6 +87,8 @@ export interface WeekStats {
   /** As in WindowStats. */
   hoursOff: number;
   /** As in WindowStats. */
+  minutesOff: number;
+  /** As in WindowStats. */
   outages: number;
 }
 
