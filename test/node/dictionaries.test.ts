@@ -20,6 +20,16 @@ function strings(node: unknown, path: string): [string, string][] {
 
 describe('public copy', () => {
   for (const locale of site.locales) {
+    // The day is `day.today`, `day.yesterday` or `day.on(…)` ("op Sa. 17 Okt."), so each sentence
+    // must read with a phrase that brings its own preposition.
+    it(`reads naturally with an older day in the status sentences (${locale})`, () => {
+      const m = DICTIONARIES[locale];
+      const day = m.day.on('Sat 17 Oct');
+      for (const sentence of [m.status.wentOff('14:05', day), m.status.planned('14:05', day)]) {
+        expect(sentence).not.toMatch(/\b(sedert|since) (op|on)\b/);
+      }
+    });
+
     it(`never says how an outage was recorded (${locale})`, () => {
       const all = [...strings(DICTIONARIES[locale], locale), ...strings(HEAD[locale], `head.${locale}`)];
       expect(all.length).toBeGreaterThan(50);

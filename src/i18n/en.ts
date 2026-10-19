@@ -50,7 +50,7 @@ export const en = {
     for: (duration: string) => `for ${duration}`,
     loading: 'Loading the current status…',
     wentOff: (time: string, day: string) => `Outage started at ${time} ${day}.`,
-    planned: (time: string, day: string) => `Planned outage since ${time} ${day}.`,
+    planned: (time: string, day: string) => `Planned outage started at ${time} ${day}.`,
     noOutages: (date: string) => `No outages since records began on ${date}.`,
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Last outage: ${from} to ${to} ${day} (${lasted}).`,

@@ -4,7 +4,7 @@
 export const af = {
   // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
   lang: { switchTo: 'Switch to English', next: 'English' },
-  theme: { label: 'Wissel tema', toDark: 'Skakel oor na donker modus', toLight: 'Skakel oor na ligte modus' },
+  theme: { label: 'Wissel tema', toDark: 'Skakel oor na donker tema', toLight: 'Skakel oor na ligte tema' },
   // `m` is the compact minute for the tab title ("1u 5m").
   units: { d: 'd', h: 'u', min: 'min', m: 'm', s: 's' },
   day: { today: 'vandag', yesterday: 'gister', on: (day: string) => `op ${day}` },
@@ -39,8 +39,8 @@ export const af = {
   scope: {
     measured: (landmark: string) =>
       landmark
-        ? `Gemeet in Garsfontein Uitb. 16, naby ${landmark}. Party strate kan anders wees.`
-        : 'Gemeet in Garsfontein Uitb. 16. Party strate kan anders wees.',
+        ? `Gemeet in Garsfontein Uitb. 16, naby ${landmark}. Sommige strate kan verskil.`
+        : 'Gemeet in Garsfontein Uitb. 16. Sommige strate kan verskil.',
   },
   // `report` is the link to site.faultReporting.url.
   safety: {
@@ -59,11 +59,11 @@ export const af = {
     for: (duration: string) => `Al ${duration}`,
     loading: 'Laai tans die huidige status…',
     wentOff: (time: string, day: string) => `Die onderbreking het ${day} om ${time} begin.`,
-    planned: (time: string, day: string) => `Beplande onderbreking sedert ${day} om ${time}.`,
+    planned: (time: string, day: string) => `Die beplande onderbreking het ${day} om ${time} begin.`,
     noOutages: (date: string) => `Geen onderbrekings sedert die rekord op ${date} begin het nie.`,
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Laaste onderbreking: ${day} van ${from} tot ${to} (${lasted}).`,
-    stale: (time: string) => `Kan nie die bediener bereik nie. Dit is die status soos om ${time}.`,
+    stale: (time: string) => `Kan nie die bediener bereik nie. Dit is die status soos dit om ${time} was.`,
     unreachable: 'Kan nie die bediener bereik nie. Ons probeer binnekort weer.',
   },
   history: {
@@ -78,7 +78,7 @@ export const af = {
   trends: {
     title: 'Statistiek',
     tableLabel: 'Wys die weeklikse syfers',
-    refreshFailed: (time: string) => `Kon nie die statistiek bywerk nie. Dit is die syfers soos om ${time}.`,
+    refreshFailed: (time: string) => `Kon nie die statistiek bywerk nie. Dit is die syfers soos dit om ${time} was.`,
     // Retried every STATS_POLL_MS (src/App.tsx).
     loadFailed: 'Kon nie die statistiek laai nie. Ons probeer oor ’n paar minute weer.',
     same: 'Onveranderd teenoor die vorige 30 dae',

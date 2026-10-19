@@ -28,7 +28,7 @@ export const HEAD: Record<Locale, Head> = {
   en: {
     title: 'Is the power off in Garsfontein? · %site.brand.full%',
     description:
-      'Is the power off in Garsfontein, Pretoria? Power outage status as last measured in Garsfontein Extension 16 (Ward 45), and a record of outages.',
+      'Is the power off in Garsfontein, Pretoria? Power status as last measured in Garsfontein Extension 16 (Ward 45), and a record of outages.',
     ogDescription: 'Power status as last measured in Garsfontein Ext. 16, and a record of outages.',
     imageAlt: '%site.brand.full%: is the power off in Garsfontein?',
     serviceDescription:

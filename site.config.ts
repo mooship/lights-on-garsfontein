@@ -43,8 +43,8 @@ export const site = {
   utcOffsetMinutes: 120,
   /** The first is the default. A single entry hides the language switch. */
   locales: ['af', 'en'],
-  /** BCP 47 tags for Intl formatting, per locale. */
-  intlLocales: { af: 'af-ZA', en: 'en-ZA' },
+  /** BCP 47 tags for Intl formatting, per locale. English is British: en-ZA pads days ("04 Nov"). */
+  intlLocales: { af: 'af-ZA', en: 'en-GB' },
 } as const;
 
 export type Locale = (typeof site.locales)[number];
