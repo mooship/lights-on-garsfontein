@@ -2,7 +2,7 @@
 
 > A record of power outages in Garsfontein, Pretoria, South Africa, kept since %since.en% (%site.timeZone%). There is no data from before that date. Independent service, operated by a Garsfontein resident. Not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
 
-What is measured: whether the electricity supply is on at one home in Garsfontein Extension 16, near %site.landmark% (%site.area.region%). That point is usually representative of the area supplied by the Garsfontein substation, but some streets can differ, and an outage limited to another street or extension will not appear. The site shows the status as last recorded; it is not a feed of every street.
+What is measured: whether the electricity supply is on at one home in Garsfontein Extension 16, near %site.landmark% (%site.area.region%). It speaks only for Extension 16, which is supplied by the Garsfontein substation (fed from Highlands, which is fed from Njala); even there some streets can differ, and an outage limited to another street or extension will not appear. The site shows the status as last recorded; it is not a feed of every street.
 
 The record covers all power outages at the measuring point, planned and unplanned, whatever the cause. It is not a load-shedding schedule and does not predict outages. The figures describe outages recorded at that one point; they are not a statement about any organisation's performance.
 
@@ -17,7 +17,7 @@ Source code (MIT): %site.repo%
 
 ## Endpoints
 
-All public endpoints are free to use; the JSON API, the CSV and the feed allow any origin (CORS). They share a limit of 60 requests a minute per connection, with IPv6 addresses counted per /64. Please poll no more than once every 30 seconds.
+All public endpoints are free to use; the JSON API, the CSV and the feed allow any origin (CORS). They share a limit of 60 requests a minute per connection, with IPv6 addresses counted per /64; answers from the edge cache do not count. Please poll no more than once every 30 seconds.
 
 - [Status (JSON)](%site.url%/api/status): the status as last recorded at the measuring point
 - [Statistics (JSON)](%site.url%/api/stats): for the last 7, 30 and 365 days, hours without power, number of outages (and how many were planned), days with an outage, share of time with power, and the longest outage; the previous 30 days for comparison; weekly totals; and, for the last 30 days, the minutes without power in each hour of the day. Only time since records began is counted.

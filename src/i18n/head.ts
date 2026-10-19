@@ -23,7 +23,7 @@ export const HEAD: Record<Locale, Head> = {
     ogDescription: 'Kragstatus soos laas gemeet in Garsfontein Uitbreiding 16, en ’n rekord van kragonderbrekings.',
     imageAlt: '%site.brand.full%: is die krag af in Garsfontein?',
     serviceDescription:
-      '’n Oop rekord van kragonderbrekings in Garsfontein, Pretoria, bygehou sedert %since.af%. Gemeet by een punt in Garsfontein Uitbreiding 16, naby %site.landmark%. Dit is gewoonlik verteenwoordigend van die gebied wat deur die Garsfontein-substasie voorsien word, maar sommige strate kan verskil. Onafhanklik bedryf deur ’n inwoner. Nie verbonde aan die Stad Tshwane of Eskom nie.',
+      '’n Oop rekord van kragonderbrekings in Garsfontein, Pretoria, bygehou sedert %since.af%. Gemeet by een punt in Garsfontein Uitbreiding 16, naby %site.landmark%. Dit geld net vir Uitbreiding 16, wat deur die Garsfontein-substasie voorsien word, en selfs daar kan sommige strate verskil. Onafhanklik bedryf deur ’n inwoner. Nie verbonde aan die Stad Tshwane of Eskom nie.',
   },
   en: {
     title: 'Is the power off in Garsfontein? · %site.brand.full%',
@@ -32,6 +32,6 @@ export const HEAD: Record<Locale, Head> = {
     ogDescription: 'Power status as last measured in Garsfontein Ext. 16, and a record of outages.',
     imageAlt: '%site.brand.full%: is the power off in Garsfontein?',
     serviceDescription:
-      'An open record of power outages in Garsfontein, Pretoria, kept since %since.en%. Measured at one point in Garsfontein Extension 16, near %site.landmark%. It is usually representative of the area supplied by the Garsfontein substation, but some streets can differ. Operated independently by a resident. Not affiliated with the City of Tshwane or Eskom.',
+      'An open record of power outages in Garsfontein, Pretoria, kept since %since.en%. Measured at one point in Garsfontein Extension 16, near %site.landmark%. It speaks only for Extension 16, which is supplied by the Garsfontein substation, and even there some streets can differ. Operated independently by a resident. Not affiliated with the City of Tshwane or Eskom.',
   },
 };

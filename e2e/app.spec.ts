@@ -459,6 +459,20 @@ test.describe('public page', () => {
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
   });
 
+  // Gentle on readers' phones: the status changes at most once a minute (heartbeats and the cron).
+  test('asks for the status once a minute while the page is open', async ({ page }) => {
+    await page.clock.install();
+    let statusRequests = 0;
+    page.on('request', (r) => r.url().endsWith(STATUS_PATH) && statusRequests++);
+    await page.goto('/en/');
+    await expect(page.getByRole('status')).toContainText(en.status.NONE);
+    const before = statusRequests;
+    await page.clock.fastForward(MINUTE_MS - 5_000);
+    expect(statusRequests).toBe(before);
+    await page.clock.fastForward(10_000);
+    await expect.poll(() => statusRequests).toBe(before + 1);
+  });
+
   test('refreshes statistics that went stale while the tab was hidden, but not fresh ones', async ({ page }) => {
     await page.clock.install();
     let statsRequests = 0;
