@@ -18,5 +18,9 @@
 /favicon*
   Cache-Control: public, max-age=86400
 
+# Browsers must see a new copy at once (public/sw.js says why).
+/sw.js
+  Cache-Control: no-cache
+
 /og/*
   Cache-Control: public, max-age=3600

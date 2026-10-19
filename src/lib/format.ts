@@ -45,6 +45,12 @@ export const formatTime = (iso: string) => timeFormat(new Date(iso));
 
 const zoneDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
 
+/** "02:30" when the outage ends on the day it began, else "So. 18 Okt. 02:30", so an overnight one reads right. */
+export function formatEnd(startIso: string, endIso: string): string {
+  const time = formatTime(endIso);
+  return zoneDay(new Date(startIso)) === zoneDay(new Date(endIso)) ? time : `${formatDay(endIso)} ${time}`;
+}
+
 /** "vandag", "gister" or "op Sa. 17 Okt." (or the English), judged in the configured zone. */
 export function formatRelativeDay(iso: string, now: number): string {
   const day = zoneDay(new Date(iso));

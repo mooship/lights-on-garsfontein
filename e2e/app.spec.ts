@@ -1,6 +1,14 @@
 import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
-import { DAY_MS, HEARTBEAT_THRESHOLD_MS, localDate, MINUTE_MS, type StatsResponse, UTC_OFFSET_MS } from '../shared/api';
+import {
+  CREDENTIAL_MAX_LENGTH,
+  DAY_MS,
+  HEARTBEAT_THRESHOLD_MS,
+  localDate,
+  MINUTE_MS,
+  type StatsResponse,
+  UTC_OFFSET_MS,
+} from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
 import {
@@ -1044,5 +1052,43 @@ test.describe('admin keyboard focus', () => {
     await page.keyboard.press('Enter');
     await expect(planned).toHaveAttribute('aria-pressed', 'true');
     await expect(planned).toBeFocused();
+  });
+});
+
+test.describe('unexpected responses', () => {
+  // A 200 that is not the expected JSON (a captive portal, a truncated body) is a failure to reach
+  // the server, never a reading; the next good answer recovers the page.
+  for (const body of ['<html>Sign in to the Wi-Fi</html>', '{}', '{"status":"BROWNOUT","recent":[]}']) {
+    test(`treats a status of ${body.slice(0, 20)}… as unreachable, then recovers`, async ({ page }) => {
+      await page.route(`**${STATUS_PATH}`, (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body }),
+      );
+      await page.goto('/en/');
+      await expect(page.getByRole('alert')).toHaveText(en.status.unreachable);
+      await page.unroute(`**${STATUS_PATH}`);
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await expect(page.getByRole('status')).toContainText(en.status.NONE);
+    });
+  }
+
+  test('treats statistics that are not the expected JSON as failing to load', async ({ page }) => {
+    await page.route(`**${STATS_PATH}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"trackingSince":null}' }),
+    );
+    await page.goto('/en/');
+    await expect(page.getByText(en.trends.loadFailed, { exact: true })).toBeVisible();
+  });
+
+  test('limits the sign-in fields to what the server accepts', async ({ page }) => {
+    await page.goto(ADMIN_PAGE_PATH);
+    await expect(page.locator('#password')).toHaveAttribute('maxlength', String(CREDENTIAL_MAX_LENGTH.password));
+    await expect(page.locator('#username')).toHaveAttribute('maxlength', String(CREDENTIAL_MAX_LENGTH.username));
+  });
+
+  test('serves the service worker kill switch at /sw.js, never cached', async ({ request }) => {
+    const response = await request.get('/sw.js');
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toMatch(/javascript/);
+    expect(response.headers()['cache-control']).toBe('no-cache');
   });
 });

@@ -22,7 +22,7 @@ import { SafetyLine, Scope } from './components/StatusNotes';
 import { ThemeToggle } from './components/ThemeToggle';
 import { HowWeMeasure, Trends } from './components/Trends';
 import { api } from './lib/api';
-import { formatDate, formatDuration, formatRelativeDay, formatTime } from './lib/format';
+import { formatDate, formatDuration, formatEnd, formatRelativeDay, formatTime } from './lib/format';
 import { locale, t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll, POLL_MS, STATS_POLL_MS } from './lib/poll';
@@ -99,7 +99,7 @@ function statusDetail(s: StatusResponse, now: number): string {
   const lasted = formatDuration(outageDurationMs(last, now));
   return m.lastOutage(
     formatTime(last.startTime),
-    formatTime(last.endTime),
+    formatEnd(last.startTime, last.endTime),
     formatRelativeDay(last.startTime, now),
     lasted,
   );

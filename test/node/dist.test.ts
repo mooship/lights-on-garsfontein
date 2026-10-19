@@ -46,6 +46,14 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
+  it('serves a /sw.js that clears and unregisters the removed service worker', () => {
+    const sw = read('sw.js');
+    expect(sw).toContain('registration.unregister()');
+    expect(sw).toContain('caches.delete');
+    // No fetch handler: from the moment it installs, every request goes to the network.
+    expect(sw).not.toMatch(/addEventListener\(\s*['"]fetch/);
+  });
+
   it('leaves no placeholder unfilled', () => {
     for (const file of [...HTML, 'site.webmanifest', 'llms.txt']) {
       // index.html's own comment names the placeholders.
@@ -62,8 +70,8 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  it('has no service worker', () => {
-    expect(exists('sw.js')).toBe(false);
+  // sw.js is only the kill switch above; the app never registers a service worker.
+  it('never registers a service worker', () => {
     const scripts = readdirSync(resolve(DIST, 'assets')).filter((name) => name.endsWith('.js'));
     expect(scripts.length).toBeGreaterThan(0);
     for (const name of scripts) expect(read(`assets/${name}`), name).not.toContain('serviceWorker');

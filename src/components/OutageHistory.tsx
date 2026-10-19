@@ -1,6 +1,6 @@
 import { type Component, For, Show } from 'solid-js';
 import { type OutageSummary, outageDurationMs } from '../../shared/api';
-import { formatDay, formatDuration, formatTime } from '../lib/format';
+import { formatDay, formatDuration, formatEnd, formatTime } from '../lib/format';
 import { t } from '../lib/i18n';
 import { plainList } from '../styles/ui.css';
 import * as css from './OutageHistory.css';
@@ -21,7 +21,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => (
               <div class={css.secondary}>
                 {t().history.range(
                   formatTime(outage.startTime),
-                  outage.endTime ? formatTime(outage.endTime) : t().history.now,
+                  outage.endTime ? formatEnd(outage.startTime, outage.endTime) : t().history.now,
                 )}
               </div>
             </div>

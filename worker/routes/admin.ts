@@ -18,23 +18,24 @@ const isoDate = z.iso
   .transform((v) => new Date(v).toISOString())
   .refine((v) => Date.parse(v) <= Date.now() + MAX_FUTURE_MS, 'time_in_future');
 
-const timerSchema = z.object({ action: z.enum(TIMER_ACTION) });
+// Strict: an unknown field is refused, so a misspelt or unsupported edit is never reported as done.
+const timerSchema = z.strictObject({ action: z.enum(TIMER_ACTION) });
 
 const outageSchema = z.discriminatedUnion('action', [
-  z.object({
+  z.strictObject({
     action: z.literal(OUTAGE_ACTION.create),
     startTime: isoDate,
     endTime: isoDate.nullable().optional(),
     isPlanned: z.boolean().optional(),
   }),
-  z.object({
+  z.strictObject({
     action: z.literal(OUTAGE_ACTION.update),
     id: z.number().int().positive(),
     endTime: isoDate.nullable().optional(),
     isFalsePositive: z.boolean().optional(),
     isPlanned: z.boolean().optional(),
   }),
-  z.object({ action: z.literal(OUTAGE_ACTION.delete), id: z.number().int().positive() }),
+  z.strictObject({ action: z.literal(OUTAGE_ACTION.delete), id: z.number().int().positive() }),
 ]);
 
 /** The newest 50 outages, false positives included, with how each was recorded. */
@@ -81,6 +82,9 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
 
   if (input.action === OUTAGE_ACTION.create) {
     if (input.endTime && input.endTime < input.startTime) return errors.badRequest(ERROR.endBeforeStart);
+    // One open outage at a time: punch in and heartbeats close "the" open one, so a second would
+    // keep the status OFF after the power came back.
+    if (!input.endTime && (await getOpenOutage(db))) return errors.conflict(ERROR.outageAlreadyOpen);
     const [outage] = await db
       .insert(outages)
       .values({
@@ -107,13 +111,18 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   if (input.isFalsePositive !== undefined) {
     changes.isFalsePositive = input.isFalsePositive;
     changes.dismissedBy = input.isFalsePositive ? 'admin' : null;
-    // A false positive should not stay open and keep the grid "OFF".
-    if (input.isFalsePositive && !existing.endTime && changes.endTime === undefined) {
-      changes.endTime = new Date().toISOString();
-    }
+  }
+  const falsePositive = changes.isFalsePositive ?? existing.isFalsePositive;
+  // A false positive never stays open: an open one would block the next missed gap from being recorded.
+  if (falsePositive && (changes.endTime === undefined ? existing.endTime : changes.endTime) === null) {
+    changes.endTime = new Date().toISOString();
   }
   const endTime = changes.endTime === undefined ? existing.endTime : changes.endTime;
   if (endTime && endTime < existing.startTime) return errors.badRequest(ERROR.endBeforeStart);
+  if (endTime === null && !falsePositive) {
+    const open = await getOpenOutage(db);
+    if (open && open.id !== existing.id) return errors.conflict(ERROR.outageAlreadyOpen);
+  }
   if (Object.keys(changes).length === 0) return json({ outage: existing });
 
   const [outage] = await db.update(outages).set(changes).where(eq(outages.id, input.id)).returning();

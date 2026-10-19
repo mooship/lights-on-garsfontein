@@ -31,8 +31,8 @@ export const errors = {
 
 /** The token from `Authorization: Bearer <token>` ('' when empty), or null without a bearer header. */
 export function bearerToken(request: Request): string | null {
-  const auth = request.headers.get('Authorization');
-  return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+  // The scheme is case-insensitive (RFC 9110), so a sensor's client may send "bearer".
+  return /^bearer +(.+)$/i.exec(request.headers.get('Authorization') ?? '')?.[1] ?? null;
 }
 
 export const CLIENT_IP_HEADER = 'CF-Connecting-IP';
@@ -87,7 +87,7 @@ function isCrossSite(request: Request): boolean {
   return site !== null && site !== 'same-origin' && site !== 'none';
 }
 
-const isJson = (type: string) => type.split(';')[0]?.trim().toLowerCase() === 'application/json';
+export const isJson = (type: string) => type.split(';')[0]?.trim().toLowerCase() === 'application/json';
 
 /**
  * Guard for cookie-authenticated writes: refuses other sites, and bodies that are not JSON

@@ -5,6 +5,7 @@ import {
   formatCompactDuration,
   formatDate,
   formatDuration,
+  formatEnd,
   formatRelativeDay,
   fromLocalInput,
   toLocalInput,
@@ -57,6 +58,13 @@ describe('durations', () => {
     switchLocale('af');
     expect(formatDuration(HOUR_MS + MINUTE_MS)).toBe('1 u 1 min');
     expect(formatCompactDuration(HOUR_MS + MINUTE_MS)).toBe('1u 1m');
+  });
+});
+
+describe('formatEnd', () => {
+  it('gives the end time alone on the start day, and with its day after midnight', () => {
+    expect(formatEnd(zoned('2026-10-17T20:00:00'), zoned('2026-10-17T22:30:00'))).toBe('22:30');
+    expect(formatEnd(zoned('2026-10-17T22:00:00'), zoned('2026-10-18T02:30:00'))).toBe('Sun 18 Oct 02:30');
   });
 });
 

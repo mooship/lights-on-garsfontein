@@ -3,7 +3,7 @@ import { DAY_MS, type StatusResponse } from '../../shared/api';
 import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
 import { requireBearer } from '../lib/auth';
 import { getGridState, pauseSensor, recordHeartbeat } from '../lib/grid';
-import { json, parseBody } from '../lib/http';
+import { isJson, json, parseBody } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 
 /**
@@ -40,7 +40,7 @@ const heartbeatSchema = z.object({ poweredFor: z.int().nonnegative().default(0) 
 async function postHeartbeat({ db, request }: RouteContext): Promise<Response> {
   // The body is optional: a sensor that cannot tell how long it has had power posts none.
   let poweredFor = 0;
-  if (request.headers.get('Content-Type')?.startsWith('application/json')) {
+  if (isJson(request.headers.get('Content-Type') ?? '')) {
     const parsed = await parseBody(request, heartbeatSchema);
     if ('response' in parsed) return parsed.response;
     poweredFor = parsed.data.poweredFor;
