@@ -341,7 +341,11 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: en.footer.privacy })).toBeVisible();
     await expect(page.getByRole('link', { name: en.footer.feed })).toHaveAttribute('href', FEED_PATH);
-    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute('href', PRIVACY_PAGE_PATH);
+    // English opens the privacy page at its English section.
+    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute(
+      'href',
+      `${PRIVACY_PAGE_PATH}#en`,
+    );
   });
 
   for (const locale of LOCALES) {
@@ -911,7 +915,10 @@ test.describe('outages by time of day', () => {
               const last = el.lastElementChild?.getBoundingClientRect();
               return { height: box.height, gap: box.bottom - (last?.bottom ?? box.bottom) };
             });
+          // Twice, so the display font is cached and used from the start, as on most visits.
           await page.goto(localePath(locale));
+          await page.evaluate(() => document.fonts.ready);
+          await page.reload();
           await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
           const loaded = await measure();
           // The reserve is the tallest body in its width range, so a shorter one leaves some room.
@@ -950,14 +957,6 @@ test.describe('admin false positives', () => {
 });
 
 test.describe('audit fixes', () => {
-  test('the English footer opens the privacy page at its English section', async ({ page }) => {
-    await page.goto('/en/');
-    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute(
-      'href',
-      `${PRIVACY_PAGE_PATH}#en`,
-    );
-  });
-
   test.describe('af', () => {
     test.use({ appLocale: 'af' });
 
