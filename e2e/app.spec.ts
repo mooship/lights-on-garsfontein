@@ -894,7 +894,7 @@ test.describe('outages by time of day', () => {
         [320, 60],
         [360, 36],
         [1280, 36],
-      ]) {
+      ] as const) {
         test(`reserves the statistics their loaded height, without a gap, at ${width}px (${locale})`, async ({
           page,
         }) => {
