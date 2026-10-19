@@ -65,6 +65,13 @@ export const en = {
     now: 'now',
     ongoing: 'Ongoing',
     planned: 'Planned',
+    allTitle: 'All outages',
+    showAll: 'Show all outages',
+    showRecent: 'Show recent outages only',
+    pages: 'Outage pages',
+    newer: 'Newer',
+    older: 'Older',
+    page: (n: number, count: number) => `Page ${n} of ${count}`,
   },
   trends: {
     title: 'Statistics',

@@ -11,7 +11,7 @@ Shows whether the electricity supply is on in Garsfontein, Pretoria, and keeps a
 - **Its limits.** It is one measuring point, so some streets can differ: parts of the network can be back-fed from another substation, and an outage limited to another street or extension will not appear. It records every interruption, planned or not; it is not a load-shedding schedule and does not predict outages.
 - **Independent.** Operated by a resident of Garsfontein Extension 16. Not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
 
-The site shows the status as last recorded and for how long, statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart, and recent outages, with planned outages tagged. Without a reporting sensor, the status reads "No outage reported" rather than claiming the power is on.
+The site shows the status as last recorded and for how long, statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart, and recent outages, with planned outages tagged; "Show all outages" pages through the rest. Without a reporting sensor, the status reads "No outage reported" rather than claiming the power is on.
 
 The code runs on one Cloudflare Worker with a D1 database, and anyone can run it for their own area.
 
@@ -25,6 +25,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | --- | --- | --- | --- |
 | `GET /api/status` | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages, `monitored`, `turnstileSiteKey`, `generatedAt` | `no-store` for browsers; 12 s at the edge | Shared 60/min; CORS |
 | `GET /api/stats` | The last 7, 30 and 365 days, the previous 30 days (`null` until tracked), each with the time without power as `hoursOff` (to 0.1 h) and `minutesOff` (to the minute), up to 26 weekly totals with the same two fields, and `last30ByHour`: the minutes without power in each hour of the day (local time, index 0 is 00:00) over the last 30 days | `max-age=60` | Shared 60/min; CORS |
+| `GET /api/outages` | Every outage, false positives excluded, newest first, as `outages` (each as in `recent`), and `generatedAt` | `no-store` for browsers; 12 s at the edge | Shared 60/min; CORS |
 | `GET /api/outages.csv` | Every outage, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /feed.xml` | Atom feed of the 20 most recent outages, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |
@@ -35,7 +36,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
-- "Shared 60/min" is one limit per connection across those four endpoints, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
+- "Shared 60/min" is one limit per connection across those five endpoints, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
 - A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt.
 - Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.

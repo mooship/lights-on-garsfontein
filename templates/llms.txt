@@ -21,6 +21,7 @@ All public endpoints are free to use; the JSON API, the CSV and the feed allow a
 
 - [Status (JSON)](%site.url%/api/status): the status as last recorded at the measuring point
 - [Statistics (JSON)](%site.url%/api/stats): for the last 7, 30 and 365 days, hours without power, number of outages (and how many were planned), days with an outage, share of time with power, and the longest outage; the previous 30 days for comparison; weekly totals; and, for the last 30 days, the minutes without power in each hour of the day. Only time since records began is counted.
+- [All outages (JSON)](%site.url%/api/outages): every outage, newest first, with the same fields as `outage` in the status. Outages marked as false positives are excluded.
 - [All outages (CSV)](%site.url%/api/outages.csv): one row per outage, with id, start and end (UTC), duration in minutes, and whether it was planned. Outages marked as false positives are excluded.
 - [Outage feed (Atom)](%site.url%/feed.xml): the 20 most recent outages, for feed readers
 - [Sitemap](%site.url%/sitemap.xml)

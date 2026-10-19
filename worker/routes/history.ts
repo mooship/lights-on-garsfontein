@@ -15,6 +15,7 @@ import { summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { hourlyMinutes, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
+import { STATUS_EDGE_TTL_SECONDS } from './status';
 
 async function getStats({ db }: RouteContext): Promise<Response> {
   const now = Date.now();
@@ -86,7 +87,9 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
 
 /**
  * Every outage but false positives, newest first, for the page's full history. One response rather
- * than pages of it, so the edge cache can hold it: its key ignores the query string.
+ * than pages of it, so the edge cache can hold it: its key ignores the query string. Browsers get
+ * `no-store`, like the status it extends: the page reloads it when the status changes, and a
+ * browser's copy would bring back the old list.
  */
 async function getOutages({ db }: RouteContext): Promise<Response> {
   const rows = await db
@@ -95,7 +98,7 @@ async function getOutages({ db }: RouteContext): Promise<Response> {
     .where(eq(outages.isFalsePositive, false))
     .orderBy(desc(outages.startTime));
   const body: OutagesResponse = { outages: rows.map(summarise), generatedAt: new Date().toISOString() };
-  return json(body, 200, { 'Cache-Control': publicCache(MINUTE_MS) });
+  return json(body);
 }
 
 const FEED_LIMIT = 20;
@@ -183,5 +186,10 @@ export const historyRoutes: Routes = {
   [`GET ${FEED_PATH}`]: { handler: getFeed, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
   [`GET ${STATS_PATH}`]: { handler: getStats, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
   [`GET ${CSV_PATH}`]: { handler: getOutagesCsv, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
-  [`GET ${OUTAGES_PATH}`]: { handler: getOutages, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
+  [`GET ${OUTAGES_PATH}`]: {
+    handler: getOutages,
+    limiter: 'STATUS_LIMITER',
+    cors: true,
+    edgeCache: STATUS_EDGE_TTL_SECONDS,
+  },
 };

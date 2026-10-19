@@ -74,6 +74,13 @@ export const af = {
     now: 'nou',
     ongoing: 'Aan die gang',
     planned: 'Beplan',
+    allTitle: 'Alle onderbrekings',
+    showAll: 'Wys alle onderbrekings',
+    showRecent: 'Wys slegs onlangse onderbrekings',
+    pages: 'Bladsye van onderbrekings',
+    newer: 'Nuwer',
+    older: 'Ouer',
+    page: (n: number, count: number) => `Bladsy ${n} van ${count}`,
   },
   trends: {
     title: 'Statistiek',

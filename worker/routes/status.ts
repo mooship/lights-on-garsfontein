@@ -9,9 +9,10 @@ import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 /**
  * Edge TTL for the status, which every open tab polls. Writes purge it (in the datacentre that
  * handled them), so mostly it only delays OFF after a heartbeat goes stale, by up to this much on
- * top of HEARTBEAT_THRESHOLD_MS. Browsers still get `no-store`.
+ * top of HEARTBEAT_THRESHOLD_MS. Browsers still get `no-store`. The full outage list (OUTAGES_PATH)
+ * uses it too, as the page reloads that list when the status changes.
  */
-const STATUS_EDGE_TTL_SECONDS = 12;
+export const STATUS_EDGE_TTL_SECONDS = 12;
 
 /** The longest pause, so a forgotten one cannot leave the sensor ignored for good. */
 export const MAX_PAUSE_MS = 30 * DAY_MS;

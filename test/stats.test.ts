@@ -330,7 +330,7 @@ describe('GET /api/outages', () => {
 
     const res = await call(OUTAGES_PATH);
     expect(res.status).toBe(200);
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=60');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
     const body = (await res.json()) as OutagesResponse;
     expect(body.generatedAt).toEqual(expect.any(String));
