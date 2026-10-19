@@ -65,7 +65,7 @@ Outages come from a heartbeat sensor, the admin punch clock, or both.
 
 ### Admin
 
-Sign in at `/admin`. The session cookie (`__Host-admin_session`, `HttpOnly`, `Secure`, `SameSite=Strict`) lasts 30 days after the last visit and never more than 90 days after sign-in. **Punch out** when the power goes off and **Punch in** when it returns; **Log a past outage** adds anything missed. Each outage can be marked **Planned** or **False positive**, closed or deleted. Outages before `trackingSince` can be added for the history and CSV, but statistics count only time from then.
+Sign in at `/admin`. The session cookie (`__Host-admin_session`, `HttpOnly`, `Secure`, `SameSite=Strict`) lasts 30 days after the last visit and never more than 90 days after sign-in. **Punch out** when the power goes off and **Punch in** when it returns; **Log a past outage** adds anything missed. Each outage can be marked **Planned** or **False positive**, closed or deleted. Outages before `trackingSince` can be added for the history and CSV, but statistics count only time from then. Under the punch clock, a line says whether the [sensor](#sensor) is reporting, paused or silent, and since when; the page refreshes it once a minute while it is visible, and when you return to it.
 
 Scripts can use `Authorization: Bearer <ADMIN_API_TOKEN>` instead of a session; wrong tokens count towards the per-connection sign-in limit. Times need an offset and may be at most five minutes in the future.
 
@@ -87,7 +87,7 @@ curl -X POST "$SITE_URL/api/admin/outages" \
   -d '{"action":"update","id":3,"endTime":"2026-10-17T11:20:00+02:00"}'
 ```
 
-`update` also accepts `isPlanned` and `isFalsePositive` (marking an open outage as a false positive closes it); `delete` takes only an `id`. Each listed outage has `dismissedBy`: `"sensor"` when a heartbeat's `poweredFor` showed the power stayed on (see [Sensor](#sensor)), `"admin"` when marked here, and `null` otherwise, including false positives marked before this was recorded. `/admin` tags the sensor's ones. Keep the URL and token in a git-ignored `.env` (copy `.env.example`).
+`update` also accepts `isPlanned` and `isFalsePositive` (marking an open outage as a false positive closes it); `delete` takes only an `id`. Each listed outage has `dismissedBy`: `"sensor"` when a heartbeat's `poweredFor` showed the power stayed on (see [Sensor](#sensor)), `"admin"` when marked here, and `null` otherwise, including false positives marked before this was recorded. `/admin` tags the sensor's ones. The list also carries `sensor`: the last heartbeat as `lastSeen` and `pausedUntil` (null if never paused), or `null` before the first heartbeat. Keep the URL and token in a git-ignored `.env` (copy `.env.example`).
 
 ### Sensor
 

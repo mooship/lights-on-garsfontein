@@ -71,4 +71,12 @@ export const admin = {
   punchIn: 'Punch in',
   punchedOut: (time: string) => `Punched out at ${time}`,
   punchedIn: (time: string) => `Punched in at ${time}`,
+  sensor: {
+    never: 'No sensor has reported yet.',
+    reporting: (at: string) => `Sensor reporting. Last heard at ${at}.`,
+    paused: (until: string) => `Sensor paused until ${until}.`,
+    resuming: (since: string) => `Pause ended at ${since}. Waiting for the sensor.`,
+    silent: (duration: string, since: string) => `Sensor silent for ${duration}, since ${since}.`,
+    stale: (time: string) => `Unable to refresh. Showing the sensor as at ${time}.`,
+  },
 };
