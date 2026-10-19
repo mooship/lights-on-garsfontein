@@ -1,7 +1,16 @@
 import { env } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DAY_MS, HOUR_MS as H, MINUTE_MS, type StatsResponse, TRACKING_SINCE, UTC_OFFSET_MS } from '../shared/api';
-import { CSV_PATH, STATS_PATH } from '../shared/paths';
+import {
+  DAY_MS,
+  HOUR_MS as H,
+  MINUTE_MS,
+  type OutagesResponse,
+  RECENT_LIMIT,
+  type StatsResponse,
+  TRACKING_SINCE,
+  UTC_OFFSET_MS,
+} from '../shared/api';
+import { CSV_PATH, OUTAGES_PATH, STATS_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import { zoned } from '../src/lib/zone';
 import { hourlyMinutes, mergeOutages, weeklyStats, weekStartOf, windowStats } from '../worker/lib/stats';
@@ -305,6 +314,43 @@ describe('GET /api/outages.csv', () => {
         '',
       ].join('\n'),
     );
+  });
+});
+
+describe('GET /api/outages', () => {
+  it('lists every outage but false positives, newest first, in the public shape', async () => {
+    const closed = await insertOutage({ startTime: '2026-10-20T10:00:00.000Z', endTime: '2026-10-20T11:30:00.000Z' });
+    await insertOutage({ startTime: '2026-10-21T12:00:00.000Z', isFalsePositive: 1 });
+    const planned = await insertOutage({
+      startTime: '2026-10-21T06:00:00.000Z',
+      endTime: '2026-10-21T10:00:00.000Z',
+      isPlanned: 1,
+    });
+    const open = await insertOutage({ startTime: '2026-10-22T10:00:00.000Z', source: 'manual' });
+
+    const res = await call(OUTAGES_PATH);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=60');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    const body = (await res.json()) as OutagesResponse;
+    expect(body.generatedAt).toEqual(expect.any(String));
+    expect(body.outages).toEqual([
+      { id: open, startTime: '2026-10-22T10:00:00.000Z', endTime: null, planned: false },
+      { id: planned, startTime: '2026-10-21T06:00:00.000Z', endTime: '2026-10-21T10:00:00.000Z', planned: true },
+      { id: closed, startTime: '2026-10-20T10:00:00.000Z', endTime: '2026-10-20T11:30:00.000Z', planned: false },
+    ]);
+  });
+
+  it('lists more outages than the status does', async () => {
+    for (let i = 0; i <= RECENT_LIMIT; i++) {
+      const start = Date.UTC(2026, 9, 18) + i * H;
+      await insertOutage({
+        startTime: new Date(start).toISOString(),
+        endTime: new Date(start + MINUTE_MS).toISOString(),
+      });
+    }
+    const { outages } = (await (await call(OUTAGES_PATH)).json()) as OutagesResponse;
+    expect(outages).toHaveLength(RECENT_LIMIT + 1);
   });
 });
 

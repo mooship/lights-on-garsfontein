@@ -3,13 +3,15 @@ import {
   CSV_FILE_NAME,
   DAY_MS,
   MINUTE_MS,
+  type OutagesResponse,
   outageDurationMs,
   type StatsResponse,
   TRACKING_SINCE,
 } from '../../shared/api';
-import { CSV_PATH, FEED_PATH, STATS_PATH } from '../../shared/paths';
+import { CSV_PATH, FEED_PATH, OUTAGES_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { outages } from '../db/schema';
+import { summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { hourlyMinutes, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
@@ -80,6 +82,20 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
       'Cache-Control': publicCache(5 * MINUTE_MS),
     },
   });
+}
+
+/**
+ * Every outage but false positives, newest first, for the page's full history. One response rather
+ * than pages of it, so the edge cache can hold it: its key ignores the query string.
+ */
+async function getOutages({ db }: RouteContext): Promise<Response> {
+  const rows = await db
+    .select()
+    .from(outages)
+    .where(eq(outages.isFalsePositive, false))
+    .orderBy(desc(outages.startTime));
+  const body: OutagesResponse = { outages: rows.map(summarise), generatedAt: new Date().toISOString() };
+  return json(body, 200, { 'Cache-Control': publicCache(MINUTE_MS) });
 }
 
 const FEED_LIMIT = 20;
@@ -167,4 +183,5 @@ export const historyRoutes: Routes = {
   [`GET ${FEED_PATH}`]: { handler: getFeed, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
   [`GET ${STATS_PATH}`]: { handler: getStats, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
   [`GET ${CSV_PATH}`]: { handler: getOutagesCsv, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
+  [`GET ${OUTAGES_PATH}`]: { handler: getOutages, limiter: 'STATUS_LIMITER', cors: true, edgeCache: true },
 };

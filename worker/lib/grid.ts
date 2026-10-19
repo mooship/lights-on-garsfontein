@@ -1,9 +1,13 @@
 import { and, desc, eq, gt, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
-import { HEARTBEAT_THRESHOLD_MS, type OutageSource, type OutageSummary, type PowerStatus } from '../../shared/api';
+import {
+  HEARTBEAT_THRESHOLD_MS,
+  type OutageSource,
+  type OutageSummary,
+  type PowerStatus,
+  RECENT_LIMIT,
+} from '../../shared/api';
 import type { Db } from '../db/client';
 import { heartbeats, type Outage, outages, sessions } from '../db/schema';
-
-const RECENT_LIMIT = 5;
 
 /** Open and not flagged as a false positive. */
 const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, false));
