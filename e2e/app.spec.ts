@@ -537,6 +537,7 @@ test.describe('share', () => {
     }
   });
 
+  // The link goes in the text: several targets, such as Copy on Windows and Android, keep only the text.
   test('uses the share sheet where there is one', async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(Navigator.prototype, 'share', {
@@ -549,7 +550,7 @@ test.describe('share', () => {
     await page.getByRole('button', { name: en.share.button }).click();
     await expect
       .poll(() => page.evaluate(() => (window as unknown as { __shared?: ShareData }).__shared))
-      .toEqual({ title: site.brand.full, text: TEXT, url: SHARE_URL });
+      .toEqual({ title: site.brand.full, text: `${TEXT} ${SHARE_URL}` });
   });
 
   test('copies the link where there is no share sheet', async ({ page, context }) => {
