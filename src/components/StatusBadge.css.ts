@@ -1,13 +1,14 @@
 import { keyframes, style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
-// The same min-height as .gg-skel-row (global.css.ts): a NONE headline of up to three lines fits in
-// it, so every state keeps the loading shell's height.
+// The same min-height as .gg-skel-row (global.css.ts): an ON or OFF headline wrapped to two lines on a
+// phone, with the duration under it (2 × 2rem × 1.15 + 0.25rem + 1.5rem), or a NONE headline of up to
+// three lines, fits in it, so every state keeps the loading shell's height.
 export const root = style({
   display: 'flex',
   alignItems: 'center',
   gap: '1rem',
-  minHeight: '5rem',
+  minHeight: '6.35rem',
 });
 
 const pulse = keyframes({

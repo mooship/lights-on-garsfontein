@@ -666,6 +666,17 @@ test.describe('narrow screens', () => {
         expect(scroll).toBeLessThanOrEqual(client);
       });
     }
+
+    test(`card titles wrap without overlapping what follows at 320px (${locale})`, async ({ page }) => {
+      await withLocale(page, locale);
+      await page.goto(localePath(locale));
+      await expect(page.getByRole('status')).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const overflowing = await page
+        .locator('.gg-card-title')
+        .evaluateAll((titles) => titles.filter((t) => t.scrollHeight > t.clientHeight).map((t) => t.textContent));
+      expect(overflowing).toEqual([]);
+    });
   }
 });
 
@@ -827,6 +838,39 @@ test.describe('outages by time of day', () => {
         await page.goto(localePath(locale));
         await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
         expect(await readLayoutShift(page)).toBe(0);
+      });
+
+      // A shift only counts once the shell has painted, which a fast local server can skip, so this
+      // compares the boxes themselves.
+      test(`keeps the status card the shell's height on a small phone after an outage (${locale})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 360, height: 780 });
+        await page.route(`**${STATUS_PATH}`, async (route) => {
+          const response = await route.fetch();
+          const ended = new Date(Date.now() - 2 * DAY_MS);
+          const outage = {
+            id: 1,
+            startTime: new Date(ended.getTime() - 323 * MINUTE_MS).toISOString(),
+            endTime: ended.toISOString(),
+            planned: false,
+          };
+          const json = { ...(await response.json()), status: 'ON', monitored: true, since: outage.endTime };
+          await route.fulfill({ response, json: { ...json, recent: [outage] } });
+        });
+        const card = page.locator('.gg-status-card');
+        const height = async () => {
+          await page.evaluate(() => document.fonts.ready);
+          return (await card.boundingBox())?.height;
+        };
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('status')).toHaveText(DICTIONARIES[locale].status.ON);
+        const loaded = await height();
+        // The display font is cached now, as on most visits; without the app only the shell shows.
+        await page.route('**/assets/*.js', (route) => route.abort());
+        await page.reload();
+        await expect(card.locator('.gg-skel-row')).toBeVisible();
+        expect(await height()).toBe(loaded);
       });
     });
   }
