@@ -79,7 +79,7 @@ export const af = {
     title: 'Statistiek',
     tableLabel: 'Wys die weeklikse syfers',
     refreshFailed: (time: string) => `Kon nie die statistiek bywerk nie. Dit is die syfers soos dit om ${time} was.`,
-    // Retried every STATS_POLL_MS (src/App.tsx).
+    // Retried every STATS_POLL_MS (src/lib/poll.ts).
     loadFailed: 'Kon nie die statistiek laai nie. Ons probeer oor ’n paar minute weer.',
     same: 'Onveranderd teenoor die vorige 30 dae',
     change: (sign: string, amount: string) => `${sign}${amount} teenoor die vorige 30 dae`,

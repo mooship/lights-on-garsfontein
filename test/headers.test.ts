@@ -1,4 +1,6 @@
+import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { ERROR } from '../shared/errors';
 import { CSV_PATH, LOGIN_PATH, ROBOTS_PATH, SITEMAP_PATH, STATS_PATH, STATUS_PATH } from '../shared/paths';
 import { call } from './helpers';
 
@@ -10,6 +12,24 @@ describe('security headers on Worker responses', () => {
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(res.headers.get('X-Frame-Options')).toBe('DENY');
     expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+  });
+
+  it('answers an unexpected failure with a bare internal error and the same headers', async () => {
+    const broken = {
+      ...env,
+      DB: {
+        prepare: () => {
+          throw new Error('D1 is down: secret detail');
+        },
+        batch: () => Promise.reject(new Error('D1 is down: secret detail')),
+      },
+    } as unknown as Env;
+    const res = await call(STATUS_PATH, { env: broken });
+    expect(res.status).toBe(500);
+    const body = await res.text();
+    expect(JSON.parse(body)).toEqual({ error: ERROR.internal });
+    expect(body).not.toContain('secret detail');
+    expect(res.headers.get('Content-Security-Policy')).toBe("default-src 'none'; frame-ancestors 'none'");
   });
 
   it('opens CORS only on the public read endpoints', async () => {

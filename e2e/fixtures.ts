@@ -9,7 +9,11 @@ export { expect };
 
 const ADMIN_API = { Authorization: `Bearer ${exampleVar('ADMIN_API_TOKEN')}` };
 
-/** Deletes every outage through the admin API. */
+/**
+ * Deletes every outage through the admin API. The sensor heartbeat cannot be reset this way, so the
+ * tests never post one: a live reading would turn "No outage reported" into ON for every later test.
+ * A test that needs one mocks the status response instead.
+ */
 async function deleteOutages(request: APIRequestContext): Promise<void> {
   for (;;) {
     const list = await request.get(ADMIN_OUTAGES_PATH, { headers: ADMIN_API });

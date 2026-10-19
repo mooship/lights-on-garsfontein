@@ -24,6 +24,7 @@ import { af } from '../src/i18n/af';
 import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
 import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
+import { STATS_POLL_MS } from '../src/lib/poll';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
 import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
@@ -448,6 +449,35 @@ test.describe('public page', () => {
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await page.clock.fastForward(REQUEST_TIMEOUT_MS);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
+  });
+
+  test('refreshes statistics that went stale while the tab was hidden, but not fresh ones', async ({ page }) => {
+    await page.clock.install();
+    let statsRequests = 0;
+    page.on('request', (r) => r.url().endsWith(STATS_PATH) && statsRequests++);
+    await page.goto('/en/');
+    await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
+    const setVisibility = (state: 'hidden' | 'visible') =>
+      page.evaluate((s) => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, state);
+
+    await setVisibility('hidden');
+    await setVisibility('visible');
+    await expect.poll(() => statsRequests).toBe(1); // still fresh: only the first load
+
+    await setVisibility('hidden');
+    await page.clock.fastForward(STATS_POLL_MS + MINUTE_MS); // hidden tabs do not poll
+    expect(statsRequests).toBe(1);
+    await setVisibility('visible');
+    await expect.poll(() => statsRequests).toBe(2);
+  });
+
+  test('lets browsers keep the icons for a day instead of checking them on every visit', async ({ request }) => {
+    for (const path of ['/favicon.svg', '/favicon-on.svg', '/favicon-off.svg', '/favicon.ico']) {
+      expect((await request.get(path)).headers()['cache-control'], path).toBe('public, max-age=86400');
+    }
   });
 
   test('serves the SEO manifests', async ({ request }) => {

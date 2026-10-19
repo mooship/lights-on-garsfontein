@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
-import { HOUR_MS as H, MINUTE_MS, type StatsResponse, TRACKING_SINCE, UTC_OFFSET_MS } from '../shared/api';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DAY_MS, HOUR_MS as H, MINUTE_MS, type StatsResponse, TRACKING_SINCE, UTC_OFFSET_MS } from '../shared/api';
 import { CSV_PATH, STATS_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import { zoned } from '../src/lib/zone';
@@ -242,13 +242,10 @@ describe('GET /api/stats', () => {
     const res = await call(STATS_PATH);
     expect(res.status).toBe(200);
     const body = (await res.json()) as StatsResponse;
-    expect(body.trackingSince).toBe('2026-10-16T22:00:00.000Z');
+    expect(body.trackingSince).toBe(new Date(TRACKING_SINCE).toISOString());
     const window = { hoursOff: 1.5, minutesOff: 90, outages: 2, plannedOutages: 1, longestMinutes: 60 };
     expect(body.last7).toMatchObject(window);
     expect(body.last30).toMatchObject(window);
-    // Null until the 60 days it compares have both been tracked.
-    if (now < t(TRACKING_SINCE) + 60 * 24 * H) expect(body.previous30).toBeNull();
-    else expect(body.previous30).toMatchObject({ hoursOff: 0, outages: 0 });
 
     // This week's bar: the same outages, clipped to the week if it began less than 3 hours ago.
     const week = weekStartOf(now);
@@ -308,5 +305,73 @@ describe('GET /api/outages.csv', () => {
         '',
       ].join('\n'),
     );
+  });
+});
+
+describe('GET /api/stats over time', () => {
+  /** Sets the clock this many days after tracking began; outages are placed relative to it. */
+  const daysTracked = (days: number) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(t(TRACKING_SINCE) + days * DAY_MS);
+    return Date.now();
+  };
+  afterEach(() => vi.useRealTimers());
+
+  const stats = async () => (await (await call(STATS_PATH)).json()) as StatsResponse;
+
+  it('has no previous 30 days to compare until 60 days are on record', async () => {
+    daysTracked(59);
+    expect((await stats()).previous30).toBeNull();
+  });
+
+  it('compares the last 30 days with the 30 before them once both are on record', async () => {
+    const now = daysTracked(61);
+    const ago = (ms: number) => new Date(now - ms).toISOString();
+    await insertOutage({ startTime: ago(45 * DAY_MS), endTime: ago(45 * DAY_MS - 2 * H) });
+    await insertOutage({ startTime: ago(40 * DAY_MS), endTime: ago(40 * DAY_MS - 30 * MINUTE_MS) });
+    await insertOutage({ startTime: ago(10 * DAY_MS), endTime: ago(10 * DAY_MS - H) });
+    const body = await stats();
+    expect(body.previous30).toMatchObject({ hoursOff: 2.5, minutesOff: 150, outages: 2, longestMinutes: 120 });
+    expect(body.last30).toMatchObject({ hoursOff: 1, minutesOff: 60, outages: 1 });
+  });
+
+  it('counts an outage across the two windows in each, for its part there', async () => {
+    const now = daysTracked(61);
+    const ago = (ms: number) => new Date(now - ms).toISOString();
+    await insertOutage({ startTime: ago(30 * DAY_MS + H), endTime: ago(30 * DAY_MS - H) });
+    const body = await stats();
+    expect(body.previous30).toMatchObject({ minutesOff: 60, outages: 1 });
+    expect(body.last30).toMatchObject({ minutesOff: 60, outages: 1 });
+  });
+
+  // Public contract: fields are only ever added (AGENTS.md), so none of these may disappear.
+  it('keeps every field of its public contract', async () => {
+    const body = await stats();
+    for (const key of [
+      'trackingSince',
+      'last7',
+      'last30',
+      'last365',
+      'previous30',
+      'weeks',
+      'last30ByHour',
+      'generatedAt',
+    ]) {
+      expect(body, key).toHaveProperty(key);
+    }
+    for (const key of [
+      'trackedHours',
+      'hoursOff',
+      'minutesOff',
+      'outages',
+      'availability',
+      'longestMinutes',
+      'daysTracked',
+      'daysWithOutage',
+      'plannedOutages',
+    ]) {
+      expect(body.last30, key).toHaveProperty(key);
+    }
+    expect(Object.keys(body.weeks[0] ?? {})).toEqual(['weekStart', 'hoursOff', 'minutesOff', 'outages']);
   });
 });

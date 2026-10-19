@@ -1,4 +1,10 @@
 import { type Accessor, batch, createSignal } from 'solid-js';
+import { MINUTE_MS } from '../../shared/api';
+
+/** How often a visible public page asks for the status. */
+export const POLL_MS = MINUTE_MS / 2;
+/** How often it asks for the statistics; trends.loadFailed in src/i18n promises a retry in a few minutes. */
+export const STATS_POLL_MS = 5 * MINUTE_MS;
 
 interface Poll<T> {
   /** The last successful response; kept through later failures. */
