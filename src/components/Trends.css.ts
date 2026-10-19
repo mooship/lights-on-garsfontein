@@ -84,7 +84,8 @@ export const bar = style({ fill: vars.color.chartOff });
 export const barGroup = style({});
 
 // The active (hovered, tapped or arrow-key selected) bar stands out; the others recede.
-globalStyle(`${barGroup}:not([data-active]) ${bar}`, { opacity: 0.55 });
+// At 0.7 the paler bars keep 3:1 against the card in both themes.
+globalStyle(`${barGroup}:not([data-active]) ${bar}`, { opacity: 0.7 });
 
 export const activeMarker = style({ fill: vars.color.text });
 

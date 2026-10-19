@@ -220,6 +220,10 @@ globalStyle('.gg-safety', {
   borderTop: `1px solid ${vars.color.border}`,
 });
 
+// The one action a resident may need in an outage: a 44px tap target, with negative margins so the
+// line and the card keep their height.
+globalStyle('.gg-safety a', { display: 'inline-block', paddingBlock: '0.8125rem', marginBlock: '-0.8125rem' });
+
 globalStyle('.gg-sr-only', {
   position: 'absolute',
   width: '1px',

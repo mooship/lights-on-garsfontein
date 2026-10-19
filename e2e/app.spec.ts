@@ -478,7 +478,10 @@ test.describe('admin', () => {
   test('punch clock drives the public status', async ({ page }) => {
     await login(page);
     await expect(page.getByRole('button', { name: admin.punchIn })).toHaveCount(0); // only the action that applies
-    await page.getByRole('button', { name: admin.punchOut }).click();
+    // From the keyboard, focus moves to the button that replaces the one pressed.
+    await page.getByRole('button', { name: admin.punchOut }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: admin.punchIn })).toBeFocused();
     await expect(page.getByTestId('punch-clock')).not.toHaveText('00:00:00');
     await expect(page.getByRole('status').filter({ hasText: withTime(admin.punchedOut(AT)) })).toBeVisible();
     await expect(page.getByRole('button', { name: admin.punchOut })).toHaveCount(0);
@@ -943,5 +946,42 @@ test.describe('admin false positives', () => {
     const items = page.getByRole('listitem');
     await expect(items.filter({ hasText: admin.dismissedBySensorTag.trim() })).toHaveCount(1);
     await expect(items.filter({ hasText: admin.falsePositiveTag.trim() })).toHaveCount(2);
+  });
+});
+
+test.describe('audit fixes', () => {
+  test('the English footer opens the privacy page at its English section', async ({ page }) => {
+    await page.goto('/en/');
+    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute(
+      'href',
+      `${PRIVACY_PAGE_PATH}#en`,
+    );
+  });
+
+  test.describe('af', () => {
+    test.use({ appLocale: 'af' });
+
+    test('the Afrikaans footer opens the privacy page at the top', async ({ page }) => {
+      await page.goto('/');
+      await expect(page.getByRole('link', { name: af.footer.privacy })).toHaveAttribute('href', PRIVACY_PAGE_PATH);
+    });
+  });
+
+  test('the admin page has an English title', async ({ page }) => {
+    await page.goto(ADMIN_PAGE_PATH);
+    await expect(page.getByRole('heading', { name: admin.signInTitle })).toBeVisible();
+    await expect(page).toHaveTitle(admin.pageTitle);
+  });
+});
+
+test.describe('admin keyboard focus', () => {
+  test('stays on an outage action while it runs', async ({ page }) => {
+    await login(page);
+    await page.getByRole('button', { name: admin.punchOut }).click();
+    const planned = page.getByRole('button', { name: admin.planned }).first();
+    await planned.focus();
+    await page.keyboard.press('Enter');
+    await expect(planned).toHaveAttribute('aria-pressed', 'true');
+    await expect(planned).toBeFocused();
   });
 });

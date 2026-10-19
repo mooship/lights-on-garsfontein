@@ -1,7 +1,7 @@
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
-import { type Component, createResource, createSignal, For, Match, onMount, Show, Switch } from 'solid-js';
+import { type Component, createResource, createSignal, For, Index, Match, onMount, Show, Switch } from 'solid-js';
 import {
   type AdminOutage,
   type AdminOutagesResponse,
@@ -45,7 +45,9 @@ type OnError = (error: unknown, show: (error: unknown) => void) => void;
 function createAction({ onError = (e, show) => show(e), initialError }: { onError?: OnError; initialError?: unknown }) {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<unknown>(initialError);
+  // Buttons are aria-disabled while busy, so they keep focus; this is what stops a second press.
   const run = async (fn: () => Promise<unknown>) => {
+    if (busy()) return;
     setBusy(true);
     setError(undefined);
     try {
@@ -106,7 +108,7 @@ const LoginForm: Component<{ notice?: AdminErrorCode; focus: boolean; onLoggedIn
         </label>
         <div ref={widget} />
         <FormError error={error()} />
-        <button type="submit" class={button.primary} disabled={busy()}>
+        <button type="submit" class={button.primary} aria-disabled={busy()}>
           {busy() ? admin.checking : admin.signIn}
         </button>
       </form>
@@ -151,7 +153,7 @@ const OutageRow: Component<{
             type="button"
             class={button.ghost}
             aria-describedby={titleId()}
-            disabled={busy()}
+            aria-disabled={busy()}
             onClick={() => run(() => api.updateOutage(props.outage.id, { endTime: new Date().toISOString() }))}
           >
             {admin.closeNow}
@@ -162,7 +164,7 @@ const OutageRow: Component<{
           class={button.ghost}
           aria-describedby={titleId()}
           aria-pressed={props.outage.isFalsePositive}
-          disabled={busy()}
+          aria-disabled={busy()}
           onClick={() =>
             run(() => api.updateOutage(props.outage.id, { isFalsePositive: !props.outage.isFalsePositive }))
           }
@@ -174,7 +176,7 @@ const OutageRow: Component<{
           class={button.ghost}
           aria-describedby={titleId()}
           aria-pressed={props.outage.planned}
-          disabled={busy()}
+          aria-disabled={busy()}
           onClick={() => run(() => api.updateOutage(props.outage.id, { isPlanned: !props.outage.planned }))}
         >
           {admin.planned}
@@ -183,7 +185,7 @@ const OutageRow: Component<{
           type="button"
           class={button.ghost}
           aria-describedby={titleId()}
-          disabled={busy()}
+          aria-disabled={busy()}
           onClick={() => confirm(admin.deleteConfirm) && run(() => api.deleteOutage(props.outage.id))}
         >
           {admin.delete}
@@ -238,7 +240,7 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
           <input type="checkbox" name="planned" /> {admin.plannedHint}
         </label>
         <FormError error={error()} />
-        <button type="submit" class={button.primary} disabled={busy()}>
+        <button type="submit" class={button.primary} aria-disabled={busy()}>
           <Plus size={18} aria-hidden="true" /> {busy() ? admin.saving : admin.log}
         </button>
         <p class={css.saved} role="status">
@@ -323,9 +325,11 @@ const Dashboard: Component<{
         <h2 class="gg-card-title">{admin.outages}</h2>
         <Show when={outages().outages.length > 0} fallback={<p>{admin.noOutages}</p>}>
           <ul class={plainList}>
-            <For each={outages().outages}>
-              {(o) => <OutageRow outage={o} now={minute()} onChange={refetch} onError={onError} />}
-            </For>
+            {/* Index, not For: a refetch brings new objects, and For would rebuild every row and drop the
+                focus of the button just pressed. */}
+            <Index each={outages().outages}>
+              {(o) => <OutageRow outage={o()} now={minute()} onChange={refetch} onError={onError} />}
+            </Index>
           </ul>
         </Show>
       </section>
@@ -334,6 +338,8 @@ const Dashboard: Component<{
 };
 
 const Admin: Component = () => {
+  // The shell's title is the public page's, in Afrikaans.
+  document.title = admin.pageTitle;
   // The protected outage list doubles as the session check: null means signed out.
   const [session, { refetch }] = createResource(async () => {
     try {
@@ -370,7 +376,12 @@ const Admin: Component = () => {
             <p class={errorText} role="alert">
               {admin.unreachable}
             </p>
-            <button type="button" class={button.ghost} disabled={session.loading} onClick={() => refetch()}>
+            <button
+              type="button"
+              class={button.ghost}
+              aria-disabled={session.loading}
+              onClick={() => !session.loading && refetch()}
+            >
               {admin.retry}
             </button>
           </section>

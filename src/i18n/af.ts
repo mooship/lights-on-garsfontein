@@ -79,7 +79,8 @@ export const af = {
     title: 'Statistiek',
     tableLabel: 'Wys die weeklikse syfers',
     refreshFailed: (time: string) => `Kon nie die statistiek bywerk nie. Dit is die syfers soos om ${time}.`,
-    loadFailed: 'Kon nie die statistiek laai nie. Ons probeer binnekort weer.',
+    // Retried every STATS_POLL_MS (src/App.tsx).
+    loadFailed: 'Kon nie die statistiek laai nie. Ons probeer oor ’n paar minute weer.',
     same: 'Onveranderd teenoor die vorige 30 dae',
     change: (sign: string, amount: string) => `${sign}${amount} teenoor die vorige 30 dae`,
     startsOn: (date: string) => `Die rekord begin op ${date}.`,
@@ -115,6 +116,7 @@ export const af = {
     download: 'Laai alle onderbrekings af (CSV)',
     howTitle: 'Hoe ons meet',
     how: [
+      // "3 minute" is HEARTBEAT_THRESHOLD_MS (shared/api.ts); change them together.
       'Onderbrekings korter as sowat 3 minute word dalk nie aangeteken nie.',
       'Beplande onderbrekings is ingesluit.',
       '’n Dag tel as daar op enige tydstip daardie dag ’n onderbreking was.',

@@ -70,7 +70,8 @@ export const en = {
     title: 'Statistics',
     tableLabel: 'Show weekly figures',
     refreshFailed: (time: string) => `Unable to refresh the statistics. Showing figures as at ${time}.`,
-    loadFailed: 'Unable to load the statistics. Retrying shortly.',
+    // Retried every STATS_POLL_MS (src/App.tsx).
+    loadFailed: 'Unable to load the statistics. Retrying in a few minutes.',
     same: 'Unchanged from the previous 30 days',
     change: (sign: string, amount: string) => `${sign}${amount} compared with the previous 30 days`,
     startsOn: (date: string) => `Records begin on ${date}.`,
@@ -103,6 +104,7 @@ export const en = {
     download: 'Download all outages (CSV)',
     howTitle: 'How we measure',
     how: [
+      // "3 minutes" is HEARTBEAT_THRESHOLD_MS (shared/api.ts); change them together.
       'Outages shorter than about 3 minutes may not be recorded.',
       'Planned outages are included.',
       'A day counts if any part of it had an outage.',

@@ -135,6 +135,7 @@ export function outageDurationMs(outage: { startTime: string; endTime: string | 
 }
 
 /** A sensor heartbeat older than this means the power is off at the measuring point. */
+// trends.how in src/i18n states it in minutes; change them together.
 export const HEARTBEAT_THRESHOLD_MS = 3 * MINUTE_MS;
 
 /** Statistics never count time before this. */

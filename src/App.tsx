@@ -7,6 +7,7 @@ import {
   type StatusResponse,
   TRACKING_SINCE,
 } from '../shared/api';
+import { DEFAULT_LOCALE } from '../shared/locale';
 import { ADMIN_PAGE_PATH, CSV_PATH, FEED_PATH, PRIVACY_PAGE_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import * as css from './App.css';
@@ -22,7 +23,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { HowWeMeasure, Trends } from './components/Trends';
 import { api } from './lib/api';
 import { formatDate, formatDuration, formatRelativeDay, formatTime } from './lib/format';
-import { t } from './lib/i18n';
+import { locale, t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll } from './lib/poll';
 import { useStatusTab } from './lib/tab';
@@ -31,6 +32,7 @@ import { syncThemeColor, watchSystemTheme } from './lib/theme';
 const Admin = lazy(() => import('./admin/Admin'));
 
 const POLL_MS = MINUTE_MS / 2;
+// trends.loadFailed in src/i18n promises a retry in a few minutes.
 const STATS_POLL_MS = 5 * MINUTE_MS;
 
 const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
@@ -61,6 +63,9 @@ const Masthead: Component<{ isPublic: boolean }> = (props) => (
   </>
 );
 
+// privacy.html gives each language a section with the locale as its id, the default language first.
+const privacyHref = () => (locale() === DEFAULT_LOCALE ? PRIVACY_PAGE_PATH : `${PRIVACY_PAGE_PATH}#${locale()}`);
+
 /** `isPublic` adds sharing and the sign-in link, which the admin page doesn't need. */
 const Footer: Component<{ isPublic: boolean }> = (props) => (
   <footer class="gg-footer">
@@ -68,7 +73,7 @@ const Footer: Component<{ isPublic: boolean }> = (props) => (
       <Share />
     </Show>
     <nav aria-label={t().footer.nav}>
-      <a href={PRIVACY_PAGE_PATH}>{t().footer.privacy}</a>
+      <a href={privacyHref()}>{t().footer.privacy}</a>
       <a href={CSV_PATH}>{t().footer.csv}</a>
       <a href={FEED_PATH} type="application/atom+xml">
         {t().footer.feed}
