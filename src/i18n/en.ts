@@ -70,7 +70,7 @@ export const en = {
     title: 'Statistics',
     tableLabel: 'Show weekly figures',
     refreshFailed: (time: string) => `Unable to refresh the statistics. Showing figures as at ${time}.`,
-    // Retried every STATS_POLL_MS (src/App.tsx).
+    // Retried every STATS_POLL_MS (src/lib/poll.ts).
     loadFailed: 'Unable to load the statistics. Retrying in a few minutes.',
     same: 'Unchanged from the previous 30 days',
     change: (sign: string, amount: string) => `${sign}${amount} compared with the previous 30 days`,

@@ -138,6 +138,17 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(await res.json()).toEqual({ error: ERROR.endBeforeStart });
   });
 
+  it('refuses an edit that would end an outage before it started, and leaves it as it was', async () => {
+    const id = await insertOutage({ startTime: '2026-10-01T18:00:00Z', endTime: '2026-10-01T20:00:00Z' });
+    const res = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, endTime: '2026-10-01T16:00:00Z' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: ERROR.endBeforeStart });
+    const row = await env.DB.prepare('SELECT end_time FROM outages WHERE id = ?')
+      .bind(id)
+      .first<{ end_time: string }>();
+    expect(Date.parse(row?.end_time ?? '')).toBe(Date.parse('2026-10-01T20:00:00Z'));
+  });
+
   it('rejects times more than five minutes in the future', async () => {
     const inMinutes = (n: number) => new Date(Date.now() + n * MINUTE_MS).toISOString();
     const future = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.create, startTime: inMinutes(10) });

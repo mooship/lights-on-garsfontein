@@ -25,15 +25,11 @@ import { api } from './lib/api';
 import { formatDate, formatDuration, formatRelativeDay, formatTime } from './lib/format';
 import { locale, t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
-import { createPoll } from './lib/poll';
+import { createPoll, POLL_MS, STATS_POLL_MS } from './lib/poll';
 import { useStatusTab } from './lib/tab';
 import { syncThemeColor, watchSystemTheme } from './lib/theme';
 
 const Admin = lazy(() => import('./admin/Admin'));
-
-const POLL_MS = MINUTE_MS / 2;
-// trends.loadFailed in src/i18n promises a retry in a few minutes.
-const STATS_POLL_MS = 5 * MINUTE_MS;
 
 const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
 
@@ -118,7 +114,12 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
   onMount(() => {
     const timer = setInterval(whenVisible(status.refetch), POLL_MS);
     const statsTimer = setInterval(whenVisible(stats.refetch), STATS_POLL_MS);
-    const onVisible = whenVisible(status.refetch);
+    // A tab back from the background asks for the status at once, and for the statistics only if
+    // they are older than a poll would let them get.
+    const onVisible = whenVisible(() => {
+      status.refetch();
+      if (Date.now() - stats.updatedAt() > STATS_POLL_MS) stats.refetch();
+    });
     document.addEventListener('visibilitychange', onVisible);
     onCleanup(() => {
       clearInterval(timer);

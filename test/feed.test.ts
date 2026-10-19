@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { FEED_PATH } from '../shared/paths';
+import { site } from '../site.config';
 import { call, insertOutage } from './helpers';
 
 /**
@@ -43,8 +44,8 @@ describe('GET /feed.xml', () => {
     const xml = await res.text();
     assertWellFormed(xml);
     expect(xml).toContain('<feed xmlns="http://www.w3.org/2005/Atom">');
-    expect(xml).toContain('<title>Lights On, Garsfontein?</title>');
-    expect(xml).toContain('<link rel="alternate" type="text/html" href="https://garsfontein.example/"/>');
+    expect(xml).toContain(`<title>${site.brand.full}</title>`);
+    expect(xml).toContain(`<link rel="alternate" type="text/html" href="${env.SITE_URL}/"/>`);
     const [first, second] = entries(xml);
     expect(field(first, 'title')).toBe('Outage in progress since 18 Oct 2026 08:30');
     expect(field(first, 'id')).toBe(`https://garsfontein.example/#outage-${open}`);
