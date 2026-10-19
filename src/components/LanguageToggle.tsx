@@ -3,10 +3,8 @@ import { DEFAULT_LOCALE, LOCALES } from '../../shared/locale';
 import { locale, switchLocale, t } from '../lib/i18n';
 
 /**
- * Shows the next language's name (with two, simply the other one; with more, it cycles in
- * `site.locales` order); its text, accessible name and `lang` are in that language. Each
- * dictionary's `lang.next` and `lang.switchTo` are those, written in the next language. Hidden
- * with only one locale.
+ * Shows the next language in `site.locales` order, with its text, accessible name and `lang` in that
+ * language. Hidden with only one locale.
  */
 export const LanguageToggle: Component = () => {
   const next = () => LOCALES[(LOCALES.indexOf(locale()) + 1) % LOCALES.length] ?? DEFAULT_LOCALE;

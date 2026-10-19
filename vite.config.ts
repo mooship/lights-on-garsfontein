@@ -51,8 +51,8 @@ const generated = (url: keyof typeof GENERATED) =>
 
 /**
  * Deployment identity from site.config.ts: fills the placeholders (see `fill`) in index.html
- * and privacy.html, with JSON escaping inside JSON-LD, and builds /site.webmanifest and
- * /llms.txt from templates/ (emitted in the build, served in dev).
+ * and privacy.html, with JSON escaping inside JSON-LD, and builds the GENERATED files from
+ * templates/ (emitted in the build; dev serves the manifest and llms.txt).
  */
 function siteConfig(): Plugin {
   const jsonLd = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/g;

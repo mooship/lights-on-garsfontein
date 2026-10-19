@@ -1,5 +1,7 @@
 # Who dismissed a false positive: design
 
+**Status:** built in pull request #18.
+
 18 October 2026. One of the improvements Claude proposed and the operator liked ("I like all these"), built while they were away with no questions taken, so the choices are Claude's.
 
 ## Intent

@@ -37,7 +37,7 @@ export interface AdminOutage extends OutageSummary {
 export interface StatusResponse {
   /** OFF while an outage is open or the sensor heartbeat is older than HEARTBEAT_THRESHOLD_MS. */
   status: PowerStatus;
-  /** When the current state began: the outage start or last heartbeat when OFF, the latest end in `recent` when ON. */
+  /** When the current state began: the outage start or the sensor's silence when OFF, the latest end in `recent` when ON. */
   since: string | null;
   /** The open outage; null when ON, and briefly when OFF from a stale heartbeat before the cron records it. */
   outage: OutageSummary | null;
@@ -72,7 +72,7 @@ export interface WindowStats {
   availability: number | null;
   /** The longest outage, in whole minutes, counting only the part inside the window. */
   longestMinutes: number;
-  /** South African calendar days the window covers since tracking began. */
+  /** Calendar days in the configured zone that the window covers since tracking began. */
   daysTracked: number;
   /** How many of those days had at least one outage. */
   daysWithOutage: number;
@@ -82,7 +82,7 @@ export interface WindowStats {
 
 /** One Monday-to-Sunday week; the current week runs only until now. */
 export interface WeekStats {
-  /** Monday of the week in South African time, as YYYY-MM-DD. */
+  /** Monday of the week in the configured zone, as YYYY-MM-DD. */
   weekStart: string;
   /** As in WindowStats. */
   hoursOff: number;

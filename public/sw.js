@@ -1,9 +1,8 @@
-// The site has no service worker. An offline one was live on 17 and 18 October 2026, and browsers
-// that visited then still run it: it can answer with a cached status when the server cannot be
-// reached. Browsers check this URL on every visit and install these new bytes, which delete every
-// cache the old worker made and unregister it. With no fetch handler, every request goes to the
-// network from the moment it installs. Pages it controlled reload once onto the network.
-// Keep this file for as long as such a browser might come back.
+// Kill switch. The site has no service worker, but browsers that visited on 17 or 18 October 2026
+// still run an offline one that can answer with a cached status when the server is unreachable.
+// They check this URL on every visit and install these bytes, which delete its caches, unregister
+// it and reload the pages it controlled. With no fetch handler, every request goes to the network.
+// Keep this file while such a browser might come back.
 
 self.addEventListener('install', () => self.skipWaiting());
 

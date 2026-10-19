@@ -2,8 +2,8 @@ import { type Accessor, batch, createSignal } from 'solid-js';
 import { MINUTE_MS } from '../../shared/api';
 
 /**
- * How often a visible public page asks for the status: no faster than it can change, as sensors
- * report and the cron checks once a minute. Gentle on readers' batteries and data.
+ * How often a visible public page asks for the status: no faster than it can change, as the sensor
+ * reports and the cron checks once a minute. Gentle on readers' batteries and data.
  */
 export const POLL_MS = MINUTE_MS;
 /** How often it asks for the statistics; trends.loadFailed in src/i18n promises a retry in a few minutes. */

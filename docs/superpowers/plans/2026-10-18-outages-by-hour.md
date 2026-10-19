@@ -1,5 +1,7 @@
 # Outages by time of day: implementation plan
 
+**Status:** implemented in pull request #17. The unticked boxes below are the plan as written, not open work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A second statistics chart, showing hours without power in each hour of the day over the last 30 days.

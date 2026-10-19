@@ -1,7 +1,7 @@
 // The site's colours per theme, a plain module so the build scripts can import it too: theme.css.ts
 // sets them as the app's variables, and scripts/build-og.ts and scripts/build-icons.ts paint with them.
-// Copies that cannot import it carry a note naming this file: src/styles/privacy.css, the theme-color
-// metas in index.html, public/favicon*.svg and templates/site.webmanifest.
+// Copies that cannot import it: src/styles/privacy.css, the theme-color metas in index.html and
+// public/favicon*.svg carry a note naming this file; templates/site.webmanifest is JSON and cannot.
 export const PALETTE = {
   light: {
     bg: '#F6F4EF',

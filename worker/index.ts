@@ -7,8 +7,7 @@ import { dispatch, purgeEdgeCache } from './lib/router';
 import { routes } from './routes';
 
 // public/_headers only covers static assets; Worker responses (API, SEO) get these.
-// None of them is HTML, so the CSP can forbid everything. HSTS here and in public/_headers is the
-// default for any deployment; this one's Cloudflare zone sets its own, which replaces it.
+// None of them is HTML, so the CSP can forbid everything. HSTS matches public/_headers, which says why.
 const SECURITY_HEADERS: Record<string, string> = {
   'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',

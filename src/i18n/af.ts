@@ -55,9 +55,9 @@ export const af = {
     OFF: 'Die krag is af',
     // ON without a fresh live reading: no outage is known, but nothing measured the power as on.
     NONE: 'Geen onderbreking aangemeld nie',
-    // Under NONE instead of `for`: `day` is vandag, gister or "op Sa. 17 Okt.".
     for: (duration: string) => `Al ${duration}`,
     loading: 'Laai tans die huidige status…',
+    // `day` is formatRelativeDay's: vandag, gister or "op Sa. 17 Okt.".
     wentOff: (time: string, day: string) => `Die onderbreking het ${day} om ${time} begin.`,
     planned: (time: string, day: string) => `Die beplande onderbreking het ${day} om ${time} begin.`,
     noOutages: (date: string) => `Geen onderbrekings sedert die rekord op ${date} begin het nie.`,

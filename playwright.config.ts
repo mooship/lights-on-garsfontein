@@ -11,8 +11,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  // Each test starts from an empty outage table (e2e/fixtures.ts). The tests whose state that
-  // reset cannot clear opt out of retries.
+  // Each test starts from an empty outage table (e2e/fixtures.ts), so a retry does not inherit
+  // the failed run's outages.
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {

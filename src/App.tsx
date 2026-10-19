@@ -1,7 +1,6 @@
 import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
 import {
   HEARTBEAT_THRESHOLD_MS,
-  MINUTE_MS,
   outageDurationMs,
   type StatsResponse,
   type StatusResponse,
@@ -136,8 +135,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
     return s && outOfTouch() ? { ...s, monitored: false } : s;
   };
   useStatusTab(data, minute);
-  // The last poll failed, so the status shown may be out of date. A tab back from the background
-  // is not stale: it refetches at once.
+  // The last poll failed, so the status shown may be out of date.
   const warning = () => (status.error() !== undefined ? t().status.stale(clockTime(status.updatedAt())) : undefined);
 
   return (

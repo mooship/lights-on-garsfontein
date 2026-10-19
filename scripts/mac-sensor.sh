@@ -189,8 +189,8 @@ case "${1:-}" in
     echo "Uninstalled."
     ;;
   run)
-    # When the Mac last started drawing AC power without a break since; empty on battery. Sent as
-    # poweredFor, so a heartbeat after the Wi-Fi drops and returns shows the power stayed on.
+    # When the current unbroken spell on AC power began; empty on battery. Sent as poweredFor, so a
+    # heartbeat after the Wi-Fi drops and returns shows the power stayed on.
     powered_since=
     last_tick=0
     while :; do
