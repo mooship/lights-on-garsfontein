@@ -24,6 +24,7 @@ import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
 import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
+import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
 import { expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
@@ -36,6 +37,8 @@ const BRAND = site.brand.short;
 /** The tab title without a live reading: it claims no status. */
 const NEUTRAL_TITLE = site.brand.full;
 
+/** "rgb(179, 58, 43)" for "#B33A2B", as computed styles report a colour. */
+const rgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Stands for a clock time in a message, for `withTime`. */
 const AT = '@@:@@';
@@ -338,7 +341,11 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: en.footer.privacy })).toBeVisible();
     await expect(page.getByRole('link', { name: en.footer.feed })).toHaveAttribute('href', FEED_PATH);
-    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute('href', PRIVACY_PAGE_PATH);
+    // English opens the privacy page at its English section.
+    await expect(page.getByRole('link', { name: en.footer.privacy })).toHaveAttribute(
+      'href',
+      `${PRIVACY_PAGE_PATH}#en`,
+    );
   });
 
   for (const locale of LOCALES) {
@@ -382,6 +389,19 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('alert')).toHaveText(en.status.unreachable);
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
+    // Where it is measured holds in every state, and red stays for measured outages only.
+    await expect(page.getByText(en.scope.measured(site.landmark), { exact: true })).toBeVisible();
+    await expect(page.getByRole('alert')).not.toHaveCSS('color', rgb(PALETTE.light.off));
+  });
+
+  test('keeps the statistics card’s shape and disclosures when the statistics fail to load', async ({ page }) => {
+    await page.route(`**${STATS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
+    await page.goto('/en/');
+    const failed = page.getByText(en.trends.loadFailed, { exact: true });
+    await expect(failed).toBeVisible();
+    await expect(failed).not.toHaveCSS('color', rgb(PALETTE.light.off));
+    await expect(page.locator('.gg-trends-body')).toBeVisible();
+    await expect(page.getByText(en.trends.howTitle, { exact: true })).toBeVisible();
   });
 
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
@@ -462,7 +482,10 @@ test.describe('admin', () => {
   test('punch clock drives the public status', async ({ page }) => {
     await login(page);
     await expect(page.getByRole('button', { name: admin.punchIn })).toHaveCount(0); // only the action that applies
-    await page.getByRole('button', { name: admin.punchOut }).click();
+    // From the keyboard, focus moves to the button that replaces the one pressed.
+    await page.getByRole('button', { name: admin.punchOut }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: admin.punchIn })).toBeFocused();
     await expect(page.getByTestId('punch-clock')).not.toHaveText('00:00:00');
     await expect(page.getByRole('status').filter({ hasText: withTime(admin.punchedOut(AT)) })).toBeVisible();
     await expect(page.getByRole('button', { name: admin.punchOut })).toHaveCount(0);
@@ -666,6 +689,17 @@ test.describe('narrow screens', () => {
         expect(scroll).toBeLessThanOrEqual(client);
       });
     }
+
+    test(`card titles wrap without overlapping what follows at 320px (${locale})`, async ({ page }) => {
+      await withLocale(page, locale);
+      await page.goto(localePath(locale));
+      await expect(page.getByRole('status')).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const overflowing = await page
+        .locator('.gg-card-title')
+        .evaluateAll((titles) => titles.filter((t) => t.scrollHeight > t.clientHeight).map((t) => t.textContent));
+      expect(overflowing).toEqual([]);
+    });
   }
 });
 
@@ -828,6 +862,73 @@ test.describe('outages by time of day', () => {
         await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
         expect(await readLayoutShift(page)).toBe(0);
       });
+
+      // A shift only counts once the shell has painted, which a fast local server can skip, so this
+      // compares the boxes themselves.
+      test(`keeps the status card the shell's height on a small phone after an outage (${locale})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 360, height: 780 });
+        await page.route(`**${STATUS_PATH}`, async (route) => {
+          const response = await route.fetch();
+          const ended = new Date(Date.now() - 2 * DAY_MS);
+          const outage = {
+            id: 1,
+            startTime: new Date(ended.getTime() - 323 * MINUTE_MS).toISOString(),
+            endTime: ended.toISOString(),
+            planned: false,
+          };
+          const json = { ...(await response.json()), status: 'ON', monitored: true, since: outage.endTime };
+          await route.fulfill({ response, json: { ...json, recent: [outage] } });
+        });
+        const card = page.locator('.gg-status-card');
+        const height = async () => {
+          await page.evaluate(() => document.fonts.ready);
+          return (await card.boundingBox())?.height;
+        };
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('status')).toHaveText(DICTIONARIES[locale].status.ON);
+        const loaded = await height();
+        // The display font is cached now, as on most visits; without the app only the shell shows.
+        await page.route('**/assets/*.js', (route) => route.abort());
+        await page.reload();
+        await expect(card.locator('.gg-skel-row')).toBeVisible();
+        expect(await height()).toBe(loaded);
+      });
+
+      // Below 340px text wraps the most and varies most with the data, so the reserve leaves more room.
+      for (const [width, maxGap] of [
+        [320, 60],
+        [360, 36],
+        [1280, 36],
+      ] as const) {
+        test(`reserves the statistics their loaded height, without a gap, at ${width}px (${locale})`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width, height: 900 });
+          await withOutages(page);
+          const body = page.locator('.gg-trends-body');
+          const measure = () =>
+            body.evaluate(async (el) => {
+              await document.fonts.ready;
+              const box = el.getBoundingClientRect();
+              const last = el.lastElementChild?.getBoundingClientRect();
+              return { height: box.height, gap: box.bottom - (last?.bottom ?? box.bottom) };
+            });
+          // Twice, so the display font is cached and used from the start, as on most visits.
+          await page.goto(localePath(locale));
+          await page.evaluate(() => document.fonts.ready);
+          await page.reload();
+          await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
+          const loaded = await measure();
+          // The reserve is the tallest body in its width range, so a shorter one leaves some room.
+          expect(loaded.gap).toBeLessThanOrEqual(maxGap);
+          await page.route('**/assets/*.js', (route) => route.abort());
+          await page.reload();
+          await expect(body.locator('.gg-skel')).not.toHaveCount(0);
+          expect((await measure()).height).toBe(loaded.height);
+        });
+      }
     });
   }
 });
@@ -852,5 +953,34 @@ test.describe('admin false positives', () => {
     const items = page.getByRole('listitem');
     await expect(items.filter({ hasText: admin.dismissedBySensorTag.trim() })).toHaveCount(1);
     await expect(items.filter({ hasText: admin.falsePositiveTag.trim() })).toHaveCount(2);
+  });
+});
+
+test.describe('audit fixes', () => {
+  test.describe('af', () => {
+    test.use({ appLocale: 'af' });
+
+    test('the Afrikaans footer opens the privacy page at the top', async ({ page }) => {
+      await page.goto('/');
+      await expect(page.getByRole('link', { name: af.footer.privacy })).toHaveAttribute('href', PRIVACY_PAGE_PATH);
+    });
+  });
+
+  test('the admin page has an English title', async ({ page }) => {
+    await page.goto(ADMIN_PAGE_PATH);
+    await expect(page.getByRole('heading', { name: admin.signInTitle })).toBeVisible();
+    await expect(page).toHaveTitle(admin.pageTitle);
+  });
+});
+
+test.describe('admin keyboard focus', () => {
+  test('stays on an outage action while it runs', async ({ page }) => {
+    await login(page);
+    await page.getByRole('button', { name: admin.punchOut }).click();
+    const planned = page.getByRole('button', { name: admin.planned }).first();
+    await planned.focus();
+    await page.keyboard.press('Enter');
+    await expect(planned).toHaveAttribute('aria-pressed', 'true');
+    await expect(planned).toBeFocused();
   });
 });

@@ -54,6 +54,15 @@ a {
   color: var(--accent);
   text-underline-offset: 0.2em;
 }
+/* The links at the top are taps on a phone: 44px tall, like the app's controls. */
+.jump {
+  margin: 0;
+}
+.jump a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
 .updated {
   color: var(--muted);
   margin-top: 0;

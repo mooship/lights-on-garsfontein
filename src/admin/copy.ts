@@ -3,6 +3,7 @@
 // shared masthead and footer follow. Unlike public copy, it names how an outage was recorded.
 
 import type { ERROR, ErrorCode } from '../../shared/errors.ts';
+import { site } from '../../site.config.ts';
 
 /**
  * API error codes without a message of their own, shown as `requestFailed(code)`: refusals the
@@ -35,7 +36,8 @@ export const admin = {
   } satisfies Record<AdminErrorCode, string>,
   requestFailed: (code: string) => `Request failed (${code}).`,
   network: 'Network error.',
-  signInTitle: 'Admin sign in',
+  pageTitle: `Admin · ${site.brand.full}`,
+  signInTitle: 'Admin sign-in',
   username: 'Username',
   password: 'Password',
   checking: 'Checking…',

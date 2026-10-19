@@ -103,7 +103,8 @@ globalStyle('.gg-status-card', {
   overflow: 'hidden',
 });
 
-// Room for one line of detail (padding + 0.9375rem × 1.5); a warning below it only follows a failure.
+// Room for two lines of detail (padding + 2 × 0.9375rem × 1.5 + the border), as the last outage takes
+// on a phone; a warning below it only follows a failure.
 globalStyle('.gg-status-detail', {
   paddingTop: '1rem',
   borderTop: `1px solid ${vars.color.border}`,
@@ -113,14 +114,22 @@ globalStyle('.gg-status-detail', {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.25rem',
-  minHeight: '2.40625rem',
+  minHeight: 'calc(3.8125rem + 1px)',
 });
 
 globalStyle('.gg-status-warning', { fontSize: '0.8125rem' });
 
-// The trends body reserves its loaded height; only text that wraps on a narrow or zoomed
-// screen, or the user-opened weekly table below it, may grow the card.
-globalStyle('.gg-trends-body', { minHeight: '48.25rem' });
+// The trends body reserves its loaded height, which depends on how many lines its text wraps to, so
+// it steps with the width: the tallest loaded body in each range, in either language. Only text that
+// wraps further on a zoomed screen, or the user-opened weekly table below it, may grow the card.
+globalStyle('.gg-trends-body', {
+  minHeight: '53.25rem',
+  '@media': {
+    'screen and (min-width: 21.25rem)': { minHeight: '49.6875rem' },
+    'screen and (min-width: 26.25rem)': { minHeight: '48.875rem' },
+    'screen and (min-width: 33.75rem)': { minHeight: '46.4375rem' },
+  },
+});
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
 
@@ -155,12 +164,14 @@ globalStyle('.gg-trends-details[open] > summary::before', { content: '"▾" / ""
 
 globalStyle('.gg-trends-details ul', { margin: '0 0 0.5rem', paddingLeft: '1.25rem', lineHeight: 1.45 });
 
+// One line whatever the font, so the shell and the app match; a title that wraps on a narrow screen
+// wraps the same in both.
 globalStyle('.gg-card-title', {
   fontFamily: vars.font.display,
   fontWeight: 600,
   fontSize: '1.25rem',
   lineHeight: 1.3,
-  height: '1.625rem',
+  minHeight: '1.625rem',
   marginBottom: '0.75rem',
 });
 
@@ -208,6 +219,10 @@ globalStyle('.gg-safety', {
   paddingTop: '0.75rem',
   borderTop: `1px solid ${vars.color.border}`,
 });
+
+// The one action a resident may need in an outage: a 44px tap target, with negative margins so the
+// line and the card keep their height.
+globalStyle('.gg-safety a', { display: 'inline-block', paddingBlock: '0.8125rem', marginBlock: '-0.8125rem' });
 
 globalStyle('.gg-sr-only', {
   position: 'absolute',
@@ -260,7 +275,8 @@ globalStyle('.gg-skel::after', {
 });
 
 // The same min-height as the status badge (components/StatusBadge.css.ts).
-globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem', minHeight: '5rem' });
+// The same min-height as StatusBadge's root.
+globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem', minHeight: '6.35rem' });
 globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1 });
 globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' });
 globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.25rem' });

@@ -18,6 +18,19 @@ interface PunchClockProps {
 
 export const PunchClock: Component<PunchClockProps> = (props) => {
   const elapsed = () => (props.outage ? outageDurationMs(props.outage, props.now) : 0);
+  // A punch swaps one button for the other, which would drop keyboard focus to the page: the new
+  // button takes it when the old one was pressed.
+  let pressed = false;
+  const press = (punch: () => void) => {
+    if (props.busy) return;
+    pressed = document.activeElement instanceof HTMLButtonElement;
+    punch();
+  };
+  const focusIfPressed = (el: HTMLButtonElement) => {
+    if (!pressed) return;
+    pressed = false;
+    queueMicrotask(() => el.focus());
+  };
 
   return (
     <div class={css.root}>
@@ -39,13 +52,25 @@ export const PunchClock: Component<PunchClockProps> = (props) => {
       <Show
         when={props.outage}
         fallback={
-          <button type="button" class={button.off} disabled={props.busy} onClick={props.onPunchOut}>
+          <button
+            ref={focusIfPressed}
+            type="button"
+            class={button.off}
+            aria-disabled={props.busy}
+            onClick={() => press(props.onPunchOut)}
+          >
             <ZapOff size={18} aria-hidden="true" />
             {admin.punchOut}
           </button>
         }
       >
-        <button type="button" class={button.on} disabled={props.busy} onClick={props.onPunchIn}>
+        <button
+          ref={focusIfPressed}
+          type="button"
+          class={button.on}
+          aria-disabled={props.busy}
+          onClick={() => press(props.onPunchIn)}
+        >
           <Zap size={18} aria-hidden="true" />
           {admin.punchIn}
         </button>
