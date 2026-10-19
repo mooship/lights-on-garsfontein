@@ -2,7 +2,17 @@ import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
 import { ADMIN_OUTAGES_PATH, HEARTBEAT_PAUSE_PATH, OUTAGE_VIEWS, STATUS_PATH, TIMER_PATH } from '../shared/paths';
-import { asAdmin, call, EDGE_CACHED, heartbeat, insertOutage, ORIGIN, runCron, setHeartbeat } from './helpers';
+import {
+  asAdmin,
+  call,
+  EDGE_CACHED,
+  heartbeat,
+  insertOutage,
+  ORIGIN,
+  runCron,
+  setHeartbeat,
+  stubLimiter,
+} from './helpers';
 
 // Every edge-cached route is a view of the outages, so a write that opens, closes or changes one
 // must purge them all; otherwise readers get the old outages until the cached copy expires.
@@ -109,5 +119,25 @@ describe('pausing outage detection', () => {
     expect((await pause(until())).status).toBe(200);
     expect(await isCached(STATUS_PATH)).toBe(false);
     for (const path of EDGE_CACHED.filter((p) => p !== STATUS_PATH)) expect(await isCached(path), path).toBe(true);
+  });
+});
+
+describe('edge cache and rate limits', () => {
+  // A refused request has already reached the Worker, so the limit saves only the D1 work behind a
+  // cache miss. Many readers can share one address on a mobile network, and an outage is when they
+  // all check, so a cached copy never counts against it.
+  it('serves a cached view without counting it against the limit', async () => {
+    const limiter = stubLimiter(false);
+    for (const path of EDGE_CACHED) {
+      expect((await call(path)).status, path).toBe(200);
+      const response = await call(path, { env: { ...env, STATUS_LIMITER: limiter } });
+      expect(response.status, path).toBe(200);
+    }
+    expect(limiter.limit).not.toHaveBeenCalled();
+  });
+
+  it('still limits a read the cache cannot answer', async () => {
+    const response = await call(STATUS_PATH, { env: { ...env, STATUS_LIMITER: stubLimiter(false) } });
+    expect(response.status).toBe(429);
   });
 });

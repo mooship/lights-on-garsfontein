@@ -7,7 +7,7 @@ Shows whether the electricity supply is on in Garsfontein, Pretoria, and keeps a
 
 **Live at https://garsfontein.timothybrits.co.za** (Afrikaans at `/`, English at `/en/`).
 
-- **Where it is measured.** At one home in Garsfontein Extension 16 (Ward 45, Region 6, City of Tshwane), near Mediclinic Denmar. The area is normally supplied by the Garsfontein substation (fed from Highlands, which is fed from Njala) and usually goes off as a whole.
+- **Where it is measured.** At one home in Garsfontein Extension 16 (Ward 45, Region 6, City of Tshwane), near Mediclinic Denmar. Extension 16 is supplied by the Garsfontein substation (fed from Highlands, which is fed from Njala). The reading speaks only for Extension 16; anything wider would be a guess.
 - **Its limits.** It is one measuring point, so some streets can differ: parts of the network can be back-fed from another substation, and an outage limited to another street or extension will not appear. It records every interruption, planned or not; it is not a load-shedding schedule and does not predict outages.
 - **Independent.** Operated by a resident of Garsfontein Extension 16. Not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
 
@@ -35,7 +35,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
-- "Shared 60/min" is one limit per connection across those four endpoints; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
+- "Shared 60/min" is one limit per connection across those four endpoints, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
 - A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt.
 - Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.

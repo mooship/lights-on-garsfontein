@@ -1,3 +1,4 @@
+# HSTS is the default for any deployment; this one's Cloudflare zone sets its own, which replaces it.
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-TNDnPEXAcIN6YTi2yrgtdVv8btQG4x/RL+UAGDPMMMI=' 'sha256-ooB+dHBW3cOC1q8V2tMH2dkTpudeEprRSoqnC/t05CI=' https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'
   Strict-Transport-Security: max-age=63072000; includeSubDomains
