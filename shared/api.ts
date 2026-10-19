@@ -64,6 +64,8 @@ export interface WindowStats {
   trackedHours: number;
   /** Hours without power in the window, to one decimal. */
   hoursOff: number;
+  /** The time without power in the window, in whole minutes, as precise as `longestMinutes`. */
+  minutesOff: number;
   /** Outages that overlap the window, including ones that began before it. */
   outages: number;
   /** Share of tracked time with power (0–1, four decimals), or null before any time was tracked. */

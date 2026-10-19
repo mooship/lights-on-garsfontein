@@ -86,7 +86,9 @@ export const en = {
     chartEmpty: 'No outages to chart yet.',
     chartTitle: 'Hours without power per week',
     chartLabel: 'Hours without power per week. Use the arrow keys to move between weeks, or open the table below.',
-    byHourTitle: 'When outages happen (last 30 days)',
+    /** `since` is the day records began, until 30 days are on record; then null. */
+    byHourTitle: (since: string | null, outages: number) =>
+      `When outages happen (${since ? `since ${since}` : 'last 30 days'}, ${outages} ${outages === 1 ? 'outage' : 'outages'})`,
     byHourEmpty: 'No outages in the last 30 days.',
     byHourLabel: 'Hours without power by time of day. Use the arrow keys to move between hours.',
     weekOf: (day: string) => `Week of ${day}`,

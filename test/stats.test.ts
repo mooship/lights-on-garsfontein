@@ -45,6 +45,7 @@ describe('windowStats', () => {
     expect(stats).toEqual({
       trackedHours: 96,
       hoursOff: 3.5,
+      minutesOff: 210,
       outages: 2,
       availability: 0.9635,
       longestMinutes: 150,
@@ -58,6 +59,12 @@ describe('windowStats', () => {
     const intervals = [{ start: t('2026-11-01T22:00:00Z'), end: t('2026-11-02T02:00:00Z') }];
     const stats = windowStats(intervals, t('2026-11-02T00:00:00Z'), t('2026-11-03T00:00:00Z'), since);
     expect(stats.hoursOff).toBe(2);
+  });
+
+  it('gives the time off in whole minutes, so it matches the longest outage', () => {
+    const intervals = [{ start: t('2026-11-02T03:52:00Z'), end: t('2026-11-02T09:15:00Z') }];
+    const stats = windowStats(intervals, t('2026-11-01T00:00:00Z'), t('2026-11-03T00:00:00Z'), since);
+    expect(stats).toMatchObject({ hoursOff: 5.4, minutesOff: 323, longestMinutes: 323 });
   });
 
   it('never counts time before tracking began', () => {
@@ -236,7 +243,7 @@ describe('GET /api/stats', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as StatsResponse;
     expect(body.trackingSince).toBe('2026-10-16T22:00:00.000Z');
-    const window = { hoursOff: 1.5, outages: 2, plannedOutages: 1, longestMinutes: 60 };
+    const window = { hoursOff: 1.5, minutesOff: 90, outages: 2, plannedOutages: 1, longestMinutes: 60 };
     expect(body.last7).toMatchObject(window);
     expect(body.last30).toMatchObject(window);
     // Null until the 60 days it compares have both been tracked.

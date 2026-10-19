@@ -64,12 +64,12 @@ function splitDuration(ms: number) {
   };
 }
 
-/** "3 d 4 u", "2 u 14 min", "5 min", "40 s" ("h" in English) */
+/** "3 d 4 u", "2 u 14 min", "2 u", "5 min", "40 s" ("h" in English); a zero remainder is left out. */
 export function formatDuration(ms: number): string {
   const { days, hours, minutes, seconds } = splitDuration(ms);
   const u = t().units;
-  if (days > 0) return `${days} ${u.d} ${hours} ${u.h}`;
-  if (hours > 0) return `${hours} ${u.h} ${minutes} ${u.min}`;
+  if (days > 0) return hours > 0 ? `${days} ${u.d} ${hours} ${u.h}` : `${days} ${u.d}`;
+  if (hours > 0) return minutes > 0 ? `${hours} ${u.h} ${minutes} ${u.min}` : `${hours} ${u.h}`;
   if (minutes > 0) return `${minutes} ${u.min}`;
   return `${seconds} ${u.s}`;
 }

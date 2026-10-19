@@ -1,6 +1,6 @@
 import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
-import { DAY_MS, MINUTE_MS, type StatsResponse } from '../shared/api';
+import { DAY_MS, localDate, MINUTE_MS, type StatsResponse, UTC_OFFSET_MS } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
 import {
@@ -634,11 +634,25 @@ test.describe('narrow screens', () => {
 });
 
 test.describe('outages by time of day', () => {
+  const OUTAGES_30 = 4;
+  /** The time-of-day chart's title for statistics from `withOutages`, which cover a full 30 days. */
+  const byHourTitle = (locale: Locale) => DICTIONARIES[locale].trends.byHourTitle(null, OUTAGES_30);
+  /** "14 Oct": a plain YYYY-MM-DD date as the charts show it. */
+  const calendarDay = (ymd: string) =>
+    new Intl.DateTimeFormat(site.intlLocales.en, { timeZone: 'UTC', day: 'numeric', month: 'short' }).format(
+      new Date(`${ymd}T00:00:00Z`),
+    );
+
   /**
-   * Serves the real statistics with two weeks (3 outages, then 1 this week) and, unless `byHour`
-   * says otherwise, 90 minutes off at 18:00 and 30 at 19:00.
+   * Serves the real statistics as if tracked for months, with OUTAGES_30 outages in the last 30 days,
+   * two weeks (3 outages, then 1 this week) and, unless `byHour` says otherwise, 90 minutes off at
+   * 18:00 and 30 at 19:00. `change` adjusts the result.
    */
-  const withOutages = (page: Page, byHour: Record<number, number> = { 18: 90, 19: 30 }) =>
+  const withOutages = (
+    page: Page,
+    byHour: Record<number, number> = { 18: 90, 19: 30 },
+    change: (stats: StatsResponse) => StatsResponse = (stats) => stats,
+  ) =>
     page.route(`**${STATS_PATH}`, async (route) => {
       const response = await route.fetch();
       const body = (await response.json()) as StatsResponse;
@@ -649,7 +663,14 @@ test.describe('outages by time of day', () => {
         { ...first, hoursOff: 1, outages: 3 },
         { weekStart: next, hoursOff: 2, outages: 1 },
       ];
-      await route.fulfill({ response, json: { ...body, weeks, last30ByHour } });
+      const stats: StatsResponse = {
+        ...body,
+        trackingSince: '2026-01-01T00:00:00.000Z',
+        last30: { ...body.last30, trackedHours: 30 * 24, outages: OUTAGES_30 },
+        weeks,
+        last30ByHour,
+      };
+      await route.fulfill({ response, json: change(stats) });
     });
 
   test('the weekly chart opens on this week, and Home and the arrow keys move between weeks', async ({ page }) => {
@@ -668,17 +689,66 @@ test.describe('outages by time of day', () => {
     await expect(readout(1).and(page.locator('[aria-live]'))).toHaveCount(1);
   });
 
+  test('opens on the latest week with an outage, and labels a partial first week by the day records began', async ({
+    page,
+  }) => {
+    let firstDay = '';
+    await withOutages(page, undefined, (stats) => {
+      const [first, current] = stats.weeks;
+      if (!first || !current) throw new Error('withOutages serves two weeks');
+      // Records began on the Wednesday of the first week, and this week has had no outage yet.
+      firstDay = new Date(Date.parse(first.weekStart) + 2 * DAY_MS).toISOString().slice(0, 10);
+      return {
+        ...stats,
+        trackingSince: new Date(Date.parse(`${firstDay}T00:00:00Z`) - UTC_OFFSET_MS).toISOString(),
+        weeks: [first, { ...current, hoursOff: 0, outages: 0 }],
+      };
+    });
+    await page.goto('/en/');
+    const partial = en.trends.partial(calendarDay(firstDay)).trim();
+    await expect(
+      page.locator('p', { hasText: `${en.trends.off} · ${en.trends.outageCount(3)}` }).filter({ hasText: partial }),
+    ).toBeVisible();
+    await expect(page.getByText(calendarDay(firstDay), { exact: true })).toBeVisible();
+  });
+
+  test('gives the time off to the minute, the same as the longest of a single outage', async ({ page }) => {
+    await withOutages(page, undefined, (stats) => ({
+      ...stats,
+      last30: { ...stats.last30, hoursOff: 5.4, minutesOff: 323, longestMinutes: 323, outages: 1 },
+    }));
+    await page.goto('/en/');
+    const tiles = page.locator('.gg-trends-body');
+    await expect(tiles).toContainText(`${en.trends.longest}5 ${en.units.h} 23 ${en.units.min}`);
+    await expect(tiles).toContainText(`${en.trends.withoutPower}5 ${en.units.h} 23 ${en.units.min}`);
+  });
+
+  test('names the period and the outages the time-of-day chart is based on, until 30 days are on record', async ({
+    page,
+  }) => {
+    const since = Date.now() - 10 * DAY_MS;
+    await withOutages(page, { 6: 60 }, (stats) => ({
+      ...stats,
+      trackingSince: new Date(since).toISOString(),
+      last30: { ...stats.last30, trackedHours: 10 * 24, outages: 1 },
+    }));
+    await page.goto('/en/');
+    await expect(
+      page.getByRole('heading', { name: en.trends.byHourTitle(calendarDay(localDate(since)), 1), exact: true }),
+    ).toBeVisible();
+  });
+
   test('says when the last 30 days had no outages, instead of opening on an empty hour', async ({ page }) => {
     await withOutages(page, {});
     await page.goto('/en/');
-    await expect(page.getByRole('heading', { name: en.trends.byHourTitle })).toBeVisible();
+    await expect(page.getByRole('heading', { name: byHourTitle('en'), exact: true })).toBeVisible();
     await expect(page.getByText(en.trends.byHourEmpty, { exact: true })).toBeVisible();
   });
 
   test('opens on the hour with the most time off, and the arrow keys move between hours', async ({ page }) => {
     await withOutages(page);
     await page.goto('/en/');
-    await expect(page.getByRole('heading', { name: en.trends.byHourTitle })).toBeVisible();
+    await expect(page.getByRole('heading', { name: byHourTitle('en'), exact: true })).toBeVisible();
     const u = en.units;
     await expect(page.getByText(`18:00–19:00: 1 ${u.h} 30 ${u.min} ${en.trends.off}`, { exact: true })).toBeVisible();
     await page.getByRole('img', { name: en.trends.byHourLabel }).focus();
@@ -695,7 +765,7 @@ test.describe('outages by time of day', () => {
     test('is in Afrikaans', async ({ page }) => {
       await withOutages(page);
       await page.goto('/');
-      await expect(page.getByRole('heading', { name: af.trends.byHourTitle })).toBeVisible();
+      await expect(page.getByRole('heading', { name: byHourTitle('af'), exact: true })).toBeVisible();
       await expect(page.getByRole('img', { name: af.trends.byHourLabel })).toBeVisible();
     });
   });
@@ -708,7 +778,7 @@ test.describe('outages by time of day', () => {
         await withOutages(page);
         await trackLayoutShift(page);
         await page.goto(localePath(locale));
-        await expect(page.getByRole('heading', { name: DICTIONARIES[locale].trends.byHourTitle })).toBeVisible();
+        await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
         expect(await readLayoutShift(page)).toBe(0);
       });
     });
