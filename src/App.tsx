@@ -1,5 +1,12 @@
 import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
-import { MINUTE_MS, outageDurationMs, type StatsResponse, type StatusResponse, TRACKING_SINCE } from '../shared/api';
+import {
+  HEARTBEAT_THRESHOLD_MS,
+  MINUTE_MS,
+  outageDurationMs,
+  type StatsResponse,
+  type StatusResponse,
+  TRACKING_SINCE,
+} from '../shared/api';
 import { ADMIN_PAGE_PATH, CSV_PATH, FEED_PATH, PRIVACY_PAGE_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import * as css from './App.css';
@@ -115,7 +122,13 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
     });
   });
 
-  const data = status.data;
+  // A failed poll may mean the reader's connection went down with the power, so once the last answer
+  // is as old as a stale heartbeat, ON is no longer backed by a live reading.
+  const outOfTouch = () => status.error() !== undefined && now() - status.updatedAt() > HEARTBEAT_THRESHOLD_MS;
+  const data = () => {
+    const s = status.data();
+    return s && outOfTouch() ? { ...s, monitored: false } : s;
+  };
   useStatusTab(data, minute);
   // The last poll failed, so the status shown may be out of date. A tab back from the background
   // is not stale: it refetches at once.

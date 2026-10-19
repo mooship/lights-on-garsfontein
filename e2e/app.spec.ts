@@ -1,6 +1,6 @@
 import type { Cookie, Locator, Page } from '@playwright/test';
 import { fill } from '../build/html';
-import { DAY_MS, localDate, MINUTE_MS, type StatsResponse, UTC_OFFSET_MS } from '../shared/api';
+import { DAY_MS, HEARTBEAT_THRESHOLD_MS, localDate, MINUTE_MS, type StatsResponse, UTC_OFFSET_MS } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
 import {
@@ -22,6 +22,7 @@ import { DICTIONARIES } from '../src/i18n';
 import { af } from '../src/i18n/af';
 import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
+import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
@@ -391,6 +392,41 @@ test.describe('public page', () => {
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // polls now
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
+  });
+
+  test('stops claiming the power is on once the last reading is older than the heartbeat threshold', async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await page.route(`**${STATUS_PATH}`, async (route) => {
+      const response = await route.fetch();
+      const since = new Date(Date.now() - 150 * MINUTE_MS).toISOString();
+      await route.fulfill({ response, json: { ...(await response.json()), status: 'ON', monitored: true, since } });
+    });
+    await page.goto('/en/');
+    await expect(page.getByRole('status')).toHaveText(en.status.ON);
+    // The power going off often takes the reader's own connection with it.
+    await page.unroute(`**${STATUS_PATH}`);
+    await page.route(`**${STATUS_PATH}`, (route) => route.abort());
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
+    await expect(page.getByRole('status')).toHaveText(en.status.ON);
+
+    await page.clock.fastForward(HEARTBEAT_THRESHOLD_MS + MINUTE_MS);
+    await expect(page.getByRole('status')).toHaveText(en.status.NONE);
+    await expect(page.getByTestId('badge-detail')).toHaveText(/^\s*$/);
+    await expect(page).toHaveTitle(site.brand.full);
+    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
+  });
+
+  test('gives up on a status request that hangs, and says so', async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/en/');
+    await expect(page.getByRole('status')).toContainText(en.status.NONE);
+    await page.route(`**${STATUS_PATH}`, () => {}); // never answers
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.clock.fastForward(REQUEST_TIMEOUT_MS);
+    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
   });
 
   test('serves the SEO manifests', async ({ request }) => {

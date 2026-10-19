@@ -1,5 +1,6 @@
 import {
   type AdminOutagesResponse,
+  MINUTE_MS,
   OUTAGE_ACTION,
   type StatsResponse,
   type StatusResponse,
@@ -25,9 +26,13 @@ export class ApiError extends Error {
   }
 }
 
+/** A request that hangs, as on a failing mobile connection, fails after this so the page can say so. */
+export const REQUEST_TIMEOUT_MS = MINUTE_MS / 4;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
   });
   const body = (await res.json().catch(() => ({}))) as { error?: string };
