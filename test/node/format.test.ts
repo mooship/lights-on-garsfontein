@@ -35,15 +35,20 @@ describe('durations', () => {
       [59_999, '59 s', '0m'],
       [MINUTE_MS, '1 min', '1m'],
       [HOUR_MS - 1, '59 min', '59m'],
-      [HOUR_MS, '1 h 0 min', '1h 0m'],
+      [HOUR_MS, '1 h', '1h 0m'],
       [DAY_MS - 1, '23 h 59 min', '23h 59m'],
-      [DAY_MS, '1 d 0 h', '1d 0h'],
+      [DAY_MS, '1 d', '1d 0h'],
       [3 * DAY_MS + 4 * HOUR_MS + 59 * MINUTE_MS, '3 d 4 h', '3d 4h'],
     ];
     for (const [ms, full, compact] of cases) {
       expect(formatDuration(ms), String(ms)).toBe(full);
       expect(formatCompactDuration(ms), String(ms)).toBe(compact);
     }
+  });
+
+  it('leave out a zero remainder', () => {
+    expect(formatDuration(2 * HOUR_MS + 30_000)).toBe('2 h');
+    expect(formatDuration(3 * DAY_MS + 59 * MINUTE_MS)).toBe('3 d');
   });
 
   it('use the active language’s units', () => {

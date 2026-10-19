@@ -83,6 +83,7 @@ export function windowStats(
   return {
     trackedHours: round1(tracked / HOUR),
     hoursOff: round1(offMs / HOUR),
+    minutesOff: Math.round(offMs / MINUTE_MS),
     outages,
     availability: tracked > 0 ? Math.round((1 - offMs / tracked) * 10_000) / 10_000 : null,
     longestMinutes: Math.round(longest / MINUTE_MS),

@@ -3,7 +3,14 @@ import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
 import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show, untrack } from 'solid-js';
-import { CSV_FILE_NAME, HOUR_MS, localDate, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
+import {
+  CSV_FILE_NAME,
+  localDate,
+  MINUTE_MS,
+  type StatsResponse,
+  type WeekStats,
+  type WindowStats,
+} from '../../shared/api';
 import { CSV_PATH } from '../../shared/paths';
 import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
@@ -13,7 +20,12 @@ import * as css from './Trends.css';
 const { AXIS_WIDTH } = css;
 
 /** A tile duration like the history's ("5 u 23 min"); none at all reads "0 min". */
-const tileDuration = (hours: number) => (hours > 0 ? formatDuration(hours * HOUR_MS) : `0 ${t().units.min}`);
+const tileDuration = (minutes: number) => (minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `0 ${t().units.min}`);
+
+/** To the minute, like `longestMinutes`: `hoursOff` is rounded to 6 minutes, so one outage could disagree with itself. */
+const minutesOff = (w: WindowStats) =>
+  // Absent from a /api/stats response cached by the browser from before the field existed.
+  (w.minutesOff as number | undefined) ?? Math.round(w.hoursOff * 60);
 
 /** The numbers in a duration at full size and its units smaller, so "12 u 34 min" fits a phone tile. */
 const DurationValue: Component<{ text: string }> = (props) => (
@@ -294,12 +306,17 @@ export const Trends: Component<TrendsProps> = (props) => {
   const hourBars = createMemo(() =>
     (byHour() ?? []).map((minutes, hour) => ({
       hours: minutes / 60,
-      readout: { lead: hourRange(hour), value: tileDuration(minutes / 60), rest: t().trends.off },
+      readout: { lead: hourRange(hour), value: tileDuration(minutes), rest: t().trends.off },
     })),
   );
+  const fullWindow = () => s().trackedHours >= 30 * 24;
   const subtitle = () => {
     if (!started()) return t().trends.startsOn(formatDate(props.stats.trackingSince));
-    return s().trackedHours < 30 * 24 ? t().trends.since(formatDate(props.stats.trackingSince)) : t().trends.last30;
+    return fullWindow() ? t().trends.last30 : t().trends.since(formatDate(props.stats.trackingSince));
+  };
+  const previousMinutesOff = () => {
+    const previous = props.stats.previous30;
+    return previous ? minutesOff(previous) : undefined;
   };
 
   return (
@@ -312,8 +329,8 @@ export const Trends: Component<TrendsProps> = (props) => {
         <div class={css.tiles}>
           <Tile
             label={t().trends.withoutPower}
-            value={started() ? <DurationValue text={tileDuration(s().hoursOff)} /> : '—'}
-            delta={delta(s().hoursOff, props.stats.previous30?.hoursOff, tileDuration, true)}
+            value={started() ? <DurationValue text={tileDuration(minutesOff(s()))} /> : '—'}
+            delta={delta(minutesOff(s()), previousMinutesOff(), tileDuration, true)}
           />
           <Tile
             label={t().trends.outages}
@@ -339,7 +356,9 @@ export const Trends: Component<TrendsProps> = (props) => {
               )
             }
             note={
-              s().outages > 1 ? t().trends.average(formatDuration((s().hoursOff / s().outages) * HOUR_MS)) : undefined
+              s().outages > 1
+                ? t().trends.average(formatDuration((minutesOff(s()) / s().outages) * MINUTE_MS))
+                : undefined
             }
           />
         </div>
@@ -348,17 +367,17 @@ export const Trends: Component<TrendsProps> = (props) => {
             title={t().trends.chartTitle}
             label={t().trends.chartLabel}
             bars={weekBars()}
-            initial={props.stats.weeks.length - 1}
+            initial={props.stats.weeks.findLastIndex((w) => w.hoursOff > 0 || w.outages > 0)}
             xLabels={[
               props.stats.weeks.length > 1 && props.stats.weeks[0]
-                ? formatCalendarDay(props.stats.weeks[0].weekStart)
+                ? formatCalendarDay(place(0).from ?? props.stats.weeks[0].weekStart)
                 : '',
               t().trends.thisWeek,
             ]}
           />
           <Show when={hourBars().length === 24}>
             <BarChart
-              title={t().trends.byHourTitle}
+              title={t().trends.byHourTitle(fullWindow() ? null : formatCalendarDay(firstDay()), s().outages)}
               label={t().trends.byHourLabel}
               bars={hourBars()}
               initial={peakHour(byHour() ?? [])}
