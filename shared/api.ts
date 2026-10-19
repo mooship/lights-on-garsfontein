@@ -118,6 +118,9 @@ export const UTC_OFFSET_MS = site.utcOffsetMinutes * MINUTE_MS;
 /** The calendar date of `ms` in the configured zone, as YYYY-MM-DD. */
 export const localDate = (ms: number) => new Date(ms + UTC_OFFSET_MS).toISOString().slice(0, 10);
 
+/** The longest sign-in username and password the server accepts; the form caps its fields to match. */
+export const CREDENTIAL_MAX_LENGTH = { username: 128, password: 256 } as const;
+
 /** What a Turnstile token was solved for; the server rejects tokens used for anything else. */
 export const TURNSTILE_ACTION = { login: 'login', contact: 'contact' } as const;
 export type TurnstileAction = (typeof TURNSTILE_ACTION)[keyof typeof TURNSTILE_ACTION];

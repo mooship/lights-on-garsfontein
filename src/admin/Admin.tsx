@@ -5,6 +5,7 @@ import { type Component, createResource, createSignal, For, Index, Match, onMoun
 import {
   type AdminOutage,
   type AdminOutagesResponse,
+  CREDENTIAL_MAX_LENGTH,
   outageDurationMs,
   TIMER_ACTION,
   type TimerAction,
@@ -13,7 +14,7 @@ import {
 import { ERROR } from '../../shared/errors';
 import { PunchClock } from '../components/PunchClock';
 import { ApiError, api } from '../lib/api';
-import { formatDay, formatDuration, formatTime, fromLocalInput, toLocalInput } from '../lib/format';
+import { formatDay, formatDuration, formatEnd, formatTime, fromLocalInput, toLocalInput } from '../lib/format';
 import { t } from '../lib/i18n';
 import { useMinute, useNow } from '../lib/now';
 import { getTurnstileToken, loadTurnstile } from '../lib/turnstile';
@@ -95,6 +96,7 @@ const LoginForm: Component<{ notice?: AdminErrorCode; focus: boolean; onLoggedIn
             class={input}
             type="text"
             id="username"
+            maxlength={CREDENTIAL_MAX_LENGTH.username}
             name="username"
             autocomplete="username"
             autocapitalize="none"
@@ -104,7 +106,15 @@ const LoginForm: Component<{ notice?: AdminErrorCode; focus: boolean; onLoggedIn
         </label>
         <label class={label}>
           {admin.password}
-          <input class={input} type="password" id="password" name="password" autocomplete="current-password" required />
+          <input
+            class={input}
+            type="password"
+            id="password"
+            name="password"
+            autocomplete="current-password"
+            maxlength={CREDENTIAL_MAX_LENGTH.password}
+            required
+          />
         </label>
         <div ref={widget} />
         <FormError error={error()} />
@@ -135,7 +145,7 @@ const OutageRow: Component<{
       <div classList={{ [css.flagged]: props.outage.isFalsePositive }}>
         <strong id={titleId()}>
           {formatDay(props.outage.startTime)}, {formatTime(props.outage.startTime)} –{' '}
-          {props.outage.endTime ? formatTime(props.outage.endTime) : admin.ongoing}
+          {props.outage.endTime ? formatEnd(props.outage.startTime, props.outage.endTime) : admin.ongoing}
         </strong>
         <div class={css.itemMeta}>
           {formatDuration(outageDurationMs(props.outage, props.now))} · {admin.source[props.outage.source]}

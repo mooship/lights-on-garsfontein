@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { DAY_MS, TURNSTILE_ACTION } from '../../shared/api';
+import { CREDENTIAL_MAX_LENGTH, DAY_MS, TURNSTILE_ACTION } from '../../shared/api';
 import { LOGIN_PATH, LOGOUT_PATH } from '../../shared/paths';
 import { sessions } from '../db/schema';
 import { SESSION_COOKIE } from '../lib/cookies';
@@ -21,8 +21,8 @@ const SESSION_MAX_AGE_MS = 90 * DAY_MS;
 export const ADMIN_USER_ID = 'admin';
 
 const loginSchema = z.object({
-  username: z.string().min(1).max(128),
-  password: z.string().min(1).max(256),
+  username: z.string().min(1).max(CREDENTIAL_MAX_LENGTH.username),
+  password: z.string().min(1).max(CREDENTIAL_MAX_LENGTH.password),
   token: z.string().min(1).max(2048),
 });
 
