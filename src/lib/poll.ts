@@ -3,7 +3,8 @@ import { MINUTE_MS } from '../../shared/api';
 
 /**
  * How often a visible public page asks for the status: no faster than it can change, as the sensor
- * reports and the cron checks once a minute. Gentle on readers' batteries and data.
+ * reports and the cron checks once a minute. Gentle on readers' batteries and data. The admin
+ * dashboard reloads its outage list as often; README "Admin" states it, so change them together.
  */
 export const POLL_MS = MINUTE_MS;
 /** How often it asks for the statistics; trends.loadFailed in src/i18n promises a retry in a few minutes. */

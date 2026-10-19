@@ -54,7 +54,7 @@ export const announce = style({
 
 export const sensor = style({ marginTop: '0.75rem', fontSize: '0.875rem', color: vars.color.muted });
 
-// Red, as the public page shows OFF while the sensor is silent.
+// Red: a silent sensor opens an outage, which may be only the sensor or its connection failing.
 export const sensorSilent = style({ color: vars.color.off, fontWeight: 600 });
 
 export const checkbox = style({

@@ -297,6 +297,8 @@ const SensorLine: Component<{ sensor: SensorReading | null; asOf: number }> = (p
             return admin.sensor.never;
           case 'paused':
             return admin.sensor.paused(at(s.until, props.asOf));
+          case 'resuming':
+            return admin.sensor.resuming(at(s.since, props.asOf));
           case 'reporting':
             return admin.sensor.reporting(at(s.lastSeen, props.asOf));
           case 'silent':

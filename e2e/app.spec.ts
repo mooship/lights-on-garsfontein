@@ -1090,6 +1090,8 @@ test.describe('admin sensor', () => {
     later.next = (route) => route.fulfill({ status: 401, json: { error: ERROR.unauthorized } });
     await refresh(page);
     await expect(page.getByRole('alert')).toHaveText(admin.errors.session_expired);
+    await expect(page.getByLabel(admin.password)).toBeVisible();
+    await expect(page.getByRole('heading', { name: admin.punchClock })).toHaveCount(0);
   });
 });
 

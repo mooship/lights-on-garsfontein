@@ -21,10 +21,12 @@ describe('sensorState', () => {
     });
   });
 
-  it('is paused until a pause ends, and afterwards counts the silence from its end', () => {
+  it('is paused until a pause ends, waits the heartbeat threshold, then counts the silence from its end', () => {
     const lastSeen = ago(60 * MINUTE_MS);
     const until = new Date(now + MINUTE_MS).toISOString();
     expect(sensorState({ lastSeen, pausedUntil: until }, now)).toEqual({ kind: 'paused', until });
+    const justEnded = ago(HEARTBEAT_THRESHOLD_MS);
+    expect(sensorState({ lastSeen, pausedUntil: justEnded }, now)).toEqual({ kind: 'resuming', since: justEnded });
     const ended = ago(10 * MINUTE_MS);
     expect(sensorState({ lastSeen, pausedUntil: ended }, now)).toEqual({
       kind: 'silent',
