@@ -111,6 +111,59 @@ describe('admin request checks', () => {
 });
 
 describe(ADMIN_OUTAGES_PATH, () => {
+  // Only one outage is open at a time: punch in and a heartbeat close "the" open outage, and a second
+  // would keep the status OFF after the power came back.
+  it('refuses to log an outage with no end while another is open', async () => {
+    await insertOutage({ startTime: '2026-10-10T10:00:00Z' });
+    const res = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.create, startTime: '2026-10-12T10:00:00Z' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: ERROR.outageAlreadyOpen });
+    expect(await openOutageCount()).toBe(1);
+  });
+
+  it('refuses to reopen an outage while another is open, but lets the open one be edited', async () => {
+    const closed = await insertOutage({ startTime: '2026-10-01T10:00:00Z', endTime: '2026-10-01T11:00:00Z' });
+    const open = await insertOutage({ startTime: '2026-10-12T10:00:00Z' });
+    const reopen = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id: closed, endTime: null });
+    expect(reopen.status).toBe(409);
+    expect(await reopen.json()).toEqual({ error: ERROR.outageAlreadyOpen });
+    const planned = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id: open, isPlanned: true });
+    expect(planned.status).toBe(200);
+    expect(await openOutageCount()).toBe(1);
+  });
+
+  it('closes an open outage marked a false positive, even when asked to leave its end empty', async () => {
+    const id = await insertOutage({ startTime: '2026-10-12T10:00:00Z' });
+    const res = await post(ADMIN_OUTAGES_PATH, {
+      action: OUTAGE_ACTION.update,
+      id,
+      isFalsePositive: true,
+      endTime: null,
+    });
+    expect(res.status).toBe(200);
+    const row = await env.DB.prepare('SELECT end_time FROM outages WHERE id = ?')
+      .bind(id)
+      .first<{ end_time: string | null }>();
+    expect(row?.end_time).not.toBeNull();
+  });
+
+  it('refuses fields it does not know, rather than reporting an edit it ignored', async () => {
+    const id = await insertOutage({ startTime: '2026-10-01T10:00:00Z', endTime: '2026-10-01T11:00:00Z' });
+    for (const body of [
+      { action: OUTAGE_ACTION.update, id, startTime: '2026-09-01T00:00:00Z' },
+      {
+        action: OUTAGE_ACTION.create,
+        startTime: '2026-10-02T10:00:00Z',
+        endTime: '2026-10-02T11:00:00Z',
+        source: 'sensor',
+      },
+    ]) {
+      const res = await post(ADMIN_OUTAGES_PATH, body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    expect((await post(TIMER_PATH, { action: TIMER_ACTION.punchOut, at: 'now' })).status).toBe(400);
+  });
+
   it('logs a manual outage', async () => {
     const res = await post(ADMIN_OUTAGES_PATH, {
       action: OUTAGE_ACTION.create,

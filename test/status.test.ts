@@ -267,6 +267,17 @@ describe('POST /api/heartbeat with poweredFor', () => {
     expect((await heartbeat()).status).toBe(200);
   });
 
+  // Media types and auth schemes are case-insensitive (RFC 9110); a sensor's HTTP client may send either.
+  it('reads poweredFor whatever the case of its Content-Type, and accepts a lower-case bearer', async () => {
+    await insertOutage({ startTime: new Date(Date.now() - 2 * MINUTE_MS).toISOString(), source: 'sensor' });
+    const res = await heartbeat({
+      rawBody: JSON.stringify({ poweredFor: 600 }),
+      headers: { Authorization: `bearer ${env.HEARTBEAT_TOKEN}`, 'Content-Type': 'Application/JSON; charset=UTF-8' },
+    });
+    expect(res.status).toBe(200);
+    expect((await outageRows())[0]?.is_false_positive).toBe(1);
+  });
+
   it('rejects a poweredFor that is not a whole number of seconds from 0', async () => {
     for (const bad of [-1, 1.5, '60', null]) {
       const res = await poweredFor(bad);

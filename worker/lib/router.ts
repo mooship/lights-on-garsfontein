@@ -86,11 +86,11 @@ async function fromEdgeCache(ctx: RouteContext, handler: Route['handler'], ttl: 
 }
 
 /**
- * Every write without a bearer token gets refuseCrossSite, as only a browser attaches cookies
- * on its own. Bearer requests (scripts, the sensor) are exempt; their token is the check.
+ * Every write gets refuseCrossSite, as only a browser attaches cookies on its own, except a bearer
+ * request (a script or the sensor) to a route whose `authorize` checks that token.
  */
-const needsSameSite = (request: Request) =>
-  request.method !== 'GET' && request.method !== 'HEAD' && bearerToken(request) === null;
+const needsSameSite = (route: Route, request: Request) =>
+  request.method !== 'GET' && request.method !== 'HEAD' && !(route.authorize && bearerToken(request) !== null);
 
 /** Runs a matched route: its guards, the handler (or edge cache), purges, then CORS and `ctx.headers`. */
 export async function dispatch(route: Route, request: Request, env: Env): Promise<Response> {
@@ -103,7 +103,7 @@ export async function dispatch(route: Route, request: Request, env: Env): Promis
     limitKey: rateLimitKey(ip),
     headers: new Headers(),
   };
-  let response = needsSameSite(request) ? refuseCrossSite(request) : null;
+  let response = needsSameSite(route, request) ? refuseCrossSite(request) : null;
   if (!response && route.limiter && (await isRateLimited(env[route.limiter], ctx.limitKey))) {
     response = errors.rateLimited();
   }

@@ -65,6 +65,9 @@ describe('POST /api/contact', () => {
     expect(cross.status).toBe(403);
     expect(await cross.json()).toEqual({ error: ERROR.forbidden });
     expect((await reveal({ headers: { 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(403);
+    // A bearer header exempts only routes that check one; this route never does.
+    const withBearer = await reveal({ headers: { Origin: 'https://evil.example', Authorization: 'Bearer anything' } });
+    expect(withBearer.status).toBe(403);
     const same = await reveal({ headers: { Origin: ORIGIN } });
     expect(same.status).toBe(200);
     expect(same.headers.has('Access-Control-Allow-Origin')).toBe(false);
