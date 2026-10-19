@@ -114,7 +114,7 @@ describe('windowStats', () => {
       const intervals = mergeOutages(rows, base + 30 * D);
       const from = base + random() * 5 * D;
       const to = from + random() * 25 * D;
-      // Reference: the plain per-day scan that windowStats's single forward pass replaces.
+      // Reference: a plain per-day scan to check windowStats's single forward pass against.
       const start = Math.max(from, since);
       let expected = 0;
       for (let day = Math.floor((start + UTC_OFFSET_MS) / D) * D - UTC_OFFSET_MS; day < to; day += D) {

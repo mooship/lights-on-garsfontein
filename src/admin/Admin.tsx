@@ -1,7 +1,7 @@
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
-import { type Component, createResource, createSignal, For, Index, Match, onMount, Show, Switch } from 'solid-js';
+import { type Component, createResource, createSignal, Index, Match, onMount, Show, Switch } from 'solid-js';
 import {
   type AdminOutage,
   type AdminOutagesResponse,

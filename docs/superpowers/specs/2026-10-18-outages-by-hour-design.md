@@ -1,5 +1,7 @@
 # Outages by time of day: design
 
+**Status:** built in pull request #17.
+
 18 October 2026. The operator asked for a new chart or statistic and handed the choice to Claude while away ("work on your own, no questions"), so every decision below is Claude's call, made under the project's rules in AGENTS.md.
 
 ## Intent

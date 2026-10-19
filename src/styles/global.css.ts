@@ -274,8 +274,7 @@ globalStyle('.gg-skel::after', {
   animation: 'gg-shimmer 1.4s ease-in-out infinite',
 });
 
-// The same min-height as the status badge (components/StatusBadge.css.ts).
-// The same min-height as StatusBadge's root.
+// The same min-height as root in src/components/StatusBadge.css.ts; change them together.
 globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem', minHeight: '6.35rem' });
 globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1 });
 globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' });

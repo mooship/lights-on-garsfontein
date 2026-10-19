@@ -20,7 +20,7 @@ const timeFormat = lazyFormat({ timeZone: TIME_ZONE, hour: '2-digit', minute: '2
 const dateFormat = lazyFormat({ timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
 const shortDateFormat = lazyFormat({ timeZone: 'UTC', day: 'numeric', month: 'short' });
 
-/** "Sa. 17 Okt." / "Sat, 17 Oct" */
+/** "Sa. 17 Okt." / "Sat 17 Oct" */
 export const formatDay = (iso: string) => dayFormat(new Date(iso));
 /** "17 Okt. 2026" / "17 Oct 2026" */
 export const formatDate = (iso: string) => dateFormat(new Date(iso));

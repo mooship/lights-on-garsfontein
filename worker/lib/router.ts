@@ -18,11 +18,11 @@ type Limiter = { [K in keyof Env]: Env[K] extends RateLimit ? K : never }[keyof 
 
 /**
  * One API endpoint. Guards are declared here and applied by `dispatch` in a fixed order
- * (cross-site, rate limit, admin auth), so handlers contain only their own logic.
+ * (cross-site, edge cache, rate limit, auth), so handlers contain only their own logic.
  */
 export interface Route {
   handler: (ctx: RouteContext) => Promise<Response> | Response;
-  /** Per-connection rate limit, checked before auth and the handler. */
+  /** Per-connection rate limit; on an edge-cached route only a cache miss counts. */
   limiter?: Limiter;
   /** Return a Response to refuse the request, or null to let it through (e.g. admin auth). */
   authorize?: (ctx: RouteContext) => Promise<Response | null>;

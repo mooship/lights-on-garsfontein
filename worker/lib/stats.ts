@@ -9,7 +9,7 @@ import {
 } from '../../shared/api';
 
 const WEEK = 7 * DAY;
-/** The length of StatsResponse.weeks. */
+/** The most weeks StatsResponse.weeks holds. */
 const WEEKS_SHOWN = 26;
 
 interface Interval {

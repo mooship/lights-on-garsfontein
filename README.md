@@ -91,7 +91,7 @@ curl -X POST "$SITE_URL/api/admin/outages" \
 
 ### Sensor
 
-An always-on device posts to `/api/heartbeat` every minute. Once the last heartbeat is more than three minutes old, the status shows `OFF` and the minute cron opens an outage starting at that heartbeat. The next heartbeat closes **every** open outage, punch-clock ones included, since the sensor seeing power means the power is on; if power returned between two cron runs, the gap is still recorded. Heartbeats are refused until `HEARTBEAT_TOKEN` is set. Each instance supports one sensor (`worker/db/schema.ts` keeps a single heartbeat row).
+An always-on device posts to `/api/heartbeat` every minute. Once the last heartbeat is older than `HEARTBEAT_THRESHOLD_MS` (three minutes, in `shared/api.ts`), the status shows `OFF` and the minute cron opens an outage starting at that heartbeat. The next heartbeat closes **every** open outage, punch-clock ones included, since the sensor seeing power means the power is on; if power returned between two cron runs, the gap is still recorded. Heartbeats are refused until `HEARTBEAT_TOKEN` is set. Each instance supports one sensor (`worker/db/schema.ts` keeps a single heartbeat row).
 
 A sensor that knows how long it has had power can say so, which lets the Worker tell a lost connection from a power cut. It posts `{ "poweredFor": <whole seconds> }` as JSON: its uptime, if a power cut restarts it, or how long it has been on its charger. A sensor outage that began since then was only the connection dropping, so the heartbeat marks it as a false positive, which takes it off the site, and records no gap. Other outages end when the power came back, not when the heartbeat arrived. Without a body, a heartbeat vouches only for the moment it is sent. Punch-clock outages are closed but never marked as false positives. The status still shows `OFF` while the sensor is silent, since the Worker cannot tell why until it hears from it again.
 
@@ -224,13 +224,13 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 | --- | --- |
 | `site.config.ts` | Deployment identity (see [Run it for your area](#run-it-for-your-area)) |
 | `src/` | SolidJS app: `components/`, `lib/`, `styles/` (colours in `palette.ts`), `banners.ts` |
-| `public/` | Static files copied as they are: icons, `_headers` and `sw.js`, a kill switch that removes the offline service worker browsers installed on 17 and 18 October 2026; the app registers none |
+| `public/` | Static files copied as they are: icons, `_headers`, and `sw.js`, a kill switch for an earlier offline service worker (the file says why); the app registers none |
 | `src/i18n/` | Public copy: one dictionary per language (`af.ts` is the source) and `head.ts` for the `<head>` |
 | `src/admin/` | The `/admin` page; its copy is English-only, in `copy.ts`, outside the dictionaries |
 | `worker/` | Worker: `index.ts` (security headers, crons), `routes/` (handlers; the route table is in `routes/index.ts`), `lib/` (router, grid, stats, auth, Turnstile), `crons.ts`, `db/schema.ts` |
 | `shared/` | Types and constants for both the app and the Worker: `api.ts` (API types, `OUTAGE_SOURCES`, `UTC_OFFSET_MS`, `localDate`), `paths.ts`, `errors.ts`, `locale.ts` (`LOCALES`, `DEFAULT_LOCALE`, `pageLocale`) |
 | `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload |
-| `index.html`, `privacy.html`, `404.html`, `templates/` | Static pages (`404.html` answers any unknown path with status 404), `llms.txt`, `site.webmanifest` and `.well-known/security.txt`, filled from `site.config.ts` at build time |
+| `index.html`, `privacy.html`, `404.html`, `templates/` | Static pages (`404.html` answers any unknown path with status 404, so the build also writes `admin.html` for `/admin`), `llms.txt`, `site.webmanifest` and `.well-known/security.txt`, filled from `site.config.ts` at build time |
 | `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the MacBook sensor |
 | `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 
@@ -272,7 +272,7 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
-Lefthook runs Biome and the typecheck on commit and `npm test` on push. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
+Lefthook runs Biome and the typecheck on commit and `npm test` on push. `npm install` installs the hooks; if Git has a global `core.hooksPath`, it cannot, so run `npx lefthook install -f`. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
 
 ### API tests (Bruno)
 

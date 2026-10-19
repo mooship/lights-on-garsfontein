@@ -68,7 +68,6 @@ export const statusRoutes: Routes = {
     cors: true,
     edgeCache: STATUS_EDGE_TTL_SECONDS,
   },
-  // Until HEARTBEAT_TOKEN is set (no sensor yet), every heartbeat is refused.
   [`POST ${HEARTBEAT_PATH}`]: {
     handler: postHeartbeat,
     authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),

@@ -6,6 +6,8 @@ Each case gives the request, the expected result, the actual result, and whether
 
 Unless a case says otherwise, every Worker JSON response had `Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store`, the six Worker security headers, and an error body of `{ "error": <code from shared/errors.ts> }` (plus `details` on `bad_request`). No 500 was produced.
 
+**Status:** a record of 19 October 2026. Defects marked "fixed in #29" were fixed in pull request #29; the others were still open when this note was added.
+
 ## Cross-cutting
 
 | # | Request | Expected | Actual | |
@@ -36,7 +38,7 @@ Unless a case says otherwise, every Worker JSON response had `Content-Type: appl
 | S1 | `GET` | 200, `no-store`, CORS `*`, fields per `StatusResponse` | As expected | [covered] status.test.ts, bruno |
 | S2 | `HEAD` | 200, same headers, no body | As expected | [covered] |
 | S3 | `GET ?x=1&y=<script>` | Same cached body | Same | [covered] query string ignored |
-| S4 | With two open outages (see A3) | One open outage at most | `outage` is the newer one; after one punch in, still OFF from the other | [new], see A3 |
+| S4 | With two open outages (see A3) | One open outage at most | `outage` is the newer one; after one punch in, still OFF from the other | [new], see A3. Fixed in #29: a second open outage is refused |
 
 ## GET /api/stats, /api/outages.csv, /feed.xml
 
@@ -59,7 +61,7 @@ Unless a case says otherwise, every Worker JSON response had `Content-Type: appl
 | B1 | No `Authorization` | 401 | 401 | [covered] |
 | B2 | `Bearer nope` six times from one IP | 401 ×5 then 429 with `Retry-After: 60` (LOGIN_LIMITER) | As expected | [covered] for admin token; [new] for heartbeat token |
 | B3 | `Bearer ` (empty token) | 401 | 401 | [new] |
-| B4 | `bearer <valid token>` (lower-case scheme) | Accepted: the scheme is case-insensitive (RFC 9110 §11.1) | 401 | [new] DEFECT (low) |
+| B4 | `bearer <valid token>` (lower-case scheme) | Accepted: the scheme is case-insensitive (RFC 9110 §11.1) | 401 | [new] DEFECT (low), fixed in #29 |
 | B5 | `Basic ...` | 401 | 401 | [new] |
 | B6 | `Bearer <ADMIN_API_TOKEN>` | 401 | 401 | [new] |
 | B7 | No auth, `Origin: https://evil.example` | 403 | 403 (cross-site guard runs before auth) | [new] |
@@ -68,7 +70,7 @@ Unless a case says otherwise, every Worker JSON response had `Content-Type: appl
 | B10 | `poweredFor`: -1, 1.5, "60", null, true, 1e20, 2^53, -0.0001 | 400 `bad_request` | As expected | [covered] for -1, 1.5, "60"; [new] for the rest |
 | B11 | Duplicate key `{"poweredFor":5,"poweredFor":-1}` | Last wins | 400 (last wins) | [new] |
 | B12 | `poweredFor: 9007199254740991` (max safe int) (code) | Should be bounded; it dismisses every open sensor outage since 1970 | Accepted: `poweredSince` clamps to epoch | [new] note: consider a cap (for example a year) |
-| B13 | `Content-Type: Application/JSON` with a body (code) | Body parsed | `startsWith('application/json')` is case-sensitive: body silently ignored, heartbeat recorded with `poweredFor` 0 | [new] DEFECT (low) |
+| B13 | `Content-Type: Application/JSON` with a body (code) | Body parsed | `startsWith('application/json')` is case-sensitive: body silently ignored, heartbeat recorded with `poweredFor` 0 | [new] DEFECT (low), fixed in #29 |
 | B14 | `Content-Type: application/jsonx` (code) | Body ignored or 415 | Parsed as JSON (prefix match) | [new] info |
 | B15 | 5 MB JSON body with invalid `poweredFor` | 413 or 400 | 400 (parsed in full; no size cap) | [new] info |
 | B16 | `GET/PUT/DELETE` | 405 | 404 | [new], X1 |
@@ -101,22 +103,22 @@ No heartbeat row exists in the e2e database, so every valid pause answered `{ "o
 |---|---|---|---|---|
 | A1 | `create` closed | 201 | 201 | [covered] |
 | A2 | `create` open while none is open | 201 | 201 | [covered] |
-| A3 | `create` open while another is open | 409 `outage_already_open`, as punch out does | 201; two open outages. Status shows OFF from the newer one; one `punch_in` closes only the newest and the status stays OFF until a second `punch_in` | [new] DEFECT (medium) |
-| A4 | `update` `endTime: null` on a closed outage (weeks old) while another is open | 409, or at least refused while another is open | 200; outage reopened, status OFF "since 4 October" | [new] DEFECT (medium, same root as A3) |
+| A3 | `create` open while another is open | 409 `outage_already_open`, as punch out does | 201; two open outages. Status shows OFF from the newer one; one `punch_in` closes only the newest and the status stays OFF until a second `punch_in` | [new] DEFECT (medium), fixed in #29: 409 `outage_already_open` |
+| A4 | `update` `endTime: null` on a closed outage (weeks old) while another is open | 409, or at least refused while another is open | 200; outage reopened, status OFF "since 4 October" | [new] DEFECT (medium, same root as A3), fixed in #29 |
 | A5 | `create` with end = start (zero length), including equal instants in different offsets | Either 400 or accepted | 201; CSV `duration_minutes` 0 | [new] |
 | A6 | `create` `0001-01-01T00:00:00Z` | A floor (for example not before some sane year) | 201; listed first in CSV | [new] DEFECT (low) |
 | A7 | `create` `9999-12-31` | 400 `time_in_future` | As expected | [covered] |
 | A8 | `create` end before start only once offsets are applied | 400 `end_before_start` | As expected | [new] |
 | A9 | `create` no offset, `isPlanned` "true" or null, `startTime` null | 400 | 400 | [new] |
-| A10 | `create` with `source: "sensor"`, `isFalsePositive: true`, `id: 999` | Refused, or ignored visibly | 201; extra fields silently stripped (`source: manual`, new id) | [new] |
+| A10 | `create` with `source: "sensor"`, `isFalsePositive: true`, `id: 999` | Refused, or ignored visibly | 201; extra fields silently stripped (`source: manual`, new id) | [new]; fixed in #29: admin bodies are strict, so 400 |
 | A11 | Response shape of `create`, `update` and `timer` | `AdminOutage` (`planned`), like the list | Raw row with `isPlanned` and no `planned`; the list uses `planned` | [new] DEFECT (low) |
 | A12 | `update` nonexistent id | 404 | 404 | [covered] |
 | A13 | `update` id "1", 0, -1, 1.5, 1e300, 2^53+1 | 400 | 400 | [new] |
 | A14 | `update` with no changes | 200, unchanged | 200 | [new] |
 | A15 | `update` an already closed outage's `endTime` | 200 | 200 | [covered] |
-| A16 | `update` with `startTime` | 400 (not editable), or edited | 200 and nothing changed: the admin is told it worked | [new] DEFECT (low) |
+| A16 | `update` with `startTime` | 400 (not editable), or edited | 200 and nothing changed: the admin is told it worked | [new] DEFECT (low), fixed in #29: 400 |
 | A17 | `update` `isFalsePositive: true` on an open outage | Closes it | Closes it | [covered] |
-| A18 | `update` `isFalsePositive: true, endTime: null` | Closed (the handler's own rule: "a false positive should not stay open") | 200; stays open with `isFalsePositive: true` | [new] DEFECT (low) |
+| A18 | `update` `isFalsePositive: true, endTime: null` | Closed (the handler's own rule: "a false positive should not stay open") | 200; stays open with `isFalsePositive: true` | [new] DEFECT (low), fixed in #29: false positives always close |
 | A19 | `delete` then `delete` again | 200 then 404 | As expected | [covered] partly; [new] for the repeat |
 | A20 | `delete` id "5", missing id | 400 | 400 | [new] |
 | A21 | `delete` with extra `endTime: "bogus"` | 200, ignored | 200 | [new] |
@@ -152,7 +154,7 @@ No heartbeat row exists in the e2e database, so every valid pause answered `{ "o
 | C10 | Old cookie after logout | 401 | 401 | [covered] |
 | C11 | Login with `Sec-Fetch-Site: cross-site` | 403 before the rate limit | 403 | [new] |
 | C12 | Login with 200-character username | 400 | 400 | [new] |
-| C13 | Any `Authorization: Bearer x` header on `/api/contact` or `/api/admin/login` | Same-site and JSON checks still apply: these routes verify no bearer token | Bypassed: cross-site `Origin` gets 200 with the email (Turnstile still runs). Not exploitable from a browser (the header forces a failing preflight) | [new] DEFECT (low, defence in depth) |
+| C13 | Any `Authorization: Bearer x` header on `/api/contact` or `/api/admin/login` | Same-site and JSON checks still apply: these routes verify no bearer token | Bypassed: cross-site `Origin` gets 200 with the email (Turnstile still runs). Not exploitable from a browser (the header forces a failing preflight) | [new] DEFECT (low, defence in depth), fixed in #29: a bearer header exempts a write only on routes that check the token |
 
 ## POST /api/contact
 
@@ -167,13 +169,13 @@ No heartbeat row exists in the e2e database, so every valid pause answered `{ "o
 
 ## Cases to automate first
 
-1. **A3/A4**: `create` with no `endTime`, or `update` with `endTime: null`, while another outage is open, answers 409 `outage_already_open` (worker test in `test/admin.test.ts`; bruno request in `bruno/admin/`).
+1. Done in #29. **A3/A4**: `create` with no `endTime`, or `update` with `endTime: null`, while another outage is open, answers 409 `outage_already_open` (worker test in `test/admin.test.ts`; bruno request in `bruno/admin/`).
 2. **A11**: `create`, `update` and `timer` answer with the `AdminOutage` shape (`planned`, no `isPlanned`), checked against the list's item for the same id.
-3. **A18**: `update { isFalsePositive: true, endTime: null }` on an open outage leaves it closed (or is refused).
-4. **A16/A10**: unknown fields in admin bodies are refused with 400 (`z.strictObject`), so an attempted `startTime` edit does not report success.
+3. Done in #29. **A18**: `update { isFalsePositive: true, endTime: null }` on an open outage leaves it closed (or is refused).
+4. Done in #29. **A16/A10**: unknown fields in admin bodies are refused with 400 (`z.strictObject`), so an attempted `startTime` edit does not report success.
 5. **X1/X2**: wrong method on a known API path answers 405 with `Allow`; `OPTIONS` on a CORS route answers the preflight. Extend `test/router.test.ts`.
-6. **X15/B4**: 401 carries `WWW-Authenticate: Bearer`; the bearer scheme is matched case-insensitively (`test/http.test.ts` for `bearerToken`).
-7. **B13**: a heartbeat with `Content-Type: Application/JSON; charset=UTF-8` and `{"poweredFor":600}` dismisses an open sensor outage, like the lower-case header.
-8. **C13**: `POST /api/contact` with `Authorization: Bearer x` and a cross-site `Origin` answers 403.
+6. B4 done in #29; X15 still open. **X15/B4**: 401 carries `WWW-Authenticate: Bearer`; the bearer scheme is matched case-insensitively (`test/http.test.ts` for `bearerToken`).
+7. Done in #29. **B13**: a heartbeat with `Content-Type: Application/JSON; charset=UTF-8` and `{"poweredFor":600}` dismisses an open sensor outage, like the lower-case header.
+8. Done in #29. **C13**: `POST /api/contact` with `Authorization: Bearer x` and a cross-site `Origin` answers 403.
 9. **X14**: extend `test/headers.test.ts` to a 400, 401, 403, 409, 415 and 429.
 10. **H6/H7**: `HEAD` and query strings on `/api/stats` and `/api/outages.csv`.

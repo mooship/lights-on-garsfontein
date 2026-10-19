@@ -112,8 +112,8 @@ function feedDuration(ms: number): string {
 }
 
 /**
- * Atom feed of the latest outages (false positives excluded), newest first. In English only:
- * feeds are machine-facing and read by feed readers, so they skip the site's dictionaries.
+ * Atom feed of the latest outages (false positives excluded), newest first. English only, as feeds
+ * are read by software, so it skips the site's dictionaries.
  */
 async function getFeed({ env, db }: RouteContext): Promise<Response> {
   const rows = await db
