@@ -22,7 +22,7 @@ function stripRepeatedly(text: string, pattern: RegExp): string {
 
 /** dist/index.html for the default locale, dist/<code>/index.html for the others. */
 const LOCALE_PAGES = site.locales.map((locale) => ({ locale, file: `${localePath(locale).slice(1)}index.html` }));
-const HTML = [...LOCALE_PAGES.map((p) => p.file), 'privacy.html'];
+const HTML = [...LOCALE_PAGES.map((p) => p.file), 'privacy.html', '404.html', 'admin.html'];
 
 describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () => {
   it('allows every inline script by a hash in _headers', () => {

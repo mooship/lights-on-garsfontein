@@ -30,7 +30,14 @@ describe('public copy', () => {
 
 describe('public static files', () => {
   // These ship as-is to every visitor and crawler, outside the dictionaries.
-  for (const file of ['templates/llms.txt', 'templates/site.webmanifest', 'index.html', 'privacy.html']) {
+  for (const file of [
+    'templates/llms.txt',
+    'templates/site.webmanifest',
+    'templates/.well-known/security.txt',
+    'index.html',
+    'privacy.html',
+    '404.html',
+  ]) {
     it(`never says how an outage was recorded (${file})`, () => {
       const text = readFileSync(resolve(import.meta.dirname, '../..', file), 'utf8');
       expect(text.split('\n').filter((line) => RECORDING_METHOD.test(line))).toEqual([]);

@@ -28,7 +28,8 @@ upload_source_maps = true
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-not_found_handling = "single-page-application"
+# Unknown paths get dist/404.html with status 404; the app's pages each have a file (vite.config.ts).
+not_found_handling = "404-page"
 # The same paths as API_PREFIX and WORKER_PAGES in shared/paths.ts; change them together.
 run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png", "/feed.xml"]
 

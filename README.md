@@ -17,7 +17,7 @@ The code runs on one Cloudflare Worker with a D1 database, and anyone can run it
 
 ## Using the data
 
-The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): credit "Lights On, Garsfontein?" and link to the site. It is provided as is, with no warranty of accuracy. Times are ISO 8601 UTC; local time is SAST (UTC+2, no daylight saving). Please poll no more than once every 30 seconds. A plain-text summary for language models is at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt).
+The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): credit "Lights On, Garsfontein?" and link to the site. It is provided as is, with no warranty of accuracy. Times are ISO 8601 UTC; local time is SAST (UTC+2, no daylight saving). Please poll no more than once every 30 seconds. A plain-text summary for language models is at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt). To report a security problem, see [SECURITY.md](SECURITY.md) or [`/.well-known/security.txt`](https://garsfontein.timothybrits.co.za/.well-known/security.txt).
 
 ### API
 
@@ -190,6 +190,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `faultReporting.url` | The utility's official fault-reporting page; check it still works |
    | `dataLicence.name`, `.url` | Licence for the outage data; the code stays MIT |
    | `area` | Name, region, city, province and country, for structured data only |
+   | `securityTxtExpires` | When `/.well-known/security.txt` expires, under a year ahead; a test fails 30 days before, so renew it then |
    | `trackingSince` | When records begin, with offset |
    | `timeZone` | IANA zone for displayed dates and times |
    | `utcOffsetMinutes` | Fixed UTC offset for day and week boundaries; daylight saving is not supported |
@@ -197,7 +198,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `intlLocales` | BCP 47 tag per locale, for `Intl` formatting |
 
 3. **Edit the place copy** in `src/i18n/*.ts` (for example `masthead`, `footer.measured`, `footer.operator` and `scope`) and the `<head>` copy in `src/i18n/head.ts`.
-4. **Review the prose** in `index.html`, `privacy.html` and `templates/` (`llms.txt`, `site.webmanifest`) that names the area or operator. Config values go in as `%site.<path>%` and the start date as `%since.<locale>%`; the build fails on an unknown placeholder.
+4. **Review the prose** in `index.html`, `privacy.html`, `404.html` and `templates/` (`llms.txt`, `site.webmanifest`, `.well-known/security.txt`) that names the area or operator. Config values go in as `%site.<path>%` and the start date as `%since.<locale>%`; the build fails on an unknown placeholder.
 5. **Configure Cloudflare**: `cp wrangler.example.toml wrangler.toml` and follow the numbered steps at its top (Worker and database names, `npx wrangler d1 create`, Turnstile widget and hostnames, `SITE_URL`). Each rate limiter's `namespace_id` must be unique in your account. Keep `workers_dev = true`, or uncomment `routes` for a custom domain and set `workers_dev = false` once it is live.
 6. **Set the secrets** (`npx wrangler login`, then `npx wrangler secret put <NAME>`):
 
@@ -228,7 +229,7 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 | `worker/` | Worker: `index.ts` (security headers, crons), `routes/` (handlers; the route table is in `routes/index.ts`), `lib/` (router, grid, stats, auth, Turnstile), `crons.ts`, `db/schema.ts` |
 | `shared/` | Types and constants for both the app and the Worker: `api.ts` (API types, `OUTAGE_SOURCES`, `UTC_OFFSET_MS`, `localDate`), `paths.ts`, `errors.ts`, `locale.ts` (`LOCALES`, `DEFAULT_LOCALE`, `pageLocale`) |
 | `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload |
-| `index.html`, `privacy.html`, `templates/` | Static pages, `llms.txt` and `site.webmanifest`, filled from `site.config.ts` at build time |
+| `index.html`, `privacy.html`, `404.html`, `templates/` | Static pages (`404.html` answers any unknown path with status 404), `llms.txt`, `site.webmanifest` and `.well-known/security.txt`, filled from `site.config.ts` at build time |
 | `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the MacBook sensor |
 | `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 

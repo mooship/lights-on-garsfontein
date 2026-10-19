@@ -18,6 +18,8 @@ export const TIMER_PATH = '/api/admin/timer';
 export const SITEMAP_PATH = '/sitemap.xml';
 export const ROBOTS_PATH = '/robots.txt';
 export const OG_IMAGE_PATH = '/og.png';
+/** RFC 9116; a static file built from templates/.well-known/security.txt. */
+export const SECURITY_TXT_PATH = '/.well-known/security.txt';
 
 /** The boot script in index.html repeats this as a literal (it must stay static); change both together. */
 export const ADMIN_PAGE_PATH = '/admin';

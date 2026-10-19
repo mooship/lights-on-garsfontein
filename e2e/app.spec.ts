@@ -11,6 +11,7 @@ import {
   OG_IMAGE_PATH,
   PRIVACY_PAGE_PATH,
   ROBOTS_PATH,
+  SECURITY_TXT_PATH,
   SITEMAP_PATH,
   STATS_PATH,
   STATUS_PATH,
@@ -457,6 +458,36 @@ test.describe('public page', () => {
     expect(locs).toEqual(['/', '/en/', PRIVACY_PAGE_PATH]);
     const og = await request.get(OG_IMAGE_PATH);
     expect(og.headers()['content-type']).toBe('image/png');
+  });
+
+  test('lets feed readers find the feed from the page', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('link[rel="alternate"][type="application/atom+xml"]')).toHaveAttribute('href', FEED_PATH);
+  });
+
+  test('serves security.txt with a contact, an expiry and its canonical URL', async ({ request }) => {
+    const response = await request.get(SECURITY_TXT_PATH);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toMatch(/^text\/plain/);
+    const text = await response.text();
+    expect(text).toMatch(/^Contact: https:\/\//m);
+    expect(text).toContain(`Expires: ${site.securityTxtExpires}`);
+    expect(text).toContain(`Canonical: ${site.url}${SECURITY_TXT_PATH}`);
+  });
+
+  for (const path of ['/nope', '/en/nope', '/.well-known/change-password']) {
+    test(`answers an unknown path (${path}) with a 404 page that leads home`, async ({ page }) => {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(404);
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+      await expect(page.getByRole('link', { name: site.brand.full }).first()).toHaveAttribute('href', '/');
+    });
+  }
+
+  test('still serves the admin page, which the app renders', async ({ request }) => {
+    const response = await request.get(ADMIN_PAGE_PATH);
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain('id="root"');
   });
 });
 
