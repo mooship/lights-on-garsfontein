@@ -1,0 +1,8 @@
+# Security contacts for %site.url%. The email address is kept off this file on purpose: the
+# privacy page shows it after a bot check.
+Contact: %site.repo%/security/advisories/new
+Contact: %site.url%/privacy#contact-en
+Expires: %site.securityTxtExpires%
+Preferred-Languages: en, af
+Canonical: %site.url%/.well-known/security.txt
+Policy: %site.repo%/security/policy

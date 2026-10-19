@@ -5,7 +5,7 @@ import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
 import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from './shared/locale.ts';
-import { API_PREFIX, WORKER_PAGES } from './shared/paths.ts';
+import { ADMIN_PAGE_PATH, API_PREFIX, WORKER_PAGES } from './shared/paths.ts';
 import { type Locale, site } from './site.config.ts';
 import { HEAD } from './src/i18n/head.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
@@ -43,6 +43,7 @@ function hashedFonts(): Plugin {
 const GENERATED = {
   '/site.webmanifest': { mode: 'json', type: 'application/manifest+json' },
   '/llms.txt': { mode: 'text', type: 'text/plain; charset=utf-8' },
+  '/.well-known/security.txt': { mode: 'text', type: 'text/plain; charset=utf-8' },
 } as const;
 
 const generated = (url: keyof typeof GENERATED) =>
@@ -133,8 +134,12 @@ function localePages(): Plugin {
         const html = String(index.source);
         for (const locale of LOCALES) {
           const source = localePage(html, locale);
-          if (locale === DEFAULT_LOCALE) index.source = source;
-          else this.emitFile({ type: 'asset', fileName: `${localePath(locale).slice(1)}index.html`, source });
+          if (locale === DEFAULT_LOCALE) {
+            index.source = source;
+            // Unknown paths get 404.html, so the admin page needs a file of its own; the boot script
+            // makes it English.
+            this.emitFile({ type: 'asset', fileName: `${ADMIN_PAGE_PATH.slice(1)}.html`, source });
+          } else this.emitFile({ type: 'asset', fileName: `${localePath(locale).slice(1)}index.html`, source });
         }
       },
     },
@@ -184,11 +189,12 @@ export default defineConfig({
     outDir: 'dist',
     modulePreload: { polyfill: false },
     rolldownOptions: {
-      // privacy.html is served at /privacy (Workers assets html_handling). The other language
-      // pages are copies of index.html (localePages).
+      // privacy.html is served at /privacy (Workers assets html_handling) and 404.html for every
+      // unknown path. The other language pages and admin.html are copies of index.html (localePages).
       input: {
         index: resolve(import.meta.dirname, 'index.html'),
         privacy: resolve(import.meta.dirname, 'privacy.html'),
+        notFound: resolve(import.meta.dirname, '404.html'),
       },
     },
   },

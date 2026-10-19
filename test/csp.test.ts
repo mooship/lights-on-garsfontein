@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import notFound from '../404.html?raw';
 import index from '../index.html?raw';
 import privacy from '../privacy.html?raw';
 import headers from '../public/_headers?raw';
@@ -14,7 +15,7 @@ async function sha256(body: string): Promise<string> {
 
 describe('Content-Security-Policy', () => {
   it('allows exactly the inline theme boot script on every page', async () => {
-    for (const html of [index, privacy]) {
+    for (const html of [index, privacy, notFound]) {
       const scripts = inlineScripts(html);
       expect(scripts).toHaveLength(1);
       expect(headers).toContain(await sha256(scripts[0] ?? ''));
@@ -24,7 +25,7 @@ describe('Content-Security-Policy', () => {
   it('keeps the boot scripts static, so the source hash is the built one', () => {
     // vite.config.ts fills %site.…%, %since.…% and %page.…% placeholders; the page's language and
     // the locale list reach the script through <html lang> and <html data-locales> instead.
-    for (const html of [index, privacy]) {
+    for (const html of [index, privacy, notFound]) {
       for (const script of inlineScripts(html)) expect(script).not.toMatch(/%(?:site|since|page)\./);
     }
     expect(index).toMatch(/<html lang="%page\.lang%" data-locales="%site\.locales%">/);

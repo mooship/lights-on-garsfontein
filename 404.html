@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- Served with status 404 for any path the site does not have (not_found_handling in wrangler.toml). -->
+<html lang="af">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <script>
+      (function() {
+        try {
+          var s = localStorage.getItem('theme');
+          var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.add((s === 'dark' || (!s && d)) ? 'dark' : 'light');
+        } catch (e) {}
+      })();
+    </script>
+    <title>Bladsy nie gevind nie · Page not found · %site.brand.full%</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/styles/privacy.css" />
+  </head>
+  <body>
+    <main>
+      <p class="jump"><a href="/">← %site.brand.full%</a></p>
+      <h1>Bladsy nie gevind nie</h1>
+      <p>Hierdie adres bestaan nie op die webwerf nie. <a href="/">Gaan na die huidige status</a>.</p>
+      <h1 lang="en">Page not found</h1>
+      <p lang="en">This address does not exist on the site. <a href="/en/" hreflang="en">Go to the current status</a>.</p>
+    </main>
+  </body>
+</html>

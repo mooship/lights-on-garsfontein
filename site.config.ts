@@ -27,6 +27,11 @@ export const site = {
     province: 'Gauteng',
     country: 'ZA',
   },
+  /**
+   * When /.well-known/security.txt stops being valid. RFC 9116 asks for less than a year ahead;
+   * test/node/security-txt.test.ts fails 30 days before, so renewing it is a deliberate review.
+   */
+  securityTxtExpires: '2027-04-19T00:00:00.000Z',
   /** When records begin; nothing before it counts as tracked time. */
   trackingSince: '2026-10-17T00:00:00+02:00',
   /** IANA zone for every displayed date and time. */
