@@ -1,4 +1,4 @@
-import type { Cookie, Locator, Page, Route } from '@playwright/test';
+import type { APIRequestContext, Cookie, Locator, Page, Route } from '@playwright/test';
 import { fill } from '../build/html';
 import {
   CREDENTIAL_MAX_LENGTH,
@@ -6,6 +6,8 @@ import {
   HEARTBEAT_THRESHOLD_MS,
   localDate,
   MINUTE_MS,
+  OUTAGE_ACTION,
+  RECENT_LIMIT,
   type StatsResponse,
   UTC_OFFSET_MS,
 } from '../shared/api';
@@ -17,6 +19,7 @@ import {
   ADMIN_PAGE_PATH,
   FEED_PATH,
   OG_IMAGE_PATH,
+  OUTAGES_PATH,
   PRIVACY_PAGE_PATH,
   ROBOTS_PATH,
   SECURITY_TXT_PATH,
@@ -32,12 +35,13 @@ import { af } from '../src/i18n/af';
 import { en } from '../src/i18n/en';
 import { HEAD } from '../src/i18n/head';
 import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
+import { PAGE_SIZE } from '../src/lib/pages';
 import { STATS_POLL_MS } from '../src/lib/poll';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
 import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
-import { expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
+import { ADMIN_API, expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
 
 // Copy comes from the dictionaries, so a wording change does not break a test about behaviour.
 // One literal per language ('Geen onderbreking aangemeld nie', 'No outage reported') checks the
@@ -1015,6 +1019,186 @@ test.describe('outages by time of day', () => {
       }
     });
   }
+});
+
+test.describe('all outages', () => {
+  /** Logs `count` half-hour outages, one a day going back from yesterday; returns their ids, newest first. */
+  async function logOutages(request: APIRequestContext, count: number): Promise<number[]> {
+    const ids: number[] = [];
+    for (let day = 1; day <= count; day++) {
+      const start = Date.now() - day * DAY_MS;
+      const res = await request.post(ADMIN_OUTAGES_PATH, {
+        headers: ADMIN_API,
+        data: {
+          action: OUTAGE_ACTION.create,
+          startTime: new Date(start).toISOString(),
+          endTime: new Date(start + 30 * MINUTE_MS).toISOString(),
+        },
+      });
+      expect(res.status()).toBe(201);
+      ids.push(((await res.json()) as { outage: { id: number } }).outage.id);
+    }
+    return ids;
+  }
+  const history = (page: Page) => page.locator('section', { has: page.locator('#history-heading') });
+  const rows = (page: Page) => history(page).getByRole('listitem');
+
+  for (const locale of LOCALES) {
+    test.describe(locale, () => {
+      test.use({ appLocale: locale });
+
+      test(`pages through every outage and back to the recent ones (${locale})`, async ({ page, request }) => {
+        const m = DICTIONARIES[locale].history;
+        await logOutages(request, PAGE_SIZE + 2);
+        await page.goto(localePath(locale));
+        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+
+        const showAll = page.getByRole('button', { name: m.showAll });
+        await showAll.click();
+        await expect(page.getByRole('heading', { name: m.allTitle })).toBeVisible();
+        await expect(rows(page)).toHaveCount(PAGE_SIZE);
+        await expect(page.getByRole('status').filter({ hasText: m.page(1, 2) })).toBeVisible();
+        const newer = page.getByRole('button', { name: m.newer });
+        const older = page.getByRole('button', { name: m.older });
+        await expect(newer).toHaveAttribute('aria-disabled', 'true');
+
+        await older.click();
+        await expect(rows(page)).toHaveCount(2);
+        await expect(page.getByRole('status').filter({ hasText: m.page(2, 2) })).toBeVisible();
+        await expect(older).toHaveAttribute('aria-disabled', 'true');
+        await expect(older).toBeFocused();
+        await older.click({ force: true }); // aria-disabled past the last page, so nothing happens
+        await expect(rows(page)).toHaveCount(2);
+        await newer.click();
+        await expect(rows(page)).toHaveCount(PAGE_SIZE);
+
+        await page.getByRole('button', { name: m.showRecent }).click();
+        await expect(page.getByRole('heading', { name: m.title })).toBeVisible();
+        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+        await expect(showAll).toBeFocused();
+      });
+
+      test(`fits the pager on a 320px screen (${locale})`, async ({ page, request }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await logOutages(request, PAGE_SIZE + 1);
+        await page.goto(localePath(locale));
+        await page.getByRole('button', { name: DICTIONARIES[locale].history.showAll }).click();
+        const pager = page.getByRole('navigation', { name: DICTIONARIES[locale].history.pages });
+        await expect(pager).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        const { scroll, client } = await page.evaluate(() => ({
+          scroll: document.documentElement.scrollWidth,
+          client: document.documentElement.clientWidth,
+        }));
+        expect(scroll).toBeLessThanOrEqual(client);
+        // One row: the buttons and the page label all share one line.
+        const boxes = await pager.locator(':scope > *').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+        expect(boxes).toHaveLength(3);
+        // Boxes on one line overlap vertically; a wrapped one starts below another's bottom.
+        expect(Math.max(...boxes.map((b) => b.top))).toBeLessThan(Math.min(...boxes.map((b) => b.bottom)));
+      });
+
+      test(`has zero cumulative layout shift while loading a full recent list (${locale})`, async ({
+        page,
+        request,
+      }) => {
+        await logOutages(request, RECENT_LIMIT);
+        await trackLayoutShift(page);
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('button', { name: DICTIONARIES[locale].history.showAll })).toBeVisible();
+        expect(await readLayoutShift(page)).toBe(0);
+      });
+    });
+  }
+
+  test('moves the focus to the pages it opens, then keeps the list shut once it is closed', async ({
+    page,
+    request,
+  }) => {
+    const [newest] = await logOutages(request, RECENT_LIMIT);
+    await page.goto('/');
+    await page.getByRole('button', { name: en.history.showAll }).click();
+    await expect(page.getByRole('navigation', { name: en.history.pages })).toBeFocused();
+
+    // A reload the status sets off is still on its way when the reader closes the list.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(`**${OUTAGES_PATH}`, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    const outagesRequested = page.waitForRequest(`**${OUTAGES_PATH}`);
+    await request.post(ADMIN_OUTAGES_PATH, {
+      headers: ADMIN_API,
+      data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
+    });
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await outagesRequested;
+    await page.getByRole('button', { name: en.history.showRecent }).click();
+    const outagesAnswered = page.waitForResponse(`**${OUTAGES_PATH}`);
+    release();
+    await outagesAnswered;
+    await expect(page.getByRole('heading', { name: en.history.title })).toBeVisible();
+    await expect(page.getByRole('button', { name: en.history.showAll })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  test('says so when a reload of the open list fails, and not once it is closed', async ({ page, request }) => {
+    const [newest] = await logOutages(request, RECENT_LIMIT);
+    await page.goto('/');
+    await page.getByRole('button', { name: en.history.showAll }).click();
+    await expect(page.getByRole('heading', { name: en.history.allTitle })).toBeVisible();
+    await page.route(`**${OUTAGES_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
+    await request.post(ADMIN_OUTAGES_PATH, {
+      headers: ADMIN_API,
+      data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
+    });
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(history(page).getByText(en.history.failed)).toBeVisible();
+    await page.getByRole('button', { name: en.history.showRecent }).click();
+    await expect(history(page).getByText(en.history.failed)).toHaveCount(0);
+  });
+
+  test('offers no full list while the recent one holds every outage', async ({ page, request }) => {
+    await logOutages(request, RECENT_LIMIT - 1);
+    await page.goto('/');
+    await expect(rows(page)).toHaveCount(RECENT_LIMIT - 1);
+    await expect(page.getByRole('button', { name: en.history.showAll })).toHaveCount(0);
+  });
+
+  test('says so when the full list cannot be loaded, and tries again on request', async ({ page, request }) => {
+    await logOutages(request, RECENT_LIMIT);
+    let fail = true;
+    await page.route(`**${OUTAGES_PATH}`, (route) =>
+      fail ? route.fulfill({ status: 500, json: { error: ERROR.internal } }) : route.fallback(),
+    );
+    await page.goto('/');
+    const showAll = page.getByRole('button', { name: en.history.showAll });
+    await showAll.click();
+    await expect(history(page).getByText(en.history.failed)).toBeVisible();
+    await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+    fail = false;
+    await showAll.click();
+    await expect(page.getByRole('heading', { name: en.history.allTitle })).toBeVisible();
+    await expect(history(page).getByText(en.history.failed)).toHaveCount(0);
+  });
+
+  test('reloads the full list when the recent outages change', async ({ page, request }) => {
+    const [newest] = await logOutages(request, RECENT_LIMIT);
+    await page.goto('/');
+    await page.getByRole('button', { name: en.history.showAll }).click();
+    await expect(page.getByRole('heading', { name: en.history.allTitle })).toBeVisible();
+    await expect(history(page).getByText(en.history.planned)).toHaveCount(0);
+    const res = await request.post(ADMIN_OUTAGES_PATH, {
+      headers: ADMIN_API,
+      data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
+    });
+    expect(res.status()).toBe(200);
+    // A tab coming back into view asks for the status at once.
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(history(page).getByText(en.history.planned)).toHaveCount(1);
+  });
 });
 
 test.describe('admin false positives', () => {

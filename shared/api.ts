@@ -41,7 +41,7 @@ export interface StatusResponse {
   since: string | null;
   /** The open outage; null when ON, and briefly when OFF from a stale heartbeat before the cron records it. */
   outage: OutageSummary | null;
-  /** The latest outages, newest first, at most RECENT_LIMIT (worker/lib/grid.ts), the open one included. */
+  /** The latest outages, newest first, at most RECENT_LIMIT, the open one included. */
   recent: OutageSummary[];
   /**
    * A sensor has reported and its last heartbeat is fresh. When false, ON only means no outage
@@ -51,6 +51,15 @@ export interface StatusResponse {
   /** Public key for the Turnstile widget on the sign-in form and the privacy page's contact button. */
   turnstileSiteKey: string;
   /** When the Worker built it; an edge-cached copy can lag by STATUS_EDGE_TTL_SECONDS (worker/routes/status.ts). */
+  generatedAt: string;
+}
+
+/** How many outages StatusResponse.recent holds; the page offers the rest from OUTAGES_PATH (shared/paths.ts). */
+export const RECENT_LIMIT = 5;
+
+export interface OutagesResponse {
+  /** Every outage but false positives, newest first. */
+  outages: OutageSummary[];
   generatedAt: string;
 }
 

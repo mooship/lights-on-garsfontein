@@ -4,6 +4,7 @@ export const API_PREFIX = '/api/';
 export const STATUS_PATH = '/api/status';
 export const STATS_PATH = '/api/stats';
 export const CSV_PATH = '/api/outages.csv';
+export const OUTAGES_PATH = '/api/outages';
 export const FEED_PATH = '/feed.xml';
 export const HEARTBEAT_PATH = '/api/heartbeat';
 export const HEARTBEAT_PAUSE_PATH = '/api/heartbeat/pause';
@@ -32,4 +33,4 @@ export const PRIVACY_PAGE_PATH = '/privacy';
 export const WORKER_PAGES: readonly string[] = [SITEMAP_PATH, ROBOTS_PATH, OG_IMAGE_PATH, FEED_PATH];
 
 /** A write that opens, closes or changes an outage purges all of these. */
-export const OUTAGE_VIEWS: readonly string[] = [STATUS_PATH, STATS_PATH, CSV_PATH, FEED_PATH];
+export const OUTAGE_VIEWS: readonly string[] = [STATUS_PATH, STATS_PATH, CSV_PATH, OUTAGES_PATH, FEED_PATH];

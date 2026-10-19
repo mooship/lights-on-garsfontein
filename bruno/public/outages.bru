@@ -1,0 +1,27 @@
+meta {
+  name: outages
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/outages
+}
+
+tests {
+  test('200 JSON, not stored by browsers, open to any origin', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('application/json; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+    expect(res.getHeader('access-control-allow-origin')).to.equal('*');
+  });
+
+  test('every outage, newest first, in the public shape', () => {
+    expect(res.getBody()).to.have.all.keys('outages', 'generatedAt');
+    const starts = res.getBody().outages.map((o) => o.startTime);
+    expect(starts).to.deep.equal([...starts].sort().reverse());
+    for (const outage of res.getBody().outages) {
+      expect(outage).to.have.all.keys('id', 'startTime', 'endTime', 'planned');
+    }
+  });
+}

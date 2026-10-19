@@ -1,4 +1,4 @@
-import { type Component, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
+import { type Component, createSignal, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
 import {
   HEARTBEAT_THRESHOLD_MS,
   outageDurationMs,
@@ -133,6 +133,8 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
     return s && outOfTouch() ? { ...s, monitored: false } : s;
   };
   useStatusTab(data, minute);
+  // Every outage instead of the recent ones; the history card's heading names which.
+  const [allOutages, setAllOutages] = createSignal(false);
   // The last poll failed, so the status shown may be out of date.
   const warning = () => (status.error() !== undefined ? t().status.stale(clockTime(status.updatedAt())) : undefined);
 
@@ -208,7 +210,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
 
       <section class="gg-card" aria-labelledby="history-heading">
         <h2 id="history-heading" class="gg-card-title">
-          {t().history.title}
+          {allOutages() ? t().history.allTitle : t().history.title}
         </h2>
         <Show
           when={data()}
@@ -216,7 +218,9 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             status.error() !== undefined ? <p class="gg-status-note">{t().history.failed}</p> : <HistorySkeleton />
           }
         >
-          {(s) => <OutageHistory outages={s().recent} now={now()} />}
+          {(s) => (
+            <OutageHistory recent={s().recent} now={now()} expanded={allOutages()} onExpandedChange={setAllOutages} />
+          )}
         </Show>
       </section>
     </>

@@ -7,7 +7,7 @@ import { exampleVar } from './dev-vars';
 
 export { expect };
 
-const ADMIN_API = { Authorization: `Bearer ${exampleVar('ADMIN_API_TOKEN')}` };
+export const ADMIN_API = { Authorization: `Bearer ${exampleVar('ADMIN_API_TOKEN')}` };
 
 /**
  * Deletes every outage through the admin API. The sensor heartbeat cannot be reset this way, so the

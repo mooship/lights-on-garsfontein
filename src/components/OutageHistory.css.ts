@@ -17,3 +17,16 @@ export const secondary = style({ fontSize: '0.875rem', color: vars.color.muted, 
 export const end = style({ textAlign: 'right' });
 export const ongoing = style({ color: vars.color.off });
 export const empty = style({ color: vars.color.muted, paddingTop: '0.5rem' });
+
+export const more = style({ marginTop: '0.75rem' });
+
+export const pager = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '0.5rem',
+  marginTop: '0.75rem',
+  fontSize: '0.875rem',
+  color: vars.color.muted,
+  fontVariantNumeric: 'tabular-nums',
+});
