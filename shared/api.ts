@@ -54,8 +54,17 @@ export interface StatusResponse {
   generatedAt: string;
 }
 
+/** The sensor's last heartbeat and pause, as stored; admin works out its state from these. */
+export interface SensorReading {
+  lastSeen: string;
+  /** Null when the sensor has never been paused; a past time when a pause has ended. */
+  pausedUntil: string | null;
+}
+
 export interface AdminOutagesResponse {
   outages: AdminOutage[];
+  /** Null until the sensor's first heartbeat. */
+  sensor: SensorReading | null;
 }
 
 /** One window of time. Overlapping outage records count once, and an outage still in progress counts up to now. */

@@ -1,12 +1,24 @@
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import LogOut from 'lucide-solid/icons/log-out';
 import Plus from 'lucide-solid/icons/plus';
-import { type Component, createResource, createSignal, Index, Match, onMount, Show, Switch } from 'solid-js';
+import {
+  batch,
+  type Component,
+  createResource,
+  createSignal,
+  Index,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+} from 'solid-js';
 import {
   type AdminOutage,
   type AdminOutagesResponse,
   CREDENTIAL_MAX_LENGTH,
   outageDurationMs,
+  type SensorReading,
   TIMER_ACTION,
   type TimerAction,
   TURNSTILE_ACTION,
@@ -14,13 +26,23 @@ import {
 import { ERROR } from '../../shared/errors';
 import { PunchClock } from '../components/PunchClock';
 import { ApiError, api } from '../lib/api';
-import { formatDay, formatDuration, formatEnd, formatTime, fromLocalInput, toLocalInput } from '../lib/format';
+import {
+  formatDay,
+  formatDuration,
+  formatEnd,
+  formatRelativeDay,
+  formatTime,
+  fromLocalInput,
+  toLocalInput,
+} from '../lib/format';
 import { t } from '../lib/i18n';
 import { useMinute, useNow } from '../lib/now';
+import { POLL_MS, whenVisible } from '../lib/poll';
 import { getTurnstileToken, loadTurnstile } from '../lib/turnstile';
 import { button, errorText, input, label, plainList } from '../styles/ui.css';
 import * as css from './Admin.css';
 import { type AdminErrorCode, admin } from './copy';
+import { sensorState } from './sensor';
 
 const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401;
 
@@ -261,6 +283,30 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
   );
 };
 
+const at = (iso: string, now: number) => `${formatTime(iso)} ${formatRelativeDay(iso, now)}`;
+
+/** The sensor's state as of `asOf`, when the list last arrived, so a lost connection here never reads as a silent sensor. */
+const SensorLine: Component<{ sensor: SensorReading | null; asOf: number }> = (props) => {
+  const state = () => sensorState(props.sensor, props.asOf);
+  return (
+    <p class={css.sensor} classList={{ [css.sensorSilent]: state().kind === 'silent' }}>
+      {(() => {
+        const s = state();
+        switch (s.kind) {
+          case 'never':
+            return admin.sensor.never;
+          case 'paused':
+            return admin.sensor.paused(at(s.until, props.asOf));
+          case 'reporting':
+            return admin.sensor.reporting(at(s.lastSeen, props.asOf));
+          case 'silent':
+            return admin.sensor.silent(formatDuration(s.forMs), at(s.since, props.asOf));
+        }
+      })()}
+    </p>
+  );
+};
+
 const Dashboard: Component<{
   initial: AdminOutagesResponse;
   focus: boolean;
@@ -272,11 +318,21 @@ const Dashboard: Component<{
   const minute = useMinute(now);
   // Starts from the list the session check already fetched; changes refresh it.
   const [outages, setOutages] = createSignal(props.initial);
+  const [loadedAt, setLoadedAt] = createSignal(Date.now());
+  const [refreshFailed, setRefreshFailed] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
+  const load = async () => {
+    const data = await api.outages();
+    batch(() => {
+      setOutages(data);
+      setLoadedAt(Date.now());
+      setRefreshFailed(false);
+    });
+  };
   const refetch = async () => {
     setLoading(true);
     try {
-      setOutages(await api.outages());
+      await load();
     } finally {
       setLoading(false);
     }
@@ -285,6 +341,19 @@ const Dashboard: Component<{
   const open = () => outages().outages.find((o) => !o.endTime && !o.isFalsePositive) ?? null;
   const onError: OnError = (e, show) => (isUnauthorized(e) ? props.onLoggedOut('session_expired') : show(e));
   const { busy, error, run } = createAction({ onError });
+
+  // Keeps the sensor line and the list current; a failure keeps the last data and says so.
+  onMount(() => {
+    const poll = whenVisible(() => {
+      load().catch((e) => onError(e, () => setRefreshFailed(true)));
+    });
+    const timer = setInterval(poll, POLL_MS);
+    document.addEventListener('visibilitychange', poll);
+    onCleanup(() => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', poll);
+    });
+  });
 
   const punch = (action: TimerAction) =>
     run(async () => {
@@ -318,6 +387,12 @@ const Dashboard: Component<{
           onPunchOut={() => punch(TIMER_ACTION.punchOut)}
           onPunchIn={() => punch(TIMER_ACTION.punchIn)}
         />
+        <SensorLine sensor={outages().sensor} asOf={loadedAt()} />
+        <Show when={refreshFailed()}>
+          <p class={css.sensor} role="alert">
+            {admin.sensor.stale(formatTime(new Date(loadedAt()).toISOString()))}
+          </p>
+        </Show>
         <FormError error={error()} />
         <p class={css.announce} role="status">
           {(() => {

@@ -52,6 +52,11 @@ export const announce = style({
   selectors: { '&:not(:empty)': { marginTop: '0.75rem' } },
 });
 
+export const sensor = style({ marginTop: '0.75rem', fontSize: '0.875rem', color: vars.color.muted });
+
+// Red, as the public page shows OFF while the sensor is silent.
+export const sensorSilent = style({ color: vars.color.off, fontWeight: 600 });
+
 export const checkbox = style({
   display: 'flex',
   alignItems: 'center',

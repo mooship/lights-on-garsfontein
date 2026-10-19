@@ -24,13 +24,11 @@ import { api } from './lib/api';
 import { formatDate, formatDuration, formatEnd, formatRelativeDay, formatTime } from './lib/format';
 import { locale, t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
-import { createPoll, POLL_MS, STATS_POLL_MS } from './lib/poll';
+import { createPoll, POLL_MS, STATS_POLL_MS, whenVisible } from './lib/poll';
 import { useStatusTab } from './lib/tab';
 import { syncThemeColor, watchSystemTheme } from './lib/theme';
 
 const Admin = lazy(() => import('./admin/Admin'));
-
-const whenVisible = (fn: () => void) => () => document.visibilityState === 'visible' && fn();
 
 export interface InitialData {
   status: Promise<StatusResponse>;

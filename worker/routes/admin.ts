@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { type AdminOutagesResponse, MINUTE_MS, OUTAGE_ACTION, TIMER_ACTION } from '../../shared/api';
 import { ERROR } from '../../shared/errors';
 import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, TIMER_PATH } from '../../shared/paths';
-import { outages } from '../db/schema';
+import { heartbeats, outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
 import { getOpenOutage, openOutage, summarise } from '../lib/grid';
 import { errors, json, parseBody } from '../lib/http';
@@ -38,10 +38,17 @@ const outageSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal(OUTAGE_ACTION.delete), id: z.number().int().positive() }),
 ]);
 
-/** The newest 50 outages, false positives included, with how each was recorded. */
+/** The newest 50 outages, false positives included, with how each was recorded, and the sensor's last report. */
 async function listOutages({ db }: RouteContext): Promise<Response> {
-  const rows = await db.select().from(outages).orderBy(desc(outages.startTime)).limit(50);
+  const [rows, [sensor]] = await db.batch([
+    db.select().from(outages).orderBy(desc(outages.startTime)).limit(50),
+    db
+      .select({ lastSeen: heartbeats.lastSeen, pausedUntil: heartbeats.pausedUntil })
+      .from(heartbeats)
+      .where(eq(heartbeats.id, 1)),
+  ]);
   const body: AdminOutagesResponse = {
+    sensor: sensor ?? null,
     outages: rows.map((r) => ({
       ...summarise(r),
       source: r.source,

@@ -1,4 +1,4 @@
-import type { Cookie, Locator, Page } from '@playwright/test';
+import type { Cookie, Locator, Page, Route } from '@playwright/test';
 import { fill } from '../build/html';
 import {
   CREDENTIAL_MAX_LENGTH,
@@ -1037,6 +1037,59 @@ test.describe('admin false positives', () => {
     const items = page.getByRole('listitem');
     await expect(items.filter({ hasText: admin.dismissedBySensorTag.trim() })).toHaveCount(1);
     await expect(items.filter({ hasText: admin.falsePositiveTag.trim() })).toHaveCount(2);
+  });
+});
+
+test.describe('admin sensor', () => {
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+  /** Answers the dashboard's outage list with `sensor`, and later loads with `next` once it is set. */
+  async function mockSensor(page: Page, sensor: { lastSeen: string; pausedUntil: string | null } | null) {
+    const later: { next?: (route: Route) => Promise<void> } = {};
+    let loads = 0;
+    await page.route(`**${ADMIN_OUTAGES_PATH}`, (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      loads++;
+      return later.next && loads > 1 ? later.next(route) : route.fulfill({ json: { outages: [], sensor } });
+    });
+    return later;
+  }
+  const refresh = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  const SINCE = '@@since@@';
+  const withSince = (text: string) => new RegExp(`^${escapeRegExp(text).replace(SINCE, '.+')}$`);
+
+  test('says whether the sensor is reporting', async ({ page }) => {
+    await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
+    await login(page);
+    await expect(page.getByText(withSince(admin.sensor.reporting(SINCE)))).toBeVisible();
+  });
+
+  test('warns when the sensor has gone silent', async ({ page }) => {
+    await mockSensor(page, { lastSeen: ago(12 * MINUTE_MS), pausedUntil: null });
+    await login(page);
+    await expect(page.getByText(withSince(admin.sensor.silent(`12 ${en.units.min}`, SINCE)))).toBeVisible();
+  });
+
+  test('says when no sensor has reported', async ({ page }) => {
+    await mockSensor(page, null);
+    await login(page);
+    await expect(page.getByText(admin.sensor.never)).toBeVisible();
+  });
+
+  test('keeps the last reading when a refresh fails, and says so', async ({ page }) => {
+    const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
+    await login(page);
+    later.next = (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } });
+    await refresh(page);
+    await expect(page.getByRole('alert')).toHaveText(withTime(admin.sensor.stale(AT)));
+    await expect(page.getByText(withSince(admin.sensor.reporting(SINCE)))).toBeVisible();
+  });
+
+  test('a refresh after the session has ended shows the sign-in form', async ({ page }) => {
+    const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
+    await login(page);
+    later.next = (route) => route.fulfill({ status: 401, json: { error: ERROR.unauthorized } });
+    await refresh(page);
+    await expect(page.getByRole('alert')).toHaveText(admin.errors.session_expired);
   });
 });
 

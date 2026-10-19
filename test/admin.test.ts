@@ -246,6 +246,17 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(await listed()).toBeNull();
   });
 
+  it('reports the sensor: null before its first heartbeat, then its last heartbeat and pause', async () => {
+    const sensor = async () =>
+      ((await (await call(ADMIN_OUTAGES_PATH, { cookie })).json()) as AdminOutagesResponse).sensor;
+    expect(await sensor()).toBeNull();
+    const lastSeen = await setHeartbeat(30);
+    expect(await sensor()).toEqual({ lastSeen, pausedUntil: null });
+    const until = new Date(Date.now() + 60 * MINUTE_MS).toISOString();
+    await env.DB.prepare('UPDATE heartbeats SET paused_until = ? WHERE id = 1').bind(until).run();
+    expect(await sensor()).toEqual({ lastSeen, pausedUntil: until });
+  });
+
   it('updates the end time', async () => {
     const id = await insertOutage({ startTime: '2026-10-01T10:00:00.000Z' });
     await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, endTime: '2026-10-01T12:00:00Z' });
