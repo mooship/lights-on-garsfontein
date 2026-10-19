@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
 import {
+  formatCalendarDay,
   formatCompactDuration,
+  formatDate,
   formatDuration,
   formatRelativeDay,
   fromLocalInput,
@@ -58,6 +60,13 @@ describe('durations', () => {
   });
 });
 
+describe('English dates', () => {
+  it('are British, without a leading zero on the day', () => {
+    expect(formatDate('2026-11-04T10:00:00Z')).toBe('4 Nov 2026');
+    expect(formatCalendarDay('2026-09-07')).toBe('7 Sept');
+  });
+});
+
 describe('formatRelativeDay', () => {
   const now = at('2026-10-18T00:00:30');
 
@@ -65,7 +74,7 @@ describe('formatRelativeDay', () => {
     expect(formatRelativeDay(zoned('2026-10-18T00:00:00'), now)).toBe('today');
     expect(formatRelativeDay(zoned('2026-10-17T23:59:59'), now)).toBe('yesterday');
     expect(formatRelativeDay(zoned('2026-10-17T00:00:00'), now)).toBe('yesterday');
-    expect(formatRelativeDay(zoned('2026-10-16T23:59:59'), now)).toBe('on Fri, 16 Oct');
+    expect(formatRelativeDay(zoned('2026-10-16T23:59:59'), now)).toBe('on Fri 16 Oct');
     // 23:30 UTC on the 17th is already the 18th here.
     expect(formatRelativeDay('2026-10-17T23:30:00.000Z', at('2026-10-18T09:00:00'))).toBe('today');
   });
