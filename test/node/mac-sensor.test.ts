@@ -12,7 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH } from '../../shared/paths';
 
 const SCRIPT = join(import.meta.dirname, '../../scripts/mac-sensor.sh');
@@ -20,6 +20,10 @@ const RESTART_PAUSE_SECONDS = Number(/^RESTART_PAUSE_SECONDS=(\d+)$/m.exec(readF
 /** How long launchd waits after SIGTERM before SIGKILL (ExitTimeOut's default). */
 const LAUNCHD_EXIT_TIMEOUT_SECONDS = 20;
 const URL = 'https://garsfontein.example';
+/** How long one script run may take; spawning shells is slow on Windows when the suite runs in parallel. */
+const RUN_TIMEOUT_MS = 10_000;
+// A test runs up to three scripts, each allowed RUN_TIMEOUT_MS.
+vi.setConfig({ testTimeout: 3 * RUN_TIMEOUT_MS });
 /** The message the curl stub prints when told to fail. */
 const CURL_ERROR = 'curl: (22) The requested URL returned error: 401';
 
@@ -85,7 +89,7 @@ exec /usr/bin/date "$@"`,
   );
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: home, TMPDIR: tmp, SCRIPT, CALLS: calls };
   const run = async (script: string) =>
-    (await promisify(execFile)('sh', ['-c', script], { env, timeout: 10_000 })).stdout;
+    (await promisify(execFile)('sh', ['-c', script], { env, timeout: RUN_TIMEOUT_MS })).stdout;
   const recorded = () => readFileSync(calls, { encoding: 'utf8', flag: 'a+' }).trim().split('\n').filter(Boolean);
   const curl = () => recorded().filter((l) => l.startsWith('curl '));
   return { appDir, log, tmp, run, recorded, curl };
