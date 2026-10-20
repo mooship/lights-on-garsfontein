@@ -12,7 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH } from '../../shared/paths';
 
 const SCRIPT = join(import.meta.dirname, '../../scripts/mac-sensor.sh');
@@ -20,14 +20,20 @@ const RESTART_PAUSE_SECONDS = Number(/^RESTART_PAUSE_SECONDS=(\d+)$/m.exec(readF
 /** How long launchd waits after SIGTERM before SIGKILL (ExitTimeOut's default). */
 const LAUNCHD_EXIT_TIMEOUT_SECONDS = 20;
 const URL = 'https://garsfontein.example';
+/** How long one script run may take; spawning shells is slow on Windows when the suite runs in parallel. */
+const RUN_TIMEOUT_MS = 10_000;
+// A test runs up to three scripts, each allowed RUN_TIMEOUT_MS.
+vi.setConfig({ testTimeout: 3 * RUN_TIMEOUT_MS });
 /** The message the curl stub prints when told to fail. */
 const CURL_ERROR = 'curl: (22) The requested URL returned error: 401';
 
 /**
  * A home with the sensor installed and macOS's tools stubbed: each stub records its call in `calls`.
- * The curl stub fails when `failCurl` is set, and saves a copy of the script for `-o`.
+ * The curl stub fails when `failCurl` is set, and saves a copy of the script for `-o`. The launchctl
+ * stub keeps a stopped agent listed for `stoppingChecks` more prints, and refuses to bootstrap it
+ * until then, as launchd does while the old run is still exiting.
  */
-function sandbox({ onAc = true, paused = false, failCurl = false, installed = true } = {}) {
+function sandbox({ onAc = true, paused = false, failCurl = false, installed = true, stoppingChecks = 0 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'lights-on-'));
   const bin = join(dir, 'bin');
   const home = join(dir, 'home');
@@ -53,9 +59,23 @@ function sandbox({ onAc = true, paused = false, failCurl = false, installed = tr
       : 'while [ $# -gt 0 ]; do [ "$1" = -o ] && cp "$SCRIPT" "$2"; shift; done',
   );
   stub('caffeinate');
-  stub('launchctl');
+  if (installed) writeFileSync(`${calls}.loaded`, '');
+  stub(
+    'launchctl',
+    `stopping=$(cat "$CALLS.stopping" 2>/dev/null || echo 0)
+case "$1" in
+  bootout) [ -f "$CALLS.loaded" ] || exit 3; rm "$CALLS.loaded"; echo ${stoppingChecks} >"$CALLS.stopping" ;;
+  print)
+    if [ "$stopping" -gt 0 ]; then echo $((stopping - 1)) >"$CALLS.stopping"; else [ -f "$CALLS.loaded" ] || exit 113; fi ;;
+  bootstrap)
+    if [ "$stopping" -gt 0 ] || [ -f "$CALLS.loaded" ]; then echo 'Bootstrap failed: 5: Input/output error' >&2; exit 5; fi
+    : >"$CALLS.loaded" ;;
+esac`,
+  );
   stub('sudo');
-  stub('sleep', 'exec /usr/bin/sleep "$@"');
+  // terminateRun signals the run loop during its minute's sleep; start_agent's one-second polls
+  // need no real wait.
+  stub('sleep', '[ "$1" = 1 ] || exec /usr/bin/sleep "$@"');
   // BSD date's -r takes epoch seconds; GNU date's takes a file.
   stub(
     'date',
@@ -69,7 +89,7 @@ exec /usr/bin/date "$@"`,
   );
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: home, TMPDIR: tmp, SCRIPT, CALLS: calls };
   const run = async (script: string) =>
-    (await promisify(execFile)('sh', ['-c', script], { env, timeout: 10_000 })).stdout;
+    (await promisify(execFile)('sh', ['-c', script], { env, timeout: RUN_TIMEOUT_MS })).stdout;
   const recorded = () => readFileSync(calls, { encoding: 'utf8', flag: 'a+' }).trim().split('\n').filter(Boolean);
   const curl = () => recorded().filter((l) => l.startsWith('curl '));
   return { appDir, log, tmp, run, recorded, curl };
@@ -185,6 +205,13 @@ describe('lights-on update', () => {
     await box.run(`sh "${join(box.appDir, 'lights-on.sh')}" update`);
     expect(box.recorded()).toContainEqual(expect.stringMatching(/^launchctl bootstrap /));
     expect(readdirSync(box.tmp)).toEqual([]);
+  });
+
+  it('starts the agent again even when the old one is still exiting', async () => {
+    const box = sandbox({ stoppingChecks: 2 });
+    copyFileSync(SCRIPT, join(box.appDir, 'lights-on.sh'));
+    await box.run(`sh "${join(box.appDir, 'lights-on.sh')}" update`);
+    expect(await box.run('sh "$SCRIPT" status')).not.toMatch(/^Not running/m);
   });
 });
 
