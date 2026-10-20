@@ -24,6 +24,9 @@ SOURCE=https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scri
 # The loop sleeps a minute and curl may take 20 seconds more. A longer gap means the Mac slept or
 # the agent was not running, and a power cut could have passed unseen.
 MAX_TICK_GAP=150
+# How long a stop on the charger (a restart or an update) pauses the Worker for, so the time the
+# Mac takes to come back is not logged as an outage. The next run's first heartbeat ends it.
+RESTART_PAUSE_SECONDS=900
 LOG="$HOME/Library/Logs/lights-on-heartbeat.log"
 DOMAIN="gui/$(id -u)"
 
@@ -55,8 +58,25 @@ paused_until() {
   if [ "$end" -gt "$(date +%s)" ]; then echo "$end"; else rm -f "$PAUSE_FILE"; fi
 }
 
+iso_utc() { date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ; }
+
+# Sets the Worker's pause to $1 (a quoted time, or null to end it); further arguments go to curl.
 send_pause() {
-  post -H 'Content-Type: application/json' -d "{\"until\":$1}" "$(cat "$URL_FILE")/api/heartbeat/pause" >/dev/null
+  pause_end=$1
+  shift
+  post "$@" -H 'Content-Type: application/json' -d "{\"until\":$pause_end}" "$(cat "$URL_FILE")/api/heartbeat/pause" >/dev/null
+}
+
+# launchd sends SIGTERM at a restart, shutdown or logout, and when `update` or `uninstall` stops the
+# agent. On the charger the power is on, so the silence until the Mac is back is not an outage.
+# A pause from `lights-on pause` is left alone: it already covers the silence, and may be longer.
+pause_for_restart() {
+  if [ -z "$(paused_until)" ] && on_ac_power; then
+    # Well inside the 20 seconds launchd waits before SIGKILL. Best effort: the network may be gone.
+    send_pause "\"$(iso_utc $(($(date +%s) + RESTART_PAUSE_SECONDS)))\"" -m 5 ||
+      true # curl has logged why
+  fi
+  exit 0
 }
 
 # On battery the Mac may sleep, and by default it stays asleep when the charger returns, so after an
@@ -84,8 +104,6 @@ start_agent() {
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/caffeinate</string>
-    <string>-s</string>
     <string>/bin/sh</string>
     <string>$INSTALLED</string>
     <string>run</string>
@@ -134,7 +152,7 @@ case "${1:-}" in
     esac
     end=$(($(date +%s) + seconds))
     # The Worker first, so a failed request leaves the sensor reporting rather than silent.
-    send_pause "\"$(date -u -r "$end" +%Y-%m-%dT%H:%M:%SZ)\""
+    send_pause "\"$(iso_utc "$end")\""
     echo "$end" >"$PAUSE_FILE"
     echo "Paused until $(date -r "$end" '+%a %d %b %H:%M'). Run 'lights-on resume' when home."
     ;;
@@ -189,10 +207,15 @@ case "${1:-}" in
     echo "Uninstalled."
     ;;
   run)
+    # This shell is the launchd job, so SIGTERM reaches the trap rather than a wrapper.
+    caffeinate -s -w $$ &
+    trap pause_for_restart TERM
     # When the current unbroken spell on AC power began; empty on battery. Sent as poweredFor, so a
     # heartbeat after the Wi-Fi drops and returns shows the power stayed on.
     powered_since=
     last_tick=0
+    # Set while a pause_for_restart from the previous run may still be on the Worker.
+    restart_pause=1
     while :; do
       now=$(date +%s)
       if ! on_ac_power; then
@@ -202,11 +225,14 @@ case "${1:-}" in
       fi
       last_tick=$now
       if [ -z "$(paused_until)" ] && [ -n "$powered_since" ]; then
+        if [ -n "$restart_pause" ] && send_pause null; then restart_pause=; fi
         post -H 'Content-Type: application/json' -d "{\"poweredFor\":$((now - powered_since))}" \
           "$(cat "$URL_FILE")/api/heartbeat" >/dev/null ||
           true # a missed beat is retried next minute; curl has logged why
       fi
-      sleep 60
+      # In the background, since sh runs a trap only once a foreground command has finished.
+      sleep 60 &
+      wait $!
     done
     ;;
   *) usage ;;
