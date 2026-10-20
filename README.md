@@ -171,7 +171,7 @@ An install from before `lights-on update` existed is updated by running the late
 curl -fsSL -o /tmp/lights-on.sh https://raw.githubusercontent.com/mooship/lights-on-garsfontein/main/scripts/mac-sensor.sh && sh /tmp/lights-on.sh update
 ```
 
-The Mac sends how long it has been on the charger as `poweredFor`, so if the Wi-Fi drops while it stays on the charger, the outage that opens is marked as a false positive once it reconnects. The count starts again whenever it has missed a minute (asleep, or the agent not running), since a power cut could have passed unseen. Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. Errors go to `~/Library/Logs/lights-on-heartbeat.log`.
+The Mac sends how long it has been on the charger as `poweredFor`, so if the Wi-Fi drops while it stays on the charger, the outage that opens is marked as a false positive once it reconnects. The count starts again whenever it has missed a minute (asleep, or the agent not running), since a power cut could have passed unseen. Keep the lid open, since closing it sleeps the Mac and logs a false outage. The agent runs only while you are logged in, so after a restart, log in again. When it is stopped on the charger (a restart, a macOS update, logging out, or `lights-on update`), it pauses outage detection for 15 minutes (`RESTART_PAUSE_SECONDS` in the script) and its first heartbeat afterwards ends the pause, so a restart logs no outage if you log in within that time. On battery it sends nothing, so an outage still opens. Errors go to `~/Library/Logs/lights-on-heartbeat.log`.
 
 ## Run it for your area
 
