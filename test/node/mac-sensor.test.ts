@@ -25,9 +25,11 @@ const CURL_ERROR = 'curl: (22) The requested URL returned error: 401';
 
 /**
  * A home with the sensor installed and macOS's tools stubbed: each stub records its call in `calls`.
- * The curl stub fails when `failCurl` is set, and saves a copy of the script for `-o`.
+ * The curl stub fails when `failCurl` is set, and saves a copy of the script for `-o`. The launchctl
+ * stub keeps a stopped agent listed for `stoppingChecks` more prints, and refuses to bootstrap it
+ * until then, as launchd does while the old run is still exiting.
  */
-function sandbox({ onAc = true, paused = false, failCurl = false, installed = true } = {}) {
+function sandbox({ onAc = true, paused = false, failCurl = false, installed = true, stoppingChecks = 0 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'lights-on-'));
   const bin = join(dir, 'bin');
   const home = join(dir, 'home');
@@ -53,9 +55,23 @@ function sandbox({ onAc = true, paused = false, failCurl = false, installed = tr
       : 'while [ $# -gt 0 ]; do [ "$1" = -o ] && cp "$SCRIPT" "$2"; shift; done',
   );
   stub('caffeinate');
-  stub('launchctl');
+  if (installed) writeFileSync(`${calls}.loaded`, '');
+  stub(
+    'launchctl',
+    `stopping=$(cat "$CALLS.stopping" 2>/dev/null || echo 0)
+case "$1" in
+  bootout) [ -f "$CALLS.loaded" ] || exit 3; rm "$CALLS.loaded"; echo ${stoppingChecks} >"$CALLS.stopping" ;;
+  print)
+    if [ "$stopping" -gt 0 ]; then echo $((stopping - 1)) >"$CALLS.stopping"; else [ -f "$CALLS.loaded" ] || exit 113; fi ;;
+  bootstrap)
+    if [ "$stopping" -gt 0 ] || [ -f "$CALLS.loaded" ]; then echo 'Bootstrap failed: 5: Input/output error' >&2; exit 5; fi
+    : >"$CALLS.loaded" ;;
+esac`,
+  );
   stub('sudo');
-  stub('sleep', 'exec /usr/bin/sleep "$@"');
+  // terminateRun signals the run loop during its minute's sleep; start_agent's one-second polls
+  // need no real wait.
+  stub('sleep', '[ "$1" = 1 ] || exec /usr/bin/sleep "$@"');
   // BSD date's -r takes epoch seconds; GNU date's takes a file.
   stub(
     'date',
@@ -185,6 +201,13 @@ describe('lights-on update', () => {
     await box.run(`sh "${join(box.appDir, 'lights-on.sh')}" update`);
     expect(box.recorded()).toContainEqual(expect.stringMatching(/^launchctl bootstrap /));
     expect(readdirSync(box.tmp)).toEqual([]);
+  });
+
+  it('starts the agent again even when the old one is still exiting', async () => {
+    const box = sandbox({ stoppingChecks: 2 });
+    copyFileSync(SCRIPT, join(box.appDir, 'lights-on.sh'));
+    await box.run(`sh "${join(box.appDir, 'lights-on.sh')}" update`);
+    expect(await box.run('sh "$SCRIPT" status')).not.toMatch(/^Not running/m);
   });
 });
 

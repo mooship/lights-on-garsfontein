@@ -30,6 +30,9 @@ MAX_TICK_GAP=150
 # How long a stop on the charger (a restart or an update) pauses the Worker for, so the time the
 # Mac takes to come back is not logged as an outage. The next run's first heartbeat ends it.
 RESTART_PAUSE_SECONDS=900
+# Longer than the 20 seconds launchd gives a stopping agent before SIGKILL, so start_agent waits
+# out even a run caught mid-request.
+STOP_WAIT_SECONDS=30
 LOG="$HOME/Library/Logs/lights-on-heartbeat.log"
 LOG_MAX_LINES=1000
 # Holds the time of the last accepted heartbeat; `status` shows an error only if the log is newer.
@@ -111,6 +114,13 @@ enable_acwake() {
 start_agent() {
   # Stopped before the copy: sh reads a script as it runs, so overwriting it mid-loop breaks it.
   launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true # not loaded yet
+  # bootout can return while the old run is still in pause_for_restart, and launchd refuses to
+  # bootstrap a job that has not finished exiting.
+  waited=0
+  while [ "$waited" -lt "$STOP_WAIT_SECONDS" ] && launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; do
+    sleep 1
+    waited=$((waited + 1))
+  done
   mkdir -p "$HOME_DIR" "$(dirname "$PLIST")"
   [ "$0" -ef "$INSTALLED" ] || cp "$0" "$INSTALLED"
   chmod +x "$INSTALLED"
