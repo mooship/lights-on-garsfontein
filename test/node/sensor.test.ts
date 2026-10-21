@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../../shared/api';
+import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { sensorState } from '../../src/admin/sensor';
 
 const now = Date.parse('2026-10-19T15:00:00.000Z');
@@ -22,7 +22,7 @@ describe('sensorState', () => {
   });
 
   it('is paused until a pause ends, waits the heartbeat threshold, then counts the silence from its end', () => {
-    const lastSeen = ago(60 * MINUTE_MS);
+    const lastSeen = ago(HOUR_MS);
     const until = new Date(now + MINUTE_MS).toISOString();
     expect(sensorState({ lastSeen, pausedUntil: until }, now)).toEqual({ kind: 'paused', until });
     const justEnded = ago(HEARTBEAT_THRESHOLD_MS);

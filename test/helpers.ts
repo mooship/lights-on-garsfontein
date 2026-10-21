@@ -7,7 +7,7 @@ import {
   TURNSTILE_ACTION,
   type TurnstileAction,
 } from '../shared/api';
-import { HEARTBEAT_PATH, LOGIN_PATH, STATUS_PATH } from '../shared/paths';
+import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, LOGIN_PATH, STATUS_PATH } from '../shared/paths';
 import { MINUTE_CRON } from '../worker/crons';
 import worker from '../worker/index';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
@@ -176,6 +176,16 @@ export function heartbeat(options: CallOptions = {}): Promise<Response> {
     headers: { Authorization: `Bearer ${env.HEARTBEAT_TOKEN}` },
     ...options,
   });
+}
+
+/** The sensor pausing outage detection until `until`, or ending its pause with null. */
+export function pauseSensor(until: string | null, token = env.HEARTBEAT_TOKEN): Promise<Response> {
+  return call(HEARTBEAT_PAUSE_PATH, { method: 'POST', body: { until }, headers: { Authorization: `Bearer ${token}` } });
+}
+
+/** Sets the pause straight in D1, so it can lie in the past. */
+export async function setPausedUntil(until: string | null): Promise<void> {
+  await env.DB.prepare('UPDATE heartbeats SET paused_until = ? WHERE id = 1').bind(until).run();
 }
 
 /** An admin API write with ADMIN_API_TOKEN, as a script or agent sends it. */

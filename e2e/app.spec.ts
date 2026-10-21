@@ -4,11 +4,13 @@ import {
   CREDENTIAL_MAX_LENGTH,
   DAY_MS,
   HEARTBEAT_THRESHOLD_MS,
+  HOUR_MS,
   localDate,
   MINUTE_MS,
   OUTAGE_ACTION,
   RECENT_LIMIT,
   type StatsResponse,
+  type StatusResponse,
   UTC_OFFSET_MS,
 } from '../shared/api';
 import { ERROR } from '../shared/errors';
@@ -41,7 +43,17 @@ import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
 import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
-import { ADMIN_API, expect, readLayoutShift, test, trackLayoutShift, withLocale } from './fixtures';
+import {
+  ADMIN_API,
+  expect,
+  logOutage,
+  patchJson,
+  pollNow,
+  readLayoutShift,
+  test,
+  trackLayoutShift,
+  withLocale,
+} from './fixtures';
 
 // Copy comes from the dictionaries, so a wording change does not break a test about behaviour.
 // One literal per language ('Geen onderbreking aangemeld nie', 'No outage reported') checks the
@@ -298,10 +310,9 @@ test.describe('public page', () => {
       // The detail line below already describes the last outage, so the badge adds nothing.
       test(`without a live reading, adds no line under the headline (${locale})`, async ({ page }) => {
         const m = DICTIONARIES[locale];
-        await page.route(`**${STATUS_PATH}`, async (route) => {
-          const response = await route.fetch();
+        await patchJson<StatusResponse>(page, STATUS_PATH, (body) => {
           const since = new Date().toISOString();
-          await route.fulfill({ response, json: { ...(await response.json()), monitored: false, since } });
+          return { ...body, monitored: false, since };
         });
         await page.goto(localePath(locale));
         await expect(page.getByRole('status')).toHaveText(m.status.NONE);
@@ -311,10 +322,9 @@ test.describe('public page', () => {
   }
 
   test('with a live reading, says the power is on and for how long', async ({ page }) => {
-    await page.route(`**${STATUS_PATH}`, async (route) => {
-      const response = await route.fetch();
+    await patchJson<StatusResponse>(page, STATUS_PATH, (body) => {
       const since = new Date(Date.now() - 150 * MINUTE_MS).toISOString();
-      await route.fulfill({ response, json: { ...(await response.json()), monitored: true, since } });
+      return { ...body, monitored: true, since };
     });
     await page.goto('/');
     await expect(page.getByRole('status')).toHaveText(en.status.ON);
@@ -423,7 +433,7 @@ test.describe('public page', () => {
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
     await expect(page.getByRole('alert')).toHaveCount(0);
     await page.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // polls now
+    await pollNow(page);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
   });
@@ -432,17 +442,16 @@ test.describe('public page', () => {
     page,
   }) => {
     await page.clock.install();
-    await page.route(`**${STATUS_PATH}`, async (route) => {
-      const response = await route.fetch();
+    await patchJson<StatusResponse>(page, STATUS_PATH, (body) => {
       const since = new Date(Date.now() - 150 * MINUTE_MS).toISOString();
-      await route.fulfill({ response, json: { ...(await response.json()), status: 'ON', monitored: true, since } });
+      return { ...body, status: 'ON', monitored: true, since };
     });
     await page.goto('/en/');
     await expect(page.getByRole('status')).toHaveText(en.status.ON);
     // The power going off often takes the reader's own connection with it.
     await page.unroute(`**${STATUS_PATH}`);
     await page.route(`**${STATUS_PATH}`, (route) => route.abort());
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await pollNow(page);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
     await expect(page.getByRole('status')).toHaveText(en.status.ON);
 
@@ -458,7 +467,7 @@ test.describe('public page', () => {
     await page.goto('/en/');
     await expect(page.getByRole('status')).toContainText(en.status.NONE);
     await page.route(`**${STATUS_PATH}`, () => {}); // never answers
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await pollNow(page);
     await page.clock.fastForward(REQUEST_TIMEOUT_MS);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
   });
@@ -811,9 +820,7 @@ test.describe('outages by time of day', () => {
     byHour: Record<number, number> = { 18: 90, 19: 30 },
     change: (stats: StatsResponse) => StatsResponse = (stats) => stats,
   ) =>
-    page.route(`**${STATS_PATH}`, async (route) => {
-      const response = await route.fetch();
-      const body = (await response.json()) as StatsResponse;
+    patchJson<StatsResponse>(page, STATS_PATH, (body) => {
       const last30ByHour = Array.from({ length: 24 }, (_, hour) => byHour[hour] ?? 0);
       const first = body.weeks[0] ?? { weekStart: '2026-10-12', hoursOff: 0, minutesOff: 0, outages: 0 };
       const next = new Date(Date.parse(first.weekStart) + 7 * DAY_MS).toISOString().slice(0, 10);
@@ -821,14 +828,13 @@ test.describe('outages by time of day', () => {
         { ...first, hoursOff: 1, minutesOff: 60, outages: 3 },
         { weekStart: next, hoursOff: 2, minutesOff: 120, outages: 1 },
       ];
-      const stats: StatsResponse = {
+      return change({
         ...body,
         trackingSince: '2026-01-01T00:00:00.000Z',
         last30: { ...body.last30, trackedHours: 30 * 24, outages: OUTAGES_30 },
         weeks,
         last30ByHour,
-      };
-      await route.fulfill({ response, json: change(stats) });
+      });
     });
 
   test('the weekly chart opens on this week, and Home and the arrow keys move between weeks', async ({ page }) => {
@@ -957,8 +963,7 @@ test.describe('outages by time of day', () => {
         page,
       }) => {
         await page.setViewportSize({ width: 360, height: 780 });
-        await page.route(`**${STATUS_PATH}`, async (route) => {
-          const response = await route.fetch();
+        await patchJson<StatusResponse>(page, STATUS_PATH, (body) => {
           const ended = new Date(Date.now() - 2 * DAY_MS);
           const outage = {
             id: 1,
@@ -966,8 +971,7 @@ test.describe('outages by time of day', () => {
             endTime: ended.toISOString(),
             planned: false,
           };
-          const json = { ...(await response.json()), status: 'ON', monitored: true, since: outage.endTime };
-          await route.fulfill({ response, json: { ...json, recent: [outage] } });
+          return { ...body, status: 'ON', monitored: true, since: outage.endTime, recent: [outage] };
         });
         const card = page.locator('.gg-status-card');
         const height = async () => {
@@ -1025,19 +1029,7 @@ test.describe('all outages', () => {
   /** Logs `count` half-hour outages, one a day going back from yesterday; returns their ids, newest first. */
   async function logOutages(request: APIRequestContext, count: number): Promise<number[]> {
     const ids: number[] = [];
-    for (let day = 1; day <= count; day++) {
-      const start = Date.now() - day * DAY_MS;
-      const res = await request.post(ADMIN_OUTAGES_PATH, {
-        headers: ADMIN_API,
-        data: {
-          action: OUTAGE_ACTION.create,
-          startTime: new Date(start).toISOString(),
-          endTime: new Date(start + 30 * MINUTE_MS).toISOString(),
-        },
-      });
-      expect(res.status()).toBe(201);
-      ids.push(((await res.json()) as { outage: { id: number } }).outage.id);
-    }
+    for (let day = 1; day <= count; day++) ids.push(await logOutage(request, day));
     return ids;
   }
   const history = (page: Page) => page.locator('section', { has: page.locator('#history-heading') });
@@ -1134,7 +1126,7 @@ test.describe('all outages', () => {
       headers: ADMIN_API,
       data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
     });
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await pollNow(page);
     await outagesRequested;
     await page.getByRole('button', { name: en.history.showRecent }).click();
     const outagesAnswered = page.waitForResponse(`**${OUTAGES_PATH}`);
@@ -1154,7 +1146,7 @@ test.describe('all outages', () => {
       headers: ADMIN_API,
       data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
     });
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await pollNow(page);
     await expect(history(page).getByText(en.history.failed)).toBeVisible();
     await page.getByRole('button', { name: en.history.showRecent }).click();
     await expect(history(page).getByText(en.history.failed)).toHaveCount(0);
@@ -1195,8 +1187,7 @@ test.describe('all outages', () => {
       data: { action: OUTAGE_ACTION.update, id: newest, isPlanned: true },
     });
     expect(res.status()).toBe(200);
-    // A tab coming back into view asks for the status at once.
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await pollNow(page);
     await expect(history(page).getByText(en.history.planned)).toHaveCount(1);
   });
 });
@@ -1205,8 +1196,8 @@ test.describe('admin false positives', () => {
   test('marks the ones the sensor dismissed itself', async ({ page }) => {
     const outage = (id: number, dismissedBy: 'sensor' | 'admin') => ({
       id,
-      startTime: new Date(Date.now() - (id + 1) * 60 * MINUTE_MS).toISOString(),
-      endTime: new Date(Date.now() - id * 60 * MINUTE_MS).toISOString(),
+      startTime: new Date(Date.now() - (id + 1) * HOUR_MS).toISOString(),
+      endTime: new Date(Date.now() - id * HOUR_MS).toISOString(),
       planned: false,
       source: 'sensor',
       isFalsePositive: true,
@@ -1237,7 +1228,6 @@ test.describe('admin sensor', () => {
     });
     return later;
   }
-  const refresh = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   const SINCE = '@@since@@';
   const withSince = (text: string) => new RegExp(`^${escapeRegExp(text).replace(SINCE, '.+')}$`);
 
@@ -1263,7 +1253,7 @@ test.describe('admin sensor', () => {
     const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
     await login(page);
     later.next = (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } });
-    await refresh(page);
+    await pollNow(page);
     await expect(page.getByRole('alert')).toHaveText(withTime(admin.sensor.stale(AT)));
     await expect(page.getByText(withSince(admin.sensor.reporting(SINCE)))).toBeVisible();
   });
@@ -1272,7 +1262,7 @@ test.describe('admin sensor', () => {
     const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
     await login(page);
     later.next = (route) => route.fulfill({ status: 401, json: { error: ERROR.unauthorized } });
-    await refresh(page);
+    await pollNow(page);
     await expect(page.getByRole('alert')).toHaveText(admin.errors.session_expired);
     await expect(page.getByLabel(admin.password)).toBeVisible();
     await expect(page.getByRole('heading', { name: admin.punchClock })).toHaveCount(0);
@@ -1319,7 +1309,7 @@ test.describe('unexpected responses', () => {
       await page.goto('/en/');
       await expect(page.getByRole('alert')).toHaveText(en.status.unreachable);
       await page.unroute(`**${STATUS_PATH}`);
-      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await pollNow(page);
       await expect(page.getByRole('status')).toContainText(en.status.NONE);
     });
   }

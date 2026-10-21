@@ -2,7 +2,7 @@ import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, MINUTE_MS, TIMER_ACTION } from '../shared/api';
 import { ERROR } from '../shared/errors';
-import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
+import { HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { createDb } from '../worker/db/client';
 import { getGridState } from '../worker/lib/grid';
 import { MAX_PAUSE_MS } from '../worker/routes/status';
@@ -11,8 +11,10 @@ import {
   call,
   heartbeat,
   insertOutage,
+  pauseSensor,
   runCron,
   setHeartbeat,
+  setPausedUntil,
   getStatus as status,
   stubLimiter,
 } from './helpers';
@@ -150,7 +152,7 @@ describe('GET /api/status edge cache', () => {
   it('ignores the query string, so it cannot be used to skip the cache', async () => {
     const first = await status();
     await insertOutage({ source: 'manual' });
-    expect(await (await call('/api/status?x=1')).json()).toEqual(first);
+    expect(await (await call(`${STATUS_PATH}?x=1`)).json()).toEqual(first);
   });
 
   it('is not purged by a refused admin write', async () => {
@@ -330,12 +332,7 @@ describe('POST /api/heartbeat with poweredFor', () => {
 });
 
 describe('POST /api/heartbeat/pause', () => {
-  const pause = (until: string | null, token = env.HEARTBEAT_TOKEN) =>
-    call(HEARTBEAT_PAUSE_PATH, { method: 'POST', body: { until }, headers: { Authorization: `Bearer ${token}` } });
   const fromNow = (ms: number) => new Date(Date.now() + ms).toISOString();
-  /** Sets the pause straight in D1, so it can lie in the past. */
-  const setPausedUntil = (until: string) =>
-    env.DB.prepare('UPDATE heartbeats SET paused_until = ? WHERE id = 1').bind(until).run();
   const pausedUntil = async () =>
     (await env.DB.prepare('SELECT paused_until FROM heartbeats WHERE id = 1').first<{ paused_until: string | null }>())
       ?.paused_until;
@@ -345,13 +342,13 @@ describe('POST /api/heartbeat/pause', () => {
     );
 
   it('rejects requests without the sensor token', async () => {
-    expect((await pause(fromNow(HOUR_MS), 'nope')).status).toBe(401);
+    expect((await pauseSensor(fromNow(HOUR_MS), 'nope')).status).toBe(401);
   });
 
   it('rejects a time that is not in the future, not a time, or beyond MAX_PAUSE_MS', async () => {
     await setHeartbeat(30);
     for (const until of [fromNow(-MINUTE_MS), 'tomorrow', fromNow(MAX_PAUSE_MS + HOUR_MS)]) {
-      const res = await pause(until);
+      const res = await pauseSensor(until);
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ error: ERROR.badRequest });
     }
@@ -360,7 +357,7 @@ describe('POST /api/heartbeat/pause', () => {
   it('opens no outage while paused, and the status is ON but not monitored', async () => {
     await setHeartbeat(600);
     const until = fromNow(HOUR_MS);
-    const res = await pause(until);
+    const res = await pauseSensor(until);
     expect(await res.json()).toEqual({ ok: true, pausedUntil: until });
     await runCron();
     expect(await outageStarts()).toEqual([]);
@@ -369,7 +366,7 @@ describe('POST /api/heartbeat/pause', () => {
 
   it('is not monitored while paused, even with a fresh heartbeat', async () => {
     await setHeartbeat(30);
-    await pause(fromNow(HOUR_MS));
+    await pauseSensor(fromNow(HOUR_MS));
     expect(await status()).toMatchObject({ status: 'ON', monitored: false });
   });
 
@@ -408,8 +405,8 @@ describe('POST /api/heartbeat/pause', () => {
 
   it('ends the pause now when until is null, so the silence counts from then', async () => {
     await setHeartbeat(HOUR_MS / 1000);
-    await pause(fromNow(HOUR_MS));
-    const res = await pause(null);
+    await pauseSensor(fromNow(HOUR_MS));
+    const res = await pauseSensor(null);
     const { pausedUntil: ended } = await res.json<{ pausedUntil: string }>();
     expect(Math.abs(Date.now() - Date.parse(ended))).toBeLessThan(5_000);
     expect(await pausedUntil()).toBe(ended);
@@ -419,12 +416,12 @@ describe('POST /api/heartbeat/pause', () => {
 
   it('leaves a pause that already ended alone when resuming', async () => {
     await setHeartbeat(30);
-    expect(await (await pause(null)).json()).toEqual({ ok: true, pausedUntil: null });
+    expect(await (await pauseSensor(null)).json()).toEqual({ ok: true, pausedUntil: null });
     expect(await pausedUntil()).toBeNull();
   });
 
   it('does nothing before any sensor has reported', async () => {
-    expect((await pause(fromNow(HOUR_MS))).status).toBe(200);
+    expect((await pauseSensor(fromNow(HOUR_MS))).status).toBe(200);
     expect(await env.DB.prepare('SELECT * FROM heartbeats').first()).toBeNull();
   });
 });

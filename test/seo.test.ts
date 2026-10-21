@@ -1,8 +1,8 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
 import { ERROR } from '../shared/errors';
-import { OG_IMAGE_PATH, ROBOTS_PATH, SITEMAP_PATH } from '../shared/paths';
-import { call, insertOutage, setHeartbeat } from './helpers';
+import { OG_CARD_ASSET_PATH, OG_IMAGE_PATH, PRIVACY_PAGE_PATH, ROBOTS_PATH, SITEMAP_PATH } from '../shared/paths';
+import { call, insertOutage, ORIGIN, setHeartbeat } from './helpers';
 
 describe('SEO routes', () => {
   it('serves robots.txt that hides the admin API and points at the sitemap', async () => {
@@ -12,7 +12,7 @@ describe('SEO routes', () => {
     expect(body).toContain('Disallow: /api/admin/');
     // /admin stays crawlable so its noindex header (public/_headers) can be seen.
     expect(body).not.toMatch(/^Disallow: \/admin$/m);
-    expect(body).toContain('Sitemap: https://garsfontein.example/sitemap.xml');
+    expect(body).toContain(`Sitemap: ${ORIGIN}${SITEMAP_PATH}`);
   });
 
   it('serves an XML sitemap with each language page and the privacy page', async () => {
@@ -20,20 +20,16 @@ describe('SEO routes', () => {
     expect(res.headers.get('Content-Type')).toContain('application/xml');
     const body = await res.text();
     const locs = [...body.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
-    expect(locs).toEqual([
-      'https://garsfontein.example/',
-      'https://garsfontein.example/en/',
-      'https://garsfontein.example/privacy',
-    ]);
+    expect(locs).toEqual([`${ORIGIN}/`, `${ORIGIN}/en/`, `${ORIGIN}${PRIVACY_PAGE_PATH}`]);
     expect(body).not.toContain('privacy.html');
   });
 
   it('links each language page to the others with hreflang', async () => {
     const body = await (await call(SITEMAP_PATH)).text();
     const alternates = [
-      '<xhtml:link rel="alternate" hreflang="af" href="https://garsfontein.example/"/>',
-      '<xhtml:link rel="alternate" hreflang="en" href="https://garsfontein.example/en/"/>',
-      '<xhtml:link rel="alternate" hreflang="x-default" href="https://garsfontein.example/"/>',
+      `<xhtml:link rel="alternate" hreflang="af" href="${ORIGIN}/"/>`,
+      `<xhtml:link rel="alternate" hreflang="en" href="${ORIGIN}/en/"/>`,
+      `<xhtml:link rel="alternate" hreflang="x-default" href="${ORIGIN}/"/>`,
     ];
     const entries = body.split('<url>').slice(1);
     for (const entry of entries.slice(0, 2)) for (const link of alternates) expect(entry).toContain(link);
@@ -53,7 +49,7 @@ describe('SEO routes', () => {
     await setHeartbeat(5);
     expect((await call(OG_IMAGE_PATH, { method: 'HEAD', env: assetsEnv })).status).toBe(200);
     const urls = fetch.mock.calls.map((args) => String((args as unknown[])[0]));
-    expect(urls).toEqual(['https://garsfontein.example/og/card.png', 'https://garsfontein.example/og/card.png']);
+    expect(urls).toEqual([`${ORIGIN}${OG_CARD_ASSET_PATH}`, `${ORIGIN}${OG_CARD_ASSET_PATH}`]);
   });
 
   it('leaves the feed out of the sitemap, which lists pages only', async () => {
