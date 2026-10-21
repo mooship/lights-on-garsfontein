@@ -16,7 +16,7 @@ const buttonBase = style({
   fontWeight: 650,
   fontSize: '1rem',
   cursor: 'pointer',
-  transition: 'transform 120ms ease, filter 120ms ease',
+  transition: 'transform 120ms ease, filter 120ms ease, background-color 150ms ease',
   selectors: {
     [`&:active${enabled}`]: { transform: 'translateY(1px)' },
     [`&:hover${enabled}`]: { filter: 'brightness(1.06)' },
@@ -38,6 +38,8 @@ export const button = styleVariants({
       minHeight: '2.75rem',
       padding: '0 0.75rem',
       fontSize: '0.875rem',
+      // Brightness does nothing to a transparent button, so it takes the page colour instead.
+      selectors: { [`&:hover${enabled}`]: { background: vars.color.bg } },
     },
   ],
 });

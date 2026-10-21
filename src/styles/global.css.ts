@@ -32,7 +32,15 @@ globalStyle('h1, h2, h3, p', { margin: 0 });
 globalStyle('p', { textWrap: 'pretty' });
 globalStyle('h1, h2, h3', { textWrap: 'balance' });
 
-globalStyle('a', { color: 'inherit', textUnderlineOffset: '0.2em' });
+// The underline is softer at rest and firms up under the pointer.
+globalStyle('a', {
+  color: 'inherit',
+  textUnderlineOffset: '0.2em',
+  textDecorationColor: 'color-mix(in srgb, currentColor 60%, transparent)',
+  transition: 'text-decoration-color 150ms ease',
+});
+
+globalStyle('a:hover', { textDecorationColor: 'currentColor' });
 
 globalStyle(':focus-visible', {
   outline: `3px solid ${vars.color.focus}`,
@@ -185,7 +193,11 @@ globalStyle('.gg-icon-button', {
   border: `1px solid ${vars.color.border}`,
   background: vars.color.card,
   cursor: 'pointer',
+  transition: 'background-color 150ms ease, border-color 150ms ease, transform 120ms ease',
 });
+
+globalStyle('.gg-icon-button:hover', { background: vars.color.bg, borderColor: vars.color.inputBorder });
+globalStyle('.gg-icon-button:active', { transform: 'translateY(1px)' });
 
 globalStyle('.gg-masthead-actions', { flex: 'none', display: 'flex', gap: '0.5rem' });
 
@@ -233,12 +245,16 @@ globalStyle('.gg-sr-only', {
   whiteSpace: 'nowrap',
 });
 
-globalStyle('*', {
+// The pseudo-elements too: the skeleton's shimmer is one. Delays go as well, or a staggered entrance
+// would leave its later parts hidden for a moment.
+globalStyle('*, *::before, *::after', {
   '@media': {
     '(prefers-reduced-motion: reduce)': {
       animationDuration: '0.01ms !important',
+      animationDelay: '0s !important',
       animationIterationCount: '1 !important',
       transitionDuration: '0.01ms !important',
+      transitionDelay: '0s !important',
     },
   },
 });

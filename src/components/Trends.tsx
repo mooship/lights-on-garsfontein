@@ -2,7 +2,18 @@ import Download from 'lucide-solid/icons/download';
 import Minus from 'lucide-solid/icons/minus';
 import TrendingDown from 'lucide-solid/icons/trending-down';
 import TrendingUp from 'lucide-solid/icons/trending-up';
-import { type Component, createMemo, createSignal, For, type JSX, onCleanup, onMount, Show, untrack } from 'solid-js';
+import {
+  type Component,
+  createMemo,
+  createSignal,
+  For,
+  Index,
+  type JSX,
+  onCleanup,
+  onMount,
+  Show,
+  untrack,
+} from 'solid-js';
 import {
   CSV_FILE_NAME,
   localDate,
@@ -15,6 +26,7 @@ import { CSV_PATH } from '../../shared/paths';
 import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
 import { pad2 } from '../lib/zone';
+import * as motion from '../styles/motion.css';
 import * as css from './Trends.css';
 
 const { AXIS_WIDTH } = css;
@@ -198,7 +210,7 @@ const BarChart: Component<BarChartProps> = (props) => {
   };
 
   return (
-    <div class={css.chartBlock}>
+    <div class={`${css.chartBlock} ${motion.enter}`}>
       <h3 class={css.chartTitle}>{props.title}</h3>
       <p class={css.readout}>
         <Show when={parts()} fallback={props.empty}>
@@ -232,15 +244,20 @@ const BarChart: Component<BarChartProps> = (props) => {
             </>
           )}
         </For>
-        <For each={props.bars}>
+        {/* By position, so a refresh updates the bars in place rather than growing them again. */}
+        <Index each={props.bars}>
           {(bar, index) => {
-            const x = () => AXIS_WIDTH + index() * geometry().slot;
+            const x = () => AXIS_WIDTH + index * geometry().slot;
             const barX = () => x() + (geometry().slot - geometry().barWidth) / 2;
-            const top = () => y(bar.hours);
+            const top = () => y(bar().hours);
             const height = () => CHART_HEIGHT - top();
             return (
-              <g class={css.barGroup} data-active={activeIndex() === index() ? '' : undefined}>
-                <Show when={bar.hours > 0}>
+              <g
+                class={css.barGroup}
+                style={{ [css.BAR_INDEX]: index }}
+                data-active={activeIndex() === index ? '' : undefined}
+              >
+                <Show when={bar().hours > 0}>
                   <rect
                     data-bar
                     class={css.bar}
@@ -260,7 +277,7 @@ const BarChart: Component<BarChartProps> = (props) => {
                     height={Math.min(4, height())}
                   />
                 </Show>
-                <Show when={activeIndex() === index()}>
+                <Show when={activeIndex() === index}>
                   <rect
                     class={css.activeMarker}
                     x={barX()}
@@ -273,7 +290,7 @@ const BarChart: Component<BarChartProps> = (props) => {
               </g>
             );
           }}
-        </For>
+        </Index>
       </svg>
       <div class={css.xLabels}>
         <span>{props.xLabels[0]}</span>
@@ -325,8 +342,8 @@ export const Trends: Component<TrendsProps> = (props) => {
         <h2 id="trends-heading" class="gg-card-title">
           {t().trends.title}
         </h2>
-        <p class={css.subtitle}>{subtitle()}</p>
-        <div class={css.tiles}>
+        <p class={`${css.subtitle} ${motion.enter}`}>{subtitle()}</p>
+        <div class={`${css.tiles} ${motion.enter}`}>
           <Tile
             label={t().trends.withoutPower}
             value={started() ? <DurationValue text={tileDuration(minutesOff(s()))} /> : '—'}
@@ -362,7 +379,7 @@ export const Trends: Component<TrendsProps> = (props) => {
             }
           />
         </div>
-        <Show when={anyOutage()} fallback={<p class={css.chartEmpty}>{t().trends.chartEmpty}</p>}>
+        <Show when={anyOutage()} fallback={<p class={`${css.chartEmpty} ${motion.enter}`}>{t().trends.chartEmpty}</p>}>
           <BarChart
             title={t().trends.chartTitle}
             label={t().trends.chartLabel}

@@ -1,4 +1,5 @@
-import { globalStyle, style, styleVariants } from '@vanilla-extract/css';
+import { globalStyle, keyframes, style, styleVariants } from '@vanilla-extract/css';
+import { SETTLE } from '../styles/motion.css';
 import { vars } from '../styles/theme.css';
 
 /** Width of a chart's y-axis labels, shared by the SVG and the x-label row. */
@@ -79,7 +80,19 @@ export const axisText = style({
   fontVariantNumeric: 'tabular-nums',
 });
 
-export const bar = style({ fill: vars.color.chartOff });
+/** A custom property set on each bar group to its position in the chart, which staggers the bars' growth. */
+export const BAR_INDEX = '--bar-index';
+
+const grow = keyframes({ from: { transform: 'scaleY(0)' } });
+
+// Grows from the baseline once, when the chart first shows: transform only, so nothing shifts.
+export const bar = style({
+  fill: vars.color.chartOff,
+  transformBox: 'fill-box',
+  transformOrigin: 'bottom',
+  animation: `${grow} 520ms ${SETTLE} backwards`,
+  animationDelay: `calc(var(${BAR_INDEX}, 0) * 15ms)`,
+});
 
 export const barGroup = style({});
 

@@ -27,6 +27,7 @@ import { useMinute, useNow } from './lib/now';
 import { createPoll, POLL_MS, STATS_POLL_MS, whenVisible } from './lib/poll';
 import { useStatusTab } from './lib/tab';
 import { syncThemeColor, watchSystemTheme } from './lib/theme';
+import * as motion from './styles/motion.css';
 
 const Admin = lazy(() => import('./admin/Admin'));
 
@@ -151,7 +152,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <StatusBadge status={s().status} monitored={s().monitored} since={s().since} now={now()} />
                 <Scope />
                 <div class="gg-status-detail">
-                  <p>{statusDetail(s(), minute())}</p>
+                  <p class={motion.enter}>{statusDetail(s(), minute())}</p>
                   {/* Only when something is wrong; the loading shell has no line for it. */}
                   <Show when={warning()}>
                     {(text) => (
@@ -166,7 +167,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             )}
           </Match>
           <Match when={status.error() !== undefined}>
-            <p class={css.error} role="alert">
+            <p class={`${css.error} ${motion.enter}`} role="alert">
               {t().status.unreachable}
             </p>
             <Scope />
