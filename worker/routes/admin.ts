@@ -6,17 +6,14 @@ import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, TIMER_PATH } from '../../shared/paths
 import { heartbeats, outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
 import { getOpenOutage, openOutage, summarise } from '../lib/grid';
-import { errors, json, parseBody } from '../lib/http';
+import { errors, isoTime, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkSession } from './auth';
 
 /** Clock skew allowed on admin times; anything later is a typo, not an outage. */
 const MAX_FUTURE_MS = 5 * MINUTE_MS;
 
-const isoDate = z.iso
-  .datetime({ offset: true })
-  .transform((v) => new Date(v).toISOString())
-  .refine((v) => Date.parse(v) <= Date.now() + MAX_FUTURE_MS, 'time_in_future');
+const isoDate = isoTime().refine((v) => Date.parse(v) <= Date.now() + MAX_FUTURE_MS, 'time_in_future');
 
 // Strict: an unknown field is refused, so a misspelt or unsupported edit is never reported as done.
 const timerSchema = z.strictObject({ action: z.enum(TIMER_ACTION) });
@@ -121,10 +118,11 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   }
   const falsePositive = changes.isFalsePositive ?? existing.isFalsePositive;
   // A false positive never stays open: an open one would block the next missed gap from being recorded.
-  if (falsePositive && (changes.endTime === undefined ? existing.endTime : changes.endTime) === null) {
-    changes.endTime = new Date().toISOString();
+  let endTime = changes.endTime === undefined ? existing.endTime : changes.endTime;
+  if (falsePositive && endTime === null) {
+    endTime = new Date().toISOString();
+    changes.endTime = endTime;
   }
-  const endTime = changes.endTime === undefined ? existing.endTime : changes.endTime;
   if (endTime && endTime < existing.startTime) return errors.badRequest(ERROR.endBeforeStart);
   if (endTime === null && !falsePositive) {
     const open = await getOpenOutage(db);

@@ -2,7 +2,7 @@ import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { FEED_PATH } from '../shared/paths';
 import { site } from '../site.config';
-import { call, insertOutage } from './helpers';
+import { call, insertOutage, ORIGIN } from './helpers';
 
 /**
  * A small well-formedness check (workerd has no DOMParser): one root, every tag closed in order,
@@ -48,10 +48,10 @@ describe('GET /feed.xml', () => {
     expect(xml).toContain(`<link rel="alternate" type="text/html" href="${env.SITE_URL}/"/>`);
     const [first, second] = entries(xml);
     expect(field(first, 'title')).toBe('Outage in progress since 18 Oct 2026 08:30');
-    expect(field(first, 'id')).toBe(`https://garsfontein.example/#outage-${open}`);
+    expect(field(first, 'id')).toBe(`${ORIGIN}/#outage-${open}`);
     expect(field(first, 'updated')).toBe('2026-10-18T06:30:00.000Z');
     expect(field(second, 'title')).toBe('Outage 17 Oct 2026 14:05 (2 h 10 min)');
-    expect(field(second, 'id')).toBe(`https://garsfontein.example/#outage-${ended}`);
+    expect(field(second, 'id')).toBe(`${ORIGIN}/#outage-${ended}`);
     expect(field(second, 'updated')).toBe('2026-10-17T14:15:00.000Z');
     // The feed's own <updated> is the latest change, the open outage's start here.
     expect(xml.split('<entry>')[0]).toContain('<updated>2026-10-18T06:30:00.000Z</updated>');
@@ -84,11 +84,11 @@ describe('GET /feed.xml', () => {
 
   it('escapes XML', async () => {
     await insertOutage({ startTime: '2026-10-17T12:05:00.000Z', endTime: '2026-10-17T12:50:00.000Z' });
-    const odd = { ...env, SITE_URL: 'https://garsfontein.example/a&b"<c>' } as Env;
+    const odd = { ...env, SITE_URL: `${ORIGIN}/a&b"<c>` } as Env;
     const xml = await (await call(FEED_PATH, { env: odd })).text();
     assertWellFormed(xml);
-    expect(xml).toContain('href="https://garsfontein.example/a&amp;b&quot;&lt;c&gt;/"');
-    expect(xml).toContain('<id>https://garsfontein.example/a&amp;b&quot;&lt;c&gt;/feed.xml</id>');
+    expect(xml).toContain(`href="${ORIGIN}/a&amp;b&quot;&lt;c&gt;/"`);
+    expect(xml).toContain(`<id>${ORIGIN}/a&amp;b&quot;&lt;c&gt;${FEED_PATH}</id>`);
     expect(field(entries(xml)[0], 'title')).toBe('Outage 17 Oct 2026 14:05 (45 min)');
   });
 

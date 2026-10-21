@@ -1,4 +1,15 @@
-import { type Component, createSignal, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
+import {
+  type Component,
+  createMemo,
+  createSignal,
+  lazy,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Suspense,
+  Switch,
+} from 'solid-js';
 import {
   HEARTBEAT_THRESHOLD_MS,
   outageDurationMs,
@@ -35,8 +46,6 @@ export interface InitialData {
   status: Promise<StatusResponse>;
   stats: Promise<StatsResponse>;
 }
-
-const clockTime = (ms: number) => formatTime(new Date(ms).toISOString());
 
 /** The disclaimer and the language switch are for the public page; the admin page is always in English. */
 const Masthead: Component<{ isPublic: boolean }> = (props) => (
@@ -128,16 +137,19 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
 
   // A failed poll may mean the reader's connection went down with the power, so once the last answer
   // is as old as a stale heartbeat, ON is no longer backed by a live reading.
-  const outOfTouch = () => status.error() !== undefined && now() - status.updatedAt() > HEARTBEAT_THRESHOLD_MS;
-  const data = () => {
+  // Memos: `now` ticks every second, but these change only with a poll or when the threshold passes.
+  const outOfTouch = createMemo(
+    () => status.error() !== undefined && now() - status.updatedAt() > HEARTBEAT_THRESHOLD_MS,
+  );
+  const data = createMemo(() => {
     const s = status.data();
     return s && outOfTouch() ? { ...s, monitored: false } : s;
-  };
+  });
   useStatusTab(data, minute);
   // Every outage instead of the recent ones; the history card's heading names which.
   const [allOutages, setAllOutages] = createSignal(false);
   // The last poll failed, so the status shown may be out of date.
-  const warning = () => (status.error() !== undefined ? t().status.stale(clockTime(status.updatedAt())) : undefined);
+  const warning = () => (status.error() !== undefined ? t().status.stale(formatTime(status.updatedAt())) : undefined);
 
   return (
     <>
@@ -187,7 +199,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <Trends stats={s()} now={minute()} />
                 <Show when={stats.error() !== undefined}>
                   <p class={css.trendsWarning} role="alert">
-                    {t().trends.refreshFailed(clockTime(stats.updatedAt()))}
+                    {t().trends.refreshFailed(formatTime(stats.updatedAt()))}
                   </p>
                 </Show>
               </>

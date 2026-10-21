@@ -1,9 +1,9 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type AdminOutagesResponse, MINUTE_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
+import { type AdminOutagesResponse, HOUR_MS, MINUTE_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { ADMIN_OUTAGES_PATH, TIMER_PATH } from '../shared/paths';
-import { call, createSession, getStatus, insertOutage, openOutageCount, setHeartbeat } from './helpers';
+import { call, createSession, getStatus, insertOutage, openOutageCount, setHeartbeat, setPausedUntil } from './helpers';
 
 let cookie: string;
 beforeEach(async () => {
@@ -252,8 +252,8 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(await sensor()).toBeNull();
     const lastSeen = await setHeartbeat(30);
     expect(await sensor()).toEqual({ lastSeen, pausedUntil: null });
-    const until = new Date(Date.now() + 60 * MINUTE_MS).toISOString();
-    await env.DB.prepare('UPDATE heartbeats SET paused_until = ? WHERE id = 1').bind(until).run();
+    const until = new Date(Date.now() + HOUR_MS).toISOString();
+    await setPausedUntil(until);
     expect(await sensor()).toEqual({ lastSeen, pausedUntil: until });
   });
 

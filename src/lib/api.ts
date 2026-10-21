@@ -3,6 +3,8 @@ import {
   MINUTE_MS,
   OUTAGE_ACTION,
   type OutagesResponse,
+  POWER_STATUSES,
+  type PowerStatus,
   type StatsResponse,
   type StatusResponse,
   type TimerAction,
@@ -53,10 +55,19 @@ async function request<T>(
 // Just enough shape to render: anything else is treated like a failed request, not drawn as a reading.
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStatus = (b: unknown) =>
-  isRecord(b) && (b.status === 'ON' || b.status === 'OFF') && Array.isArray(b.recent) && b.recent.every(isRecord);
+  isRecord(b) &&
+  POWER_STATUSES.includes(b.status as PowerStatus) &&
+  Array.isArray(b.recent) &&
+  b.recent.every(isRecord);
 const isOutages = (b: unknown) => isRecord(b) && Array.isArray(b.outages) && b.outages.every(isRecord);
 const isStats = (b: unknown) =>
-  isRecord(b) && typeof b.trackingSince === 'string' && isRecord(b.last30) && Array.isArray(b.weeks);
+  isRecord(b) &&
+  typeof b.trackingSince === 'string' &&
+  isRecord(b.last30) &&
+  typeof b.last30.minutesOff === 'number' &&
+  Array.isArray(b.weeks) &&
+  Array.isArray(b.last30ByHour) &&
+  b.last30ByHour.length === 24;
 
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });

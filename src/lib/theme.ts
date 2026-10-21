@@ -11,7 +11,8 @@ const [theme, setThemeSignal] = createSignal<Theme>(currentTheme());
 export { theme };
 
 /** Colours the phone's status bar to match the active theme, even when it differs from the OS setting. */
-export function syncThemeColor(active: Theme = currentTheme()): void {
+export function syncThemeColor(): void {
+  const active = currentTheme();
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
     meta.content = PALETTE[active].bg;
   }
@@ -21,7 +22,7 @@ function applyTheme(next: Theme): void {
   document.documentElement.classList.remove('light', 'dark');
   document.documentElement.classList.add(next);
   setThemeSignal(next);
-  syncThemeColor(next);
+  syncThemeColor();
 }
 
 /** The visitor's own choice: remembered, and from then on it overrides the OS setting. */

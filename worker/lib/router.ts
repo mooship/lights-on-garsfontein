@@ -32,7 +32,7 @@ export interface Route {
    * Serve GETs from the edge cache: `true` for as long as the response's own Cache-Control
    * allows, or a number of seconds at the edge only, while browsers get the response's own header.
    */
-  edgeCache?: boolean | number;
+  edgeCache?: true | number;
   /** Edge-cached paths to purge after a successful response, because this write changes them. */
   purges?: readonly string[];
 }

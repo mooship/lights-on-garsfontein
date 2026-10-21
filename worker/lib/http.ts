@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { MINUTE_MS } from '../../shared/api';
 import { ERROR, type ErrorCode } from '../../shared/errors';
 
@@ -22,7 +22,7 @@ export const errors = {
   badRequest: (error: ErrorCode = ERROR.badRequest, details?: unknown) => json({ error, details }, 400),
   unauthorized: () => json({ error: ERROR.unauthorized }, 401),
   forbidden: (error: ErrorCode = ERROR.forbidden) => json({ error }, 403),
-  notFound: () => json({ error: ERROR.notFound }, 404),
+  notFound: (error: ErrorCode = ERROR.notFound) => json({ error }, 404),
   conflict: (error: ErrorCode) => json({ error }, 409),
   unsupportedMediaType: () => json({ error: ERROR.unsupportedMediaType }, 415),
   rateLimited: () => json({ error: ERROR.rateLimited }, 429, { 'Retry-After': String(MINUTE_MS / 1000) }),
@@ -62,6 +62,9 @@ export async function isRateLimited(limiter: RateLimit, key: string): Promise<bo
   const { success } = await limiter.limit({ key });
   return !success;
 }
+
+/** An ISO 8601 time with an offset, normalised to UTC. */
+export const isoTime = () => z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
 
 /** Parses a JSON body against a schema; on failure returns the 400 to send instead. */
 export async function parseBody<T extends z.ZodType>(

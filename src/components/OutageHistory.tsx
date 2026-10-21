@@ -96,7 +96,8 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
   };
 
   // The status poll brings the recent outages; when one starts, ends or changes, so has the full list.
-  const recentKey = () => props.recent.map((o) => `${o.id}:${o.endTime}:${o.planned}`).join();
+  // A memo, so a poll with the same outages leaves the list alone.
+  const recentKey = createMemo(() => props.recent.map((o) => `${o.id}:${o.endTime}:${o.planned}`).join());
   createEffect(on(recentKey, () => props.expanded && load(false), { defer: true }));
 
   const current = () => pageOf(all(), page());

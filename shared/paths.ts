@@ -19,6 +19,8 @@ export const TIMER_PATH = '/api/admin/timer';
 export const SITEMAP_PATH = '/sitemap.xml';
 export const ROBOTS_PATH = '/robots.txt';
 export const OG_IMAGE_PATH = '/og.png';
+/** The static card that OG_IMAGE_PATH serves, written by scripts/build-og.ts. */
+export const OG_CARD_ASSET_PATH = '/og/card.png';
 /** RFC 9116; a static file built from templates/.well-known/security.txt. */
 export const SECURITY_TXT_PATH = '/.well-known/security.txt';
 

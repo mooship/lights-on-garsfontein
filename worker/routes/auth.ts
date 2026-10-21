@@ -7,7 +7,7 @@ import { SESSION_COOKIE } from '../lib/cookies';
 import { randomToken, safeEqual, sha256Hex, verifyPassword } from '../lib/crypto';
 import { errors, isRateLimited, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
-import { checkTurnstile } from '../lib/turnstile';
+import { checkTurnstile, turnstileToken } from '../lib/turnstile';
 
 /** The shape of randomToken()'s output. */
 const SESSION_TOKEN = /^[\w-]{43}$/;
@@ -23,7 +23,7 @@ export const ADMIN_USER_ID = 'admin';
 const loginSchema = z.object({
   username: z.string().min(1).max(CREDENTIAL_MAX_LENGTH.username),
   password: z.string().min(1).max(CREDENTIAL_MAX_LENGTH.password),
-  token: z.string().min(1).max(2048),
+  token: turnstileToken,
 });
 
 function sessionCookie(value: string, maxAge: number): string {

@@ -1,6 +1,13 @@
 import { HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { localePath } from '../../shared/locale';
-import { ADMIN_API_PREFIX, OG_IMAGE_PATH, PRIVACY_PAGE_PATH, ROBOTS_PATH, SITEMAP_PATH } from '../../shared/paths';
+import {
+  ADMIN_API_PREFIX,
+  OG_CARD_ASSET_PATH,
+  OG_IMAGE_PATH,
+  PRIVACY_PAGE_PATH,
+  ROBOTS_PATH,
+  SITEMAP_PATH,
+} from '../../shared/paths';
 import { site } from '../../site.config';
 import { publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
@@ -47,7 +54,7 @@ Sitemap: ${env.SITE_URL}${SITEMAP_PATH}
  * never claims ON or OFF. A Worker route so the public URL stays stable whatever the asset is.
  */
 async function ogImage({ request, env }: RouteContext): Promise<Response> {
-  const asset = await env.ASSETS.fetch(new URL('/og/card.png', request.url));
+  const asset = await env.ASSETS.fetch(new URL(OG_CARD_ASSET_PATH, request.url));
   const headers = new Headers(asset.headers);
   headers.set('Cache-Control', publicCache(MINUTE_MS));
   return new Response(asset.body, { status: asset.status, headers });

@@ -3,7 +3,7 @@ import { DAY_MS, type StatusResponse } from '../../shared/api';
 import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
 import { requireBearer } from '../lib/auth';
 import { getGridState, pauseSensor, recordHeartbeat } from '../lib/grid';
-import { isJson, json, parseBody } from '../lib/http';
+import { isJson, isoTime, json, parseBody } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 
 /**
@@ -18,9 +18,7 @@ export const STATUS_EDGE_TTL_SECONDS = 12;
 export const MAX_PAUSE_MS = 30 * DAY_MS;
 
 const pauseSchema = z.object({
-  until: z.iso
-    .datetime({ offset: true })
-    .transform((v) => new Date(v).toISOString())
+  until: isoTime()
     .refine((v) => Date.parse(v) > Date.now(), 'time_in_past')
     .refine((v) => Date.parse(v) <= Date.now() + MAX_PAUSE_MS, 'pause_too_long')
     .nullable(),

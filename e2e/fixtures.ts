@@ -1,5 +1,5 @@
 import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
-import { type AdminOutagesResponse, OUTAGE_ACTION } from '../shared/api';
+import { type AdminOutagesResponse, DAY_MS, MINUTE_MS, OUTAGE_ACTION } from '../shared/api';
 import { ADMIN_OUTAGES_PATH } from '../shared/paths';
 import type { Locale } from '../site.config';
 import { STORAGE_KEYS } from '../src/lib/storage';
@@ -27,6 +27,31 @@ async function deleteOutages(request: APIRequestContext): Promise<void> {
     );
     for (const res of deleted) expect(res.status()).toBe(200);
   }
+}
+
+/** A tab coming back into view asks for the status at once. */
+export const pollNow = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
+/** Serves the real response from `path`, changed by `change`. */
+export const patchJson = <T>(page: Page, path: string, change: (body: T) => T) =>
+  page.route(`**${path}`, async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: change((await response.json()) as T) });
+  });
+
+/** Logs a half-hour outage that started `daysAgo` days ago; returns its id. */
+export async function logOutage(request: APIRequestContext, daysAgo: number): Promise<number> {
+  const start = Date.now() - daysAgo * DAY_MS;
+  const res = await request.post(ADMIN_OUTAGES_PATH, {
+    headers: ADMIN_API,
+    data: {
+      action: OUTAGE_ACTION.create,
+      startTime: new Date(start).toISOString(),
+      endTime: new Date(start + 30 * MINUTE_MS).toISOString(),
+    },
+  });
+  expect(res.status()).toBe(201);
+  return ((await res.json()) as { outage: { id: number } }).outage.id;
 }
 
 /** Stores the app's language before every load of `page` (the app's own default is site.locales[0]). */

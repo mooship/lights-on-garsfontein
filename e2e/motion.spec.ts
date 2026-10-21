@@ -1,9 +1,9 @@
-import type { APIRequestContext, Page } from '@playwright/test';
-import { DAY_MS, MINUTE_MS, OUTAGE_ACTION, type StatsResponse } from '../shared/api';
-import { ADMIN_OUTAGES_PATH, STATS_PATH, STATUS_PATH } from '../shared/paths';
+import type { Page } from '@playwright/test';
+import { MINUTE_MS, type StatsResponse, type StatusResponse } from '../shared/api';
+import { STATS_PATH, STATUS_PATH } from '../shared/paths';
 import { en } from '../src/i18n/en';
 import { STATS_POLL_MS } from '../src/lib/poll';
-import { ADMIN_API, expect, test } from './fixtures';
+import { expect, logOutage, patchJson, pollNow, test } from './fixtures';
 
 type MotionWindow = Window & { __animated: Element[] };
 
@@ -22,29 +22,12 @@ const animated = (page: Page, selector: string) =>
     return (window as unknown as MotionWindow).__animated.filter((el) => el.matches(sel)).length;
   }, selector);
 
-/** A tab coming back into view asks for the status at once. */
-const pollNow = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-
 /** Serves the status with a live reading, as `status()` says it is. */
 const withStatus = (page: Page, status: () => 'ON' | 'OFF') =>
-  page.route(`**${STATUS_PATH}`, async (route) => {
-    const response = await route.fetch();
+  patchJson<StatusResponse>(page, STATUS_PATH, (body) => {
     const since = new Date(Date.now() - 10 * MINUTE_MS).toISOString();
-    await route.fulfill({ response, json: { ...(await response.json()), status: status(), monitored: true, since } });
+    return { ...body, status: status(), monitored: true, since };
   });
-
-async function logOutage(request: APIRequestContext, daysAgo: number) {
-  const start = Date.now() - daysAgo * DAY_MS;
-  const res = await request.post(ADMIN_OUTAGES_PATH, {
-    headers: ADMIN_API,
-    data: {
-      action: OUTAGE_ACTION.create,
-      startTime: new Date(start).toISOString(),
-      endTime: new Date(start + 30 * MINUTE_MS).toISOString(),
-    },
-  });
-  expect(res.status()).toBe(201);
-}
 
 test.describe('motion', () => {
   test('with reduced motion, nothing moves for longer than an instant', async ({ page }) => {
@@ -98,12 +81,10 @@ test.describe('motion', () => {
 
   test('grows the chart bars once, not again when the statistics refresh', async ({ page }) => {
     await page.clock.install();
-    await page.route(`**${STATS_PATH}`, async (route) => {
-      const response = await route.fetch();
-      const body = (await response.json()) as StatsResponse;
+    await patchJson<StatsResponse>(page, STATS_PATH, (body) => {
       const week = body.weeks.at(-1) ?? { weekStart: '2026-10-12', hoursOff: 0, minutesOff: 0, outages: 0 };
       const weeks = [{ ...week, hoursOff: 2, minutesOff: 120, outages: 1 }];
-      await route.fulfill({ response, json: { ...body, trackingSince: '2026-01-01T00:00:00.000Z', weeks } });
+      return { ...body, trackingSince: '2026-01-01T00:00:00.000Z', weeks };
     });
     await recordAnimations(page);
     await page.goto('/en/');

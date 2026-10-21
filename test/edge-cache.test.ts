@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
-import { ADMIN_OUTAGES_PATH, HEARTBEAT_PAUSE_PATH, OUTAGE_VIEWS, STATUS_PATH, TIMER_PATH } from '../shared/paths';
+import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import {
   asAdmin,
   call,
@@ -9,6 +9,7 @@ import {
   heartbeat,
   insertOutage,
   ORIGIN,
+  requestPause,
   runCron,
   setHeartbeat,
   stubLimiter,
@@ -102,13 +103,6 @@ describe('edge cache purges', () => {
 });
 
 describe('pausing outage detection', () => {
-  const pause = (until: string | null) =>
-    call(HEARTBEAT_PAUSE_PATH, {
-      method: 'POST',
-      body: { until },
-      headers: { Authorization: `Bearer ${env.HEARTBEAT_TOKEN}` },
-    });
-
   // A pause changes whether the status is backed by a live reading, and nothing else.
   it.each([
     ['starting a pause', () => new Date(Date.now() + HOUR_MS).toISOString()],
@@ -116,7 +110,7 @@ describe('pausing outage detection', () => {
   ])('%s purges only the status', async (_name, until) => {
     await setHeartbeat(30);
     for (const path of EDGE_CACHED) await call(path);
-    expect((await pause(until())).status).toBe(200);
+    expect((await requestPause(until())).status).toBe(200);
     expect(await isCached(STATUS_PATH)).toBe(false);
     for (const path of EDGE_CACHED.filter((p) => p !== STATUS_PATH)) expect(await isCached(path), path).toBe(true);
   });

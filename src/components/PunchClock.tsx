@@ -8,7 +8,6 @@ import { button } from '../styles/ui.css';
 import * as css from './PunchClock.css';
 
 interface PunchClockProps {
-  /** The currently open outage, if any. */
   outage: AdminOutage | null;
   now: number;
   busy?: boolean;
