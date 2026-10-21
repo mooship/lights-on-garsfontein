@@ -461,9 +461,8 @@ test.describe('public page', () => {
     await expect(page).toHaveTitle(site.brand.full);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
 
-    // Out of touch, nothing changes from one second to the next, so neither do the page or the tab.
-    // Watched from just after a minute starts, as the minute ticking over may rightly change things.
-    await page.clock.runFor(MINUTE_MS + 1_000 - (await page.evaluate(() => Date.now() % 60_000)));
+    // Out of touch, nothing new arrives, so neither the page nor the tab changes: not with the clock's
+    // ticks, the failed status polls, nor a statistics refresh that brings the same figures.
     await page.evaluate(() => {
       const w = window as unknown as { __mutations: number };
       w.__mutations = 0;
@@ -471,7 +470,7 @@ test.describe('public page', () => {
         w.__mutations += records.length;
       }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true });
     });
-    await page.clock.runFor(5_000);
+    await page.clock.runFor(STATS_POLL_MS + MINUTE_MS);
     expect(await page.evaluate(() => (window as unknown as { __mutations: number }).__mutations)).toBe(0);
   });
 

@@ -410,18 +410,19 @@ export const Trends: Component<TrendsProps> = (props) => {
             </tr>
           </thead>
           <tbody>
-            <For each={props.stats.weeks.map((w, i) => ({ w, note: weekNote(place(i)) })).reverse()}>
-              {({ w, note }) => (
+            {/* By position, so a refresh with the same figures leaves the rows as they are. */}
+            <Index each={props.stats.weeks.map((w, i) => ({ w, note: weekNote(place(i)) })).reverse()}>
+              {(row) => (
                 <tr>
                   <td class={css.td}>
-                    {formatCalendarDay(w.weekStart)}
-                    {note}
+                    {formatCalendarDay(row().w.weekStart)}
+                    {row().note}
                   </td>
-                  <td class={css.td}>{formatHours(w.hoursOff)}</td>
-                  <td class={css.td}>{w.outages}</td>
+                  <td class={css.td}>{formatHours(row().w.hoursOff)}</td>
+                  <td class={css.td}>{row().w.outages}</td>
                 </tr>
               )}
-            </For>
+            </Index>
           </tbody>
         </table>
         <a class={css.download} href={CSV_PATH} download={CSV_FILE_NAME}>
