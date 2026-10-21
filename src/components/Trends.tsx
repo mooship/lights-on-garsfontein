@@ -14,14 +14,7 @@ import {
   Show,
   untrack,
 } from 'solid-js';
-import {
-  CSV_FILE_NAME,
-  localDate,
-  MINUTE_MS,
-  type StatsResponse,
-  type WeekStats,
-  type WindowStats,
-} from '../../shared/api';
+import { CSV_FILE_NAME, localDate, MINUTE_MS, type StatsResponse, type WeekStats } from '../../shared/api';
 import { CSV_PATH } from '../../shared/paths';
 import { formatCalendarDay, formatDate, formatDuration, formatHours, formatNumber } from '../lib/format';
 import { t } from '../lib/i18n';
@@ -34,10 +27,11 @@ const { AXIS_WIDTH } = css;
 /** A tile duration like the history's ("5 u 23 min"); none at all reads "0 min". */
 const tileDuration = (minutes: number) => (minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `0 ${t().units.min}`);
 
-/** To the minute, like `longestMinutes`: `hoursOff` is rounded to 6 minutes, so one outage could disagree with itself. */
-const minutesOff = (w: WindowStats | WeekStats) =>
-  // Absent from a /api/stats response cached by the browser from before the field existed.
-  (w.minutesOff as number | undefined) ?? Math.round(w.hoursOff * 60);
+// Durations use `minutesOff`, to the minute like `longestMinutes`: `hoursOff` is rounded to 6 minutes, so
+// one outage could disagree with itself. The charts use `hoursOff`, which they plot in hours.
+
+/** Off time counts only inside a counted outage, so this also covers every week with time off. */
+const hadOutage = (w: WeekStats) => w.outages > 0;
 
 /** The numbers in a duration at full size and its units smaller, so "12 u 34 min" fits a phone tile. */
 const DurationValue: Component<{ text: string }> = (props) => (
@@ -128,12 +122,11 @@ interface ReadoutParts {
 
 const readoutText = (p: ReadoutParts) => `${p.lead}: ${p.value} ${p.rest}`;
 
-/** The readout for a week. */
 function weekReadout(w: WeekStats, place: WeekPlace): ReadoutParts {
   const m = t().trends;
   return {
     lead: m.weekOf(formatCalendarDay(w.weekStart)),
-    value: tileDuration(minutesOff(w)),
+    value: tileDuration(w.minutesOff),
     rest: `${m.off} · ${m.outageCount(w.outages)}${weekNote(place)}`,
   };
 }
@@ -313,15 +306,13 @@ export const Trends: Component<TrendsProps> = (props) => {
       from: index === 0 && week && week.weekStart < firstDay() ? firstDay() : null,
     };
   };
-  const anyOutage = () => props.stats.weeks.some((w) => w.hoursOff > 0 || w.outages > 0);
+  const anyOutage = () => props.stats.weeks.some(hadOutage);
   // Memos: the charts read their bars on every pointer move, and each readout formats dates.
   const weekBars = createMemo(() =>
     props.stats.weeks.map((w, i) => ({ hours: w.hoursOff, readout: weekReadout(w, place(i)) })),
   );
-  // Absent from a /api/stats response cached by the browser from before the field existed.
-  const byHour = () => props.stats.last30ByHour as number[] | undefined;
   const hourBars = createMemo(() =>
-    (byHour() ?? []).map((minutes, hour) => ({
+    props.stats.last30ByHour.map((minutes, hour) => ({
       hours: minutes / 60,
       readout: { lead: hourRange(hour), value: tileDuration(minutes), rest: t().trends.off },
     })),
@@ -330,10 +321,6 @@ export const Trends: Component<TrendsProps> = (props) => {
   const subtitle = () => {
     if (!started()) return t().trends.startsOn(formatDate(props.stats.trackingSince));
     return fullWindow() ? t().trends.last30 : t().trends.since(formatDate(props.stats.trackingSince));
-  };
-  const previousMinutesOff = () => {
-    const previous = props.stats.previous30;
-    return previous ? minutesOff(previous) : undefined;
   };
 
   return (
@@ -346,8 +333,8 @@ export const Trends: Component<TrendsProps> = (props) => {
         <div class={`${css.tiles} ${motion.enter}`}>
           <Tile
             label={t().trends.withoutPower}
-            value={started() ? <DurationValue text={tileDuration(minutesOff(s()))} /> : '—'}
-            delta={delta(minutesOff(s()), previousMinutesOff(), tileDuration, true)}
+            value={started() ? <DurationValue text={tileDuration(s().minutesOff)} /> : '—'}
+            delta={delta(s().minutesOff, props.stats.previous30?.minutesOff, tileDuration, true)}
           />
           <Tile
             label={t().trends.outages}
@@ -374,7 +361,7 @@ export const Trends: Component<TrendsProps> = (props) => {
             }
             note={
               s().outages > 1
-                ? t().trends.average(formatDuration((minutesOff(s()) / s().outages) * MINUTE_MS))
+                ? t().trends.average(formatDuration((s().minutesOff / s().outages) * MINUTE_MS))
                 : undefined
             }
           />
@@ -384,7 +371,7 @@ export const Trends: Component<TrendsProps> = (props) => {
             title={t().trends.chartTitle}
             label={t().trends.chartLabel}
             bars={weekBars()}
-            initial={props.stats.weeks.findLastIndex((w) => w.hoursOff > 0 || w.outages > 0)}
+            initial={props.stats.weeks.findLastIndex(hadOutage)}
             xLabels={[
               props.stats.weeks.length > 1 && props.stats.weeks[0]
                 ? formatCalendarDay(place(0).from ?? props.stats.weeks[0].weekStart)
@@ -392,16 +379,14 @@ export const Trends: Component<TrendsProps> = (props) => {
               t().trends.thisWeek,
             ]}
           />
-          <Show when={hourBars().length === 24}>
-            <BarChart
-              title={t().trends.byHourTitle(fullWindow() ? null : formatCalendarDay(firstDay()), s().outages)}
-              label={t().trends.byHourLabel}
-              bars={hourBars()}
-              initial={peakHour(byHour() ?? [])}
-              xLabels={[hourLabel(0), hourLabel(23)]}
-              empty={t().trends.byHourEmpty}
-            />
-          </Show>
+          <BarChart
+            title={t().trends.byHourTitle(fullWindow() ? null : formatCalendarDay(firstDay()), s().outages)}
+            label={t().trends.byHourLabel}
+            bars={hourBars()}
+            initial={peakHour(props.stats.last30ByHour)}
+            xLabels={[hourLabel(0), hourLabel(23)]}
+            empty={t().trends.byHourEmpty}
+          />
         </Show>
       </div>
       <details class="gg-trends-details">

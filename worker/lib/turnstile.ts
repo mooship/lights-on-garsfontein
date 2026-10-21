@@ -12,6 +12,9 @@ const TEST_SECRET = /^[123]x0{31}AA$/;
 /** Test secrets are only honoured on a local SITE_URL, so a misconfigured deploy fails closed. */
 const LOCAL_SITE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/;
 
+/** A Turnstile token in a request body. */
+export const turnstileToken = z.string().min(1).max(2048);
+
 const siteverifySchema = z.object({
   success: z.boolean(),
   action: z.string().optional(),

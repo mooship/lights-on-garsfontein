@@ -5,7 +5,7 @@ import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
 import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from './shared/locale.ts';
-import { ADMIN_PAGE_PATH, API_PREFIX, WORKER_PAGES } from './shared/paths.ts';
+import { ADMIN_PAGE_PATH, API_PREFIX, SECURITY_TXT_PATH, WORKER_PAGES } from './shared/paths.ts';
 import { type Locale, site } from './site.config.ts';
 import { HEAD } from './src/i18n/head.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
@@ -39,11 +39,11 @@ function hashedFonts(): Plugin {
   };
 }
 
-/** Files generated from templates/ at the site root. */
+/** Files generated from templates/ at the site root; `dev`: `npm run dev` serves it too. */
 const GENERATED = {
-  '/site.webmanifest': { mode: 'json', type: 'application/manifest+json' },
-  '/llms.txt': { mode: 'text', type: 'text/plain; charset=utf-8' },
-  '/.well-known/security.txt': { mode: 'text', type: 'text/plain; charset=utf-8' },
+  '/site.webmanifest': { mode: 'json', type: 'application/manifest+json', dev: true },
+  '/llms.txt': { mode: 'text', type: 'text/plain; charset=utf-8', dev: true },
+  [SECURITY_TXT_PATH]: { mode: 'text', type: 'text/plain; charset=utf-8', dev: false },
 } as const;
 
 const generated = (url: keyof typeof GENERATED) =>
@@ -52,7 +52,7 @@ const generated = (url: keyof typeof GENERATED) =>
 /**
  * Deployment identity from site.config.ts: fills the placeholders (see `fill`) in index.html
  * and privacy.html, with JSON escaping inside JSON-LD, and builds the GENERATED files from
- * templates/ (emitted in the build; dev serves the manifest and llms.txt).
+ * templates/ (emitted in the build, and served in dev where marked).
  */
 function siteConfig(): Plugin {
   const jsonLd = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/g;
@@ -68,8 +68,8 @@ function siteConfig(): Plugin {
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const url = req.url?.split('?')[0];
-        if (url !== '/site.webmanifest' && url !== '/llms.txt') return next();
+        const url = req.url?.split('?')[0] as keyof typeof GENERATED;
+        if (!GENERATED[url]?.dev) return next();
         res.setHeader('Content-Type', GENERATED[url].type);
         res.end(generated(url));
       });

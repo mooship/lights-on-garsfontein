@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { TURNSTILE_ACTION } from '../../shared/api';
 import { ERROR } from '../../shared/errors';
 import { CONTACT_PATH } from '../../shared/paths';
-import { json, parseBody } from '../lib/http';
+import { errors, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
-import { checkTurnstile } from '../lib/turnstile';
+import { checkTurnstile, turnstileToken } from '../lib/turnstile';
 
-const contactSchema = z.object({ token: z.string().min(1).max(2048) });
+const contactSchema = z.object({ token: turnstileToken });
 
 /**
  * The operator's email address, for the privacy page's "Show email address" button. It lives
@@ -19,7 +19,7 @@ async function postContact(ctx: RouteContext): Promise<Response> {
   if ('response' in parsed) return parsed.response;
   // Checked before Turnstile, so an unconfigured deploy spends no siteverify call.
   const email = env.CONTACT_EMAIL?.trim();
-  if (!email) return json({ error: ERROR.notConfigured }, 404);
+  if (!email) return errors.notFound(ERROR.notConfigured);
   const refused = await checkTurnstile(ctx, parsed.data.token, TURNSTILE_ACTION.contact);
   if (refused) return refused;
   return json({ email });

@@ -255,13 +255,7 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
         <div class={css.formRow}>
           <label class={label}>
             {admin.started}
-            <input
-              class={input}
-              type="datetime-local"
-              name="start"
-              required
-              max={toLocalInput(new Date().toISOString())}
-            />
+            <input class={input} type="datetime-local" name="start" required max={toLocalInput(Date.now())} />
           </label>
           <label class={label}>
             {admin.ended}
@@ -392,7 +386,7 @@ const Dashboard: Component<{
         <SensorLine sensor={outages().sensor} asOf={loadedAt()} />
         <Show when={refreshFailed()}>
           <p class={css.sensor} role="alert">
-            {admin.sensor.stale(formatTime(new Date(loadedAt()).toISOString()))}
+            {admin.sensor.stale(formatTime(loadedAt()))}
           </p>
         </Show>
         <FormError error={error()} />

@@ -1,5 +1,5 @@
 import { type Component, Show } from 'solid-js';
-import { DEFAULT_LOCALE, LOCALES } from '../../shared/locale';
+import { LOCALES, nextLocale } from '../../shared/locale';
 import { locale, switchLocale, t } from '../lib/i18n';
 
 /**
@@ -7,7 +7,7 @@ import { locale, switchLocale, t } from '../lib/i18n';
  * language. Hidden with only one locale.
  */
 export const LanguageToggle: Component = () => {
-  const next = () => LOCALES[(LOCALES.indexOf(locale()) + 1) % LOCALES.length] ?? DEFAULT_LOCALE;
+  const next = () => nextLocale(locale());
   return (
     <Show when={LOCALES.length > 1}>
       <button

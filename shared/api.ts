@@ -5,7 +5,8 @@ import { site } from '../site.config';
 // Public responses deliberately never say how an outage was recorded (sensor or by hand);
 // only the admin API exposes `source`.
 
-export type PowerStatus = 'ON' | 'OFF';
+export const POWER_STATUSES = ['ON', 'OFF'] as const;
+export type PowerStatus = (typeof POWER_STATUSES)[number];
 
 /** How an outage was recorded: by the heartbeat sensor or by an admin. */
 export const OUTAGE_SOURCES = ['sensor', 'manual'] as const;
@@ -13,7 +14,7 @@ export type OutageSource = (typeof OUTAGE_SOURCES)[number];
 
 /** Who marked an outage as a false positive: the sensor, reporting it had power throughout, or the admin. */
 export const DISMISSED_BY = ['sensor', 'admin'] as const;
-export type DismissedBy = (typeof DISMISSED_BY)[number];
+type DismissedBy = (typeof DISMISSED_BY)[number];
 
 /** All times in the public API are ISO 8601 in UTC; clients convert to the local zone. */
 export interface OutageSummary {
@@ -94,21 +95,14 @@ export interface WindowStats {
   daysTracked: number;
   /** How many of those days had at least one outage. */
   daysWithOutage: number;
-  /** Outages in the window that were planned. */
   plannedOutages: number;
 }
 
-/** One Monday-to-Sunday week; the current week runs only until now. */
-export interface WeekStats {
+/** One Monday-to-Sunday week, its figures as in WindowStats; the current week runs only until now. */
+export type WeekStats = Pick<WindowStats, 'hoursOff' | 'minutesOff' | 'outages'> & {
   /** Monday of the week in the configured zone, as YYYY-MM-DD. */
   weekStart: string;
-  /** As in WindowStats. */
-  hoursOff: number;
-  /** As in WindowStats. */
-  minutesOff: number;
-  /** As in WindowStats. */
-  outages: number;
-}
+};
 
 export interface StatsResponse {
   /** No statistic counts time before this (TRACKING_SINCE). */
@@ -158,6 +152,20 @@ export function outageDurationMs(outage: { startTime: string; endTime: string | 
 /** A sensor heartbeat older than this means the power is off at the measuring point. */
 // trends.how in src/i18n states it in minutes; change them together.
 export const HEARTBEAT_THRESHOLD_MS = 3 * MINUTE_MS;
+
+// The Worker decides the public status with these and admin shows the sensor's state with them, so
+// both call a sensor silent at the same moment. worker/lib/grid.ts repeats silentSince in SQL.
+
+/** Whether a heartbeat (or the end of a pause) at `at` is too old at `now` (ms) to count as a live reading. */
+export const isStale = (at: string, now: number) => now - Date.parse(at) > HEARTBEAT_THRESHOLD_MS;
+
+/** Whether the sensor is paused at `now` (ms). */
+export const isPaused = (pausedUntil: string | null, now: number) =>
+  pausedUntil !== null && Date.parse(pausedUntil) > now;
+
+/** When the sensor's current silence began: its last heartbeat, or the end of a pause after it. */
+export const silentSince = (lastSeen: string, pausedUntil: string | null) =>
+  pausedUntil !== null && pausedUntil > lastSeen ? pausedUntil : lastSeen;
 
 /** Statistics never count time before this. */
 export const TRACKING_SINCE = site.trackingSince;

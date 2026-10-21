@@ -36,8 +36,6 @@ export interface InitialData {
   stats: Promise<StatsResponse>;
 }
 
-const clockTime = (ms: number) => formatTime(new Date(ms).toISOString());
-
 /** The disclaimer and the language switch are for the public page; the admin page is always in English. */
 const Masthead: Component<{ isPublic: boolean }> = (props) => (
   <>
@@ -137,7 +135,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
   // Every outage instead of the recent ones; the history card's heading names which.
   const [allOutages, setAllOutages] = createSignal(false);
   // The last poll failed, so the status shown may be out of date.
-  const warning = () => (status.error() !== undefined ? t().status.stale(clockTime(status.updatedAt())) : undefined);
+  const warning = () => (status.error() !== undefined ? t().status.stale(formatTime(status.updatedAt())) : undefined);
 
   return (
     <>
@@ -187,7 +185,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <Trends stats={s()} now={minute()} />
                 <Show when={stats.error() !== undefined}>
                   <p class={css.trendsWarning} role="alert">
-                    {t().trends.refreshFailed(clockTime(stats.updatedAt()))}
+                    {t().trends.refreshFailed(formatTime(stats.updatedAt()))}
                   </p>
                 </Show>
               </>

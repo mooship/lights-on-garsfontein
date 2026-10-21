@@ -40,8 +40,8 @@ export function formatNumber(n: number): string {
 export function formatHours(hours: number): string {
   return `${formatNumber(hours >= 100 ? Math.round(hours) : hours)} ${t().units.h}`;
 }
-/** "14:05" in the configured zone. */
-export const formatTime = (iso: string) => timeFormat(new Date(iso));
+/** "14:05" in the configured zone, from an ISO time or epoch ms. */
+export const formatTime = (at: string | number) => timeFormat(new Date(at));
 
 const zoneDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
 
@@ -98,8 +98,9 @@ export function formatClock(ms: number): string {
 // The admin's datetime-local inputs are read and written in the configured zone (fixed offset),
 // whatever time zone the browser is in.
 
-/** An ISO time as a datetime-local value, "2026-10-17T14:05". */
-export const toLocalInput = (iso: string) => new Date(Date.parse(iso) + UTC_OFFSET_MS).toISOString().slice(0, 16);
+/** An ISO time or epoch ms as a datetime-local value, "2026-10-17T14:05". */
+export const toLocalInput = (at: string | number) =>
+  new Date(new Date(at).getTime() + UTC_OFFSET_MS).toISOString().slice(0, 16);
 
 /** A datetime-local value back to ISO 8601 UTC. */
 export const fromLocalInput = (value: string) => new Date(zoned(value)).toISOString();

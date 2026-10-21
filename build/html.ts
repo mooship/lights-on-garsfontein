@@ -1,7 +1,7 @@
 // The string work behind the build's plugins in vite.config.ts, kept apart from Vite so
 // test/node/plugins.test.ts can run it.
 
-import { DEFAULT_LOCALE, LOCALES } from '../shared/locale.ts';
+import { DEFAULT_LOCALE, LOCALES, nextLocale } from '../shared/locale.ts';
 import { site } from '../site.config.ts';
 import { DICTIONARIES } from '../src/i18n/index.ts';
 
@@ -104,12 +104,11 @@ export function fillStaticI18n(html: string): string {
     const isSwitch = /\sdata-i18n-switch\b/.test(attrs);
     if (isSwitch && LOCALES.length === 1) return '';
     const rest = attrs.replace(/\sdata-i18n(?:-label|-args)?="[^"]*"|\sdata-i18n-switch\b/g, '');
-    const copies = LOCALES.map((locale, i) => {
+    const copies = LOCALES.map((locale) => {
       const dict = DICTIONARIES[locale];
-      const next = LOCALES[(i + 1) % LOCALES.length] ?? locale;
       return {
         locale,
-        lang: isSwitch ? next : locale,
+        lang: isSwitch ? nextLocale(locale) : locale,
         text: isSwitch ? message(dict, 'lang.next') : text ? message(dict, text, args) : '',
         label: label && message(dict, label),
       };

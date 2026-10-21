@@ -4,8 +4,6 @@ import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../i18n';
 import { STORAGE_KEYS, writeStored } from './storage';
 
-export type { Locale };
-
 const isLocale = (value: string | null): value is Locale => LOCALES.includes(value as Locale);
 
 // The boot script in index.html has already chosen: the page's own language on a language page,
