@@ -119,7 +119,10 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   const falsePositive = changes.isFalsePositive ?? existing.isFalsePositive;
   // A false positive never stays open: an open one would block the next missed gap from being recorded.
   let endTime = changes.endTime === undefined ? existing.endTime : changes.endTime;
-  if (falsePositive && endTime === null) endTime = changes.endTime = new Date().toISOString();
+  if (falsePositive && endTime === null) {
+    endTime = new Date().toISOString();
+    changes.endTime = endTime;
+  }
   if (endTime && endTime < existing.startTime) return errors.badRequest(ERROR.endBeforeStart);
   if (endTime === null && !falsePositive) {
     const open = await getOpenOutage(db);

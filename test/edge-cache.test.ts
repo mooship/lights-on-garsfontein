@@ -9,7 +9,7 @@ import {
   heartbeat,
   insertOutage,
   ORIGIN,
-  pauseSensor,
+  requestPause,
   runCron,
   setHeartbeat,
   stubLimiter,
@@ -110,7 +110,7 @@ describe('pausing outage detection', () => {
   ])('%s purges only the status', async (_name, until) => {
     await setHeartbeat(30);
     for (const path of EDGE_CACHED) await call(path);
-    expect((await pauseSensor(until())).status).toBe(200);
+    expect((await requestPause(until())).status).toBe(200);
     expect(await isCached(STATUS_PATH)).toBe(false);
     for (const path of EDGE_CACHED.filter((p) => p !== STATUS_PATH)) expect(await isCached(path), path).toBe(true);
   });

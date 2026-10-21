@@ -179,7 +179,7 @@ export function heartbeat(options: CallOptions = {}): Promise<Response> {
 }
 
 /** The sensor pausing outage detection until `until`, or ending its pause with null. */
-export function pauseSensor(until: string | null, token = env.HEARTBEAT_TOKEN): Promise<Response> {
+export function requestPause(until: string | null, token = env.HEARTBEAT_TOKEN): Promise<Response> {
   return call(HEARTBEAT_PAUSE_PATH, { method: 'POST', body: { until }, headers: { Authorization: `Bearer ${token}` } });
 }
 

@@ -68,8 +68,10 @@ function siteConfig(): Plugin {
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const url = req.url?.split('?')[0] as keyof typeof GENERATED;
-        if (!GENERATED[url]?.dev) return next();
+        const path = req.url?.split('?')[0] ?? '';
+        if (!Object.hasOwn(GENERATED, path)) return next();
+        const url = path as keyof typeof GENERATED;
+        if (!GENERATED[url].dev) return next();
         res.setHeader('Content-Type', GENERATED[url].type);
         res.end(generated(url));
       });

@@ -61,7 +61,13 @@ const isStatus = (b: unknown) =>
   b.recent.every(isRecord);
 const isOutages = (b: unknown) => isRecord(b) && Array.isArray(b.outages) && b.outages.every(isRecord);
 const isStats = (b: unknown) =>
-  isRecord(b) && typeof b.trackingSince === 'string' && isRecord(b.last30) && Array.isArray(b.weeks);
+  isRecord(b) &&
+  typeof b.trackingSince === 'string' &&
+  isRecord(b.last30) &&
+  typeof b.last30.minutesOff === 'number' &&
+  Array.isArray(b.weeks) &&
+  Array.isArray(b.last30ByHour) &&
+  b.last30ByHour.length === 24;
 
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });

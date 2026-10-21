@@ -107,7 +107,7 @@ export async function dispatch(route: Route, request: Request, env: Env): Promis
     headers: new Headers(),
   };
   const { edgeCache, purges } = route;
-  const cacheable = request.method === 'GET' && !route.authorize ? (edgeCache ?? null) : null;
+  const cacheable = request.method === 'GET' && !route.authorize ? edgeCache || null : null;
   let response = needsSameSite(route, request) ? refuseCrossSite(request) : null;
   // A cached copy before the limit: a refused request has already reached the Worker, so the limit
   // only saves the D1 work behind a miss, and readers sharing one address (a mobile carrier's) all

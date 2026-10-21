@@ -462,6 +462,8 @@ test.describe('public page', () => {
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
 
     // Out of touch, nothing changes from one second to the next, so neither do the page or the tab.
+    // Watched from just after a minute starts, as the minute ticking over may rightly change things.
+    await page.clock.runFor(MINUTE_MS + 1_000 - (await page.evaluate(() => Date.now() % 60_000)));
     await page.evaluate(() => {
       const w = window as unknown as { __mutations: number };
       w.__mutations = 0;
@@ -1346,6 +1348,12 @@ test.describe('unexpected responses', () => {
     await page.route(`**${STATS_PATH}`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: '{"trackingSince":null}' }),
     );
+    await page.goto('/en/');
+    await expect(page.getByText(en.trends.loadFailed, { exact: true })).toBeVisible();
+  });
+
+  test('treats statistics without the hourly figures as failing to load', async ({ page }) => {
+    await patchJson<Partial<StatsResponse>>(page, STATS_PATH, ({ last30ByHour: _, ...body }) => body);
     await page.goto('/en/');
     await expect(page.getByText(en.trends.loadFailed, { exact: true })).toBeVisible();
   });
