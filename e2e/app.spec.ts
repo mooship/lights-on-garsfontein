@@ -460,6 +460,17 @@ test.describe('public page', () => {
     await expect(page.getByTestId('badge-detail')).toHaveText(/^\s*$/);
     await expect(page).toHaveTitle(site.brand.full);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
+
+    // Out of touch, nothing changes from one second to the next, so neither do the page or the tab.
+    await page.evaluate(() => {
+      const w = window as unknown as { __mutations: number };
+      w.__mutations = 0;
+      new MutationObserver((records) => {
+        w.__mutations += records.length;
+      }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true });
+    });
+    await page.clock.runFor(5_000);
+    expect(await page.evaluate(() => (window as unknown as { __mutations: number }).__mutations)).toBe(0);
   });
 
   test('gives up on a status request that hangs, and says so', async ({ page }) => {
@@ -1189,6 +1200,23 @@ test.describe('all outages', () => {
     expect(res.status()).toBe(200);
     await pollNow(page);
     await expect(history(page).getByText(en.history.planned)).toHaveCount(1);
+  });
+
+  test('keeps the full list while the recent outages stay the same', async ({ page, request }) => {
+    await logOutages(request, RECENT_LIMIT);
+    await page.goto('/');
+    await page.getByRole('button', { name: en.history.showAll }).click();
+    await expect(page.getByRole('heading', { name: en.history.allTitle })).toBeVisible();
+    let reloads = 0;
+    page.on('request', (r) => new URL(r.url()).pathname === OUTAGES_PATH && reloads++);
+    for (let poll = 0; poll < 2; poll++) {
+      const polled = page.waitForResponse(`**${STATUS_PATH}`);
+      await pollNow(page);
+      await polled;
+    }
+    // The status after both polls has rendered, so any reload they started has been requested.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    expect(reloads).toBe(0);
   });
 });
 

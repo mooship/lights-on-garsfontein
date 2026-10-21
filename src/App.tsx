@@ -1,4 +1,15 @@
-import { type Component, createSignal, lazy, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js';
+import {
+  type Component,
+  createMemo,
+  createSignal,
+  lazy,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Suspense,
+  Switch,
+} from 'solid-js';
 import {
   HEARTBEAT_THRESHOLD_MS,
   outageDurationMs,
@@ -126,11 +137,14 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
 
   // A failed poll may mean the reader's connection went down with the power, so once the last answer
   // is as old as a stale heartbeat, ON is no longer backed by a live reading.
-  const outOfTouch = () => status.error() !== undefined && now() - status.updatedAt() > HEARTBEAT_THRESHOLD_MS;
-  const data = () => {
+  // Memos: `now` ticks every second, but these change only with a poll or when the threshold passes.
+  const outOfTouch = createMemo(
+    () => status.error() !== undefined && now() - status.updatedAt() > HEARTBEAT_THRESHOLD_MS,
+  );
+  const data = createMemo(() => {
     const s = status.data();
     return s && outOfTouch() ? { ...s, monitored: false } : s;
-  };
+  });
   useStatusTab(data, minute);
   // Every outage instead of the recent ones; the history card's heading names which.
   const [allOutages, setAllOutages] = createSignal(false);
