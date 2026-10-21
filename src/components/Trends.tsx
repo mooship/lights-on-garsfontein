@@ -69,7 +69,7 @@ function delta(
   };
 }
 
-const Tile: Component<{ label: string; value: JSX.Element; delta?: Delta | null; note?: string }> = (props) => (
+const Tile: Component<{ label: string; value: JSX.Element; delta?: Delta | null; note?: JSX.Element }> = (props) => (
   <div class={css.tile}>
     <div class={css.tileLabel}>{props.label}</div>
     <div class={css.tileValue}>{props.value}</div>
@@ -340,7 +340,11 @@ export const Trends: Component<TrendsProps> = (props) => {
             label={t().trends.outages}
             value={started() ? String(s().outages) : '—'}
             delta={s().plannedOutages === 0 ? delta(s().outages, props.stats.previous30?.outages, String, true) : null}
-            note={s().plannedOutages > 0 ? t().trends.planned(s().plannedOutages) : undefined}
+            note={
+              s().plannedOutages > 0 ? (
+                <span class={css.plannedNote}>{t().trends.planned(s().plannedOutages)}</span>
+              ) : undefined
+            }
           />
           <Tile
             label={t().trends.daysAffected}

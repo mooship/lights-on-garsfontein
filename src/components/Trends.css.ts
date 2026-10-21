@@ -36,6 +36,9 @@ export const tileValue = style({ marginTop: 'auto', fontSize: '1.625rem', fontWe
 // The units in a duration ("u", "min"), smaller than its numbers.
 export const unit = style({ fontSize: '0.6em', fontWeight: 600 });
 
+/** The count of planned outages under the outages tile. */
+export const plannedNote = style({ color: vars.color.planned });
+
 export const tileDelta = style({
   display: 'flex',
   alignItems: 'center',

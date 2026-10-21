@@ -17,6 +17,9 @@ export const PALETTE = {
     offSoft: '#F7E5E1',
     offContrast: '#FFFFFF',
     chartOff: '#B33A2B',
+    // Announced in advance: calm, apart from the on green and the outage red. At least 6:1 on card, bg and plannedSoft.
+    planned: '#2B5A8A',
+    plannedSoft: '#E3ECF5',
     focus: '#8A5A12',
   },
   dark: {
@@ -34,6 +37,8 @@ export const PALETTE = {
     offContrast: '#121312',
     // Validated with the dataviz palette checker against the dark card surface.
     chartOff: '#E06A66',
+    planned: '#7FB0E0',
+    plannedSoft: '#1E2A36',
     focus: '#E6B566',
   },
 } as const;

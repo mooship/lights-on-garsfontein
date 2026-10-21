@@ -161,7 +161,13 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
           <Match when={data()}>
             {(s) => (
               <>
-                <StatusBadge status={s().status} monitored={s().monitored} since={s().since} now={now()} />
+                <StatusBadge
+                  status={s().status}
+                  monitored={s().monitored}
+                  planned={!!s().outage?.planned}
+                  since={s().since}
+                  now={now()}
+                />
                 <Scope />
                 <div class="gg-status-detail">
                   <p class={motion.enter}>{statusDetail(s(), minute())}</p>

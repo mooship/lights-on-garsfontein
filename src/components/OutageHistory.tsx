@@ -1,3 +1,4 @@
+import CalendarClock from 'lucide-solid/icons/calendar-clock';
 import { batch, type Component, createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
 import { type OutageSummary, outageDurationMs, RECENT_LIMIT } from '../../shared/api';
 import { api } from '../lib/api';
@@ -33,13 +34,24 @@ const OutageList: Component<{ outages: OutageSummary[]; now: number; markArrival
                 </div>
               </div>
               <div class={css.end}>
-                <div class={css.primary} classList={{ [css.ongoing]: !outage.endTime }}>
+                <div
+                  class={css.primary}
+                  classList={{
+                    [css.ongoing]: !outage.endTime && !outage.planned,
+                    [css.ongoingPlanned]: !outage.endTime && outage.planned,
+                  }}
+                >
                   {formatDuration(outageDurationMs(outage, props.now))}
                 </div>
                 <div class={css.secondary}>
-                  {[outage.endTime ? '' : t().history.ongoing, outage.planned ? t().history.planned : '']
-                    .filter(Boolean)
-                    .join(' · ') || ' '}
+                  {outage.endTime ? '' : t().history.ongoing}
+                  {!outage.endTime && outage.planned ? ' · ' : ''}
+                  <Show when={outage.planned} fallback={outage.endTime ? ' ' : ''}>
+                    <span class={css.plannedTag}>
+                      <CalendarClock size={12} stroke-width={2.5} aria-hidden="true" />
+                      {t().history.planned}
+                    </span>
+                  </Show>
                 </div>
               </div>
             </li>
