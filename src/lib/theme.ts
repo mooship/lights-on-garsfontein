@@ -26,8 +26,11 @@ function applyTheme(next: Theme): void {
 
 /** The visitor's own choice: remembered, and from then on it overrides the OS setting. */
 export function setTheme(next: Theme): void {
-  applyTheme(next);
   writeStored(STORAGE_KEYS.theme, next);
+  // A cross-fade where the browser has one. The reduced-motion rule in global.css.ts does not reach
+  // view transitions, so they are skipped here instead.
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) applyTheme(next);
+  else document.startViewTransition(() => applyTheme(next));
 }
 
 /** Follow OS changes while the visitor has not picked a theme themselves. */

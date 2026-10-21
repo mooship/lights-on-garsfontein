@@ -1,9 +1,10 @@
 import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
-import { type Component, Show } from 'solid-js';
+import { type Component, onMount, Show } from 'solid-js';
 import type { PowerStatus } from '../../shared/api';
 import { formatDuration } from '../lib/format';
 import { t } from '../lib/i18n';
+import * as motion from '../styles/motion.css';
 import * as css from './StatusBadge.css';
 
 interface StatusBadgeProps {
@@ -32,21 +33,33 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
     return t().status.for(formatDuration(props.now - Date.parse(since)));
   };
 
+  // The first state shown fades in with the card; only a change after that is marked.
+  let mounted = false;
+  onMount(() => {
+    mounted = true;
+  });
+
   return (
-    <div class={css.root} data-status={state()}>
-      <div class={css.icon[state()]} aria-hidden="true">
-        <Show when={props.status === 'ON'} fallback={<ZapOff size={30} stroke-width={2.25} />}>
-          <Zap size={30} stroke-width={2.25} />
-        </Show>
-        {/* Motion only for an outage. */}
-        <Show when={props.status === 'OFF'}>
-          <span class={css.ring} />
-        </Show>
-      </div>
+    <div class={`${css.root} ${motion.enter}`} data-status={state()}>
+      {/* Keyed, so a new state brings a new icon and headline text to animate. */}
+      <Show when={state()} keyed>
+        {(s) => (
+          <div class={`${css.icon[s]} ${mounted ? motion.changedIcon : ''}`} aria-hidden="true">
+            <Show when={s === 'OFF'} fallback={<Zap size={30} stroke-width={2.25} />}>
+              <ZapOff size={30} stroke-width={2.25} />
+              {/* The only motion that repeats: an outage. */}
+              <span class={css.ring} />
+            </Show>
+          </div>
+        )}
+      </Show>
       <div>
-        {/* Only the headline is live, so the ticking duration is never re-announced. */}
+        {/* Only the headline is live, so the ticking duration is never re-announced. It stays in place
+            across a change, as a live region added afresh is not announced. */}
         <p class={`${css.headline} ${css.tone[state()]}`} role="status">
-          {t().status[state()]}
+          <Show when={state()} keyed>
+            {(s) => <span class={mounted ? motion.changedText : undefined}>{t().status[s]}</span>}
+          </Show>
         </p>
         <p class={css.detail} data-testid="badge-detail">
           {detail()}

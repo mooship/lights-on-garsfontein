@@ -6,6 +6,7 @@ import { activeBanners, type Banner } from '../banners';
 import { locale, t } from '../lib/i18n';
 import { useNow } from '../lib/now';
 import { bannerDismissedKey, readStored, writeStored } from '../lib/storage';
+import * as motion from '../styles/motion.css';
 import * as css from './Banner.css';
 
 /** The copy in the active locale, else in the default one. */
@@ -20,18 +21,27 @@ export const SiteBanner: Component = () => {
     activeBanners(now()).find((b) => !dismissed().has(b.id) && readStored(bannerDismissedKey(b.id)) === null),
   );
 
+  // Fading out: the banner stays until its animation ends, so the page below closes up after it.
+  const [leaving, setLeaving] = createSignal(false);
+
   const dismiss = (id: string, button: HTMLElement) => {
-    const hadFocus = document.activeElement === button;
+    if (leaving()) return;
     writeStored(bannerDismissedKey(id), '1');
-    setDismissed((ids) => new Set([...ids, id]));
-    // The button is gone, so hand focus to the main content rather than dropping it on <body>.
-    if (hadFocus) document.querySelector<HTMLElement>('.gg-main')?.focus({ preventScroll: true });
+    setLeaving(true);
+    const section = button.closest('section');
+    Promise.allSettled(section?.getAnimations().map((a) => a.finished) ?? []).then(() => {
+      const hadFocus = document.activeElement === button;
+      setLeaving(false);
+      setDismissed((ids) => new Set([...ids, id]));
+      // The button is gone, so hand focus to the main content rather than dropping it on <body>.
+      if (hadFocus) document.querySelector<HTMLElement>('.gg-main')?.focus({ preventScroll: true });
+    });
   };
 
   return (
     <Show when={banner()} keyed>
       {(b) => (
-        <section class={css.root} aria-label={t().banner.region}>
+        <section class={`${css.root} ${leaving() ? motion.leave : motion.enter}`} aria-label={t().banner.region}>
           <div class={css.body}>
             <p>{inLocale(b.text)}</p>
             <Show when={b.link}>

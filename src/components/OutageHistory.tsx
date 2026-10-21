@@ -1,43 +1,54 @@
-import { batch, type Component, createEffect, createSignal, For, on, Show } from 'solid-js';
+import { batch, type Component, createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
 import { type OutageSummary, outageDurationMs, RECENT_LIMIT } from '../../shared/api';
 import { api } from '../lib/api';
 import { formatDay, formatDuration, formatEnd, formatTime } from '../lib/format';
 import { t } from '../lib/i18n';
 import { pageOf } from '../lib/pages';
+import * as motion from '../styles/motion.css';
 import { button, plainList } from '../styles/ui.css';
 import * as css from './OutageHistory.css';
 
-const OutageList: Component<{ outages: OutageSummary[]; now: number }> = (props) => (
-  <Show when={props.outages.length > 0} fallback={<p class={css.empty}>{t().history.empty}</p>}>
-    <ul class={plainList}>
-      <For each={props.outages}>
-        {(outage) => (
-          <li class={css.row}>
-            <div>
-              <div class={css.primary}>{formatDay(outage.startTime)}</div>
-              <div class={css.secondary}>
-                {t().history.range(
-                  formatTime(outage.startTime),
-                  outage.endTime ? formatEnd(outage.startTime, outage.endTime) : t().history.now,
-                )}
+/** `markArrivals`: an outage a later poll adds slides in; off for pages, where every row is new. */
+const OutageList: Component<{ outages: OutageSummary[]; now: number; markArrivals?: boolean }> = (props) => {
+  let listed: ReadonlySet<number> | undefined;
+  const arrived = createMemo(() => {
+    const ids = props.outages.map((o) => o.id);
+    const before = listed;
+    listed = new Set(ids);
+    return new Set(before && props.markArrivals ? ids.filter((id) => !before.has(id)) : []);
+  });
+  return (
+    <Show when={props.outages.length > 0} fallback={<p class={`${css.empty} ${motion.enter}`}>{t().history.empty}</p>}>
+      <ul class={`${plainList} ${motion.enter}`}>
+        <For each={props.outages}>
+          {(outage) => (
+            <li class={css.row} classList={{ [motion.enter]: arrived().has(outage.id) }}>
+              <div>
+                <div class={css.primary}>{formatDay(outage.startTime)}</div>
+                <div class={css.secondary}>
+                  {t().history.range(
+                    formatTime(outage.startTime),
+                    outage.endTime ? formatEnd(outage.startTime, outage.endTime) : t().history.now,
+                  )}
+                </div>
               </div>
-            </div>
-            <div class={css.end}>
-              <div class={css.primary} classList={{ [css.ongoing]: !outage.endTime }}>
-                {formatDuration(outageDurationMs(outage, props.now))}
+              <div class={css.end}>
+                <div class={css.primary} classList={{ [css.ongoing]: !outage.endTime }}>
+                  {formatDuration(outageDurationMs(outage, props.now))}
+                </div>
+                <div class={css.secondary}>
+                  {[outage.endTime ? '' : t().history.ongoing, outage.planned ? t().history.planned : '']
+                    .filter(Boolean)
+                    .join(' · ') || ' '}
+                </div>
               </div>
-              <div class={css.secondary}>
-                {[outage.endTime ? '' : t().history.ongoing, outage.planned ? t().history.planned : '']
-                  .filter(Boolean)
-                  .join(' · ') || ' '}
-              </div>
-            </div>
-          </li>
-        )}
-      </For>
-    </ul>
-  </Show>
-);
+            </li>
+          )}
+        </For>
+      </ul>
+    </Show>
+  );
+};
 
 interface OutageHistoryProps {
   /** StatusResponse.recent. */
@@ -114,7 +125,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
       when={props.expanded}
       fallback={
         <>
-          <OutageList outages={props.recent} now={props.now} />
+          <OutageList outages={props.recent} now={props.now} markArrivals />
           {failure()}
           {/* A full recent list may not be all of them. */}
           <Show when={props.recent.length >= RECENT_LIMIT}>
