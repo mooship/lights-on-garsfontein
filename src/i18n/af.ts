@@ -59,7 +59,8 @@ export const af = {
     loading: 'Laai tans die huidige status…',
     // `day` is formatRelativeDay's: vandag, gister or "op Sa. 17 Okt.".
     wentOff: (time: string, day: string) => `Die onderbreking het ${day} om ${time} begin.`,
-    planned: (time: string, day: string) => `Die beplande onderbreking het ${day} om ${time} begin.`,
+    planned: (time: string, day: string) =>
+      `Beplande onderbreking wat vooraf aangekondig is. Dit het ${day} om ${time} begin.`,
     noOutages: (date: string) => `Geen onderbrekings sedert die rekord op ${date} begin het nie.`,
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Laaste onderbreking: ${day} van ${from} tot ${to} (${lasted}).`,

@@ -461,9 +461,8 @@ test.describe('public page', () => {
     await expect(page).toHaveTitle(site.brand.full);
     await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
 
-    // Out of touch, nothing changes from one second to the next, so neither do the page or the tab.
-    // Watched from just after a minute starts, as the minute ticking over may rightly change things.
-    await page.clock.runFor(MINUTE_MS + 1_000 - (await page.evaluate(() => Date.now() % 60_000)));
+    // Out of touch, nothing new arrives, so neither the page nor the tab changes: not with the clock's
+    // ticks, the failed status polls, nor a statistics refresh that brings the same figures.
     await page.evaluate(() => {
       const w = window as unknown as { __mutations: number };
       w.__mutations = 0;
@@ -471,7 +470,7 @@ test.describe('public page', () => {
         w.__mutations += records.length;
       }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true });
     });
-    await page.clock.runFor(5_000);
+    await page.clock.runFor(STATS_POLL_MS + MINUTE_MS);
     expect(await page.evaluate(() => (window as unknown as { __mutations: number }).__mutations)).toBe(0);
   });
 
@@ -623,6 +622,59 @@ test.describe('admin', () => {
     await page.getByLabel(admin.ended).fill('2026-10-01T20:30');
     await page.getByRole('button', { name: admin.log }).click();
     await expect(page.getByText(`2 ${en.units.h} 30 ${en.units.min} · ${admin.source.manual}`)).toBeVisible();
+  });
+});
+
+test.describe('planned outages', () => {
+  /** Opens an outage that began five minutes ago, as an admin would log one; returns its id. */
+  async function openOutage(request: APIRequestContext, planned: boolean): Promise<number> {
+    const res = await request.post(ADMIN_OUTAGES_PATH, {
+      headers: ADMIN_API,
+      data: {
+        action: OUTAGE_ACTION.create,
+        startTime: new Date(Date.now() - 5 * MINUTE_MS).toISOString(),
+        endTime: null,
+        isPlanned: planned,
+      },
+    });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { outage: { id: number } }).outage.id;
+  }
+  const badge = (page: Page) => page.locator('[data-status="OFF"]');
+  const history = (page: Page) => page.locator('section', { has: page.locator('#history-heading') });
+
+  for (const locale of LOCALES) {
+    test.describe(locale, () => {
+      test.use({ appLocale: locale });
+
+      test(`read as expected, not as an alarm (${locale})`, async ({ page, request }) => {
+        const m = DICTIONARIES[locale];
+        await openOutage(request, true);
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('status')).toHaveText(m.status.OFF);
+        await expect(badge(page)).toHaveAttribute('data-planned', '');
+        // Calm: no pulsing ring, and the planned tone rather than the outage red.
+        await expect(badge(page).locator('[aria-hidden="true"] span')).toHaveCount(0);
+        await expect(page.getByRole('status')).toHaveCSS('color', rgb(PALETTE.light.planned));
+        // Factual: announced in advance, and when it began.
+        const DAY = '@@DAY@@';
+        const detail = escapeRegExp(m.status.planned(AT, DAY))
+          .replaceAll(escapeRegExp(AT), '\\d\\d:\\d\\d')
+          .replace(escapeRegExp(DAY), `(${m.day.today}|${m.day.yesterday})`);
+        await expect(page.locator('.gg-status-detail > p').first()).toHaveText(new RegExp(`^${detail}$`));
+        await expect(history(page).getByText(m.history.planned, { exact: true })).toBeVisible();
+      });
+    });
+  }
+
+  test('an unplanned outage keeps the alarm', async ({ page, request }) => {
+    await openOutage(request, false);
+    await page.goto('/en/');
+    await expect(page.getByRole('status')).toHaveText(en.status.OFF);
+    await expect(badge(page)).not.toHaveAttribute('data-planned');
+    await expect(badge(page).locator('[aria-hidden="true"] span')).toHaveCount(1);
+    await expect(page.getByRole('status')).toHaveCSS('color', rgb(PALETTE.light.off));
+    await expect(history(page).getByText(en.history.planned, { exact: true })).toHaveCount(0);
   });
 });
 

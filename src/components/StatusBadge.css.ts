@@ -29,11 +29,13 @@ const iconBase = style({
 export const icon = styleVariants({
   ON: [iconBase, { background: vars.color.onSoft, color: vars.color.on }],
   OFF: [iconBase, { background: vars.color.offSoft, color: vars.color.off }],
+  // Announced in advance: calm, and without the pulsing ring.
+  PLANNED: [iconBase, { background: vars.color.plannedSoft, color: vars.color.planned }],
   // No live reading: neutral, so it never reads as a measured "on".
   NONE: [iconBase, { background: vars.color.bg, color: vars.color.muted, border: `1px solid ${vars.color.border}` }],
 });
 
-// Only rendered for OFF.
+// Only rendered for an outage that was not planned.
 export const ring = style({
   position: 'absolute',
   inset: 0,
@@ -54,6 +56,7 @@ export const headline = style({
 export const tone = styleVariants({
   ON: { color: vars.color.on },
   OFF: { color: vars.color.off },
+  PLANNED: { color: vars.color.planned },
   // The longer, neutral headline is smaller so it fits beside the icon on a phone.
   NONE: { color: vars.color.text, fontSize: '1.25rem' },
 });

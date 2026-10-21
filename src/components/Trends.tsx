@@ -69,7 +69,7 @@ function delta(
   };
 }
 
-const Tile: Component<{ label: string; value: JSX.Element; delta?: Delta | null; note?: string }> = (props) => (
+const Tile: Component<{ label: string; value: JSX.Element; delta?: Delta | null; note?: JSX.Element }> = (props) => (
   <div class={css.tile}>
     <div class={css.tileLabel}>{props.label}</div>
     <div class={css.tileValue}>{props.value}</div>
@@ -340,7 +340,11 @@ export const Trends: Component<TrendsProps> = (props) => {
             label={t().trends.outages}
             value={started() ? String(s().outages) : '—'}
             delta={s().plannedOutages === 0 ? delta(s().outages, props.stats.previous30?.outages, String, true) : null}
-            note={s().plannedOutages > 0 ? t().trends.planned(s().plannedOutages) : undefined}
+            note={
+              s().plannedOutages > 0 ? (
+                <span class={css.plannedNote}>{t().trends.planned(s().plannedOutages)}</span>
+              ) : undefined
+            }
           />
           <Tile
             label={t().trends.daysAffected}
@@ -406,18 +410,19 @@ export const Trends: Component<TrendsProps> = (props) => {
             </tr>
           </thead>
           <tbody>
-            <For each={props.stats.weeks.map((w, i) => ({ w, note: weekNote(place(i)) })).reverse()}>
-              {({ w, note }) => (
+            {/* By position, so a refresh with the same figures leaves the rows as they are. */}
+            <Index each={props.stats.weeks.map((w, i) => ({ w, note: weekNote(place(i)) })).reverse()}>
+              {(row) => (
                 <tr>
                   <td class={css.td}>
-                    {formatCalendarDay(w.weekStart)}
-                    {note}
+                    {formatCalendarDay(row().w.weekStart)}
+                    {row().note}
                   </td>
-                  <td class={css.td}>{formatHours(w.hoursOff)}</td>
-                  <td class={css.td}>{w.outages}</td>
+                  <td class={css.td}>{formatHours(row().w.hoursOff)}</td>
+                  <td class={css.td}>{row().w.outages}</td>
                 </tr>
               )}
-            </For>
+            </Index>
           </tbody>
         </table>
         <a class={css.download} href={CSV_PATH} download={CSV_FILE_NAME}>

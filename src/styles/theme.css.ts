@@ -19,6 +19,8 @@ export const vars = createThemeContract({
     offSoft: null,
     offContrast: null,
     chartOff: null,
+    planned: null,
+    plannedSoft: null,
     focus: null,
     shadow: null,
   },
