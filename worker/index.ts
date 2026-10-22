@@ -1,6 +1,7 @@
 import { API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
 import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
+import { claimAlerts, enqueueAlerts } from './lib/alerts';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
 import { errors } from './lib/http';
 import { dispatch, purgeEdgeCache } from './lib/router';
@@ -54,6 +55,7 @@ export default {
       await purgeExpiredSessions(db, now);
     } else {
       if (await detectOutage(db, now)) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);
+      await enqueueAlerts(db, env.PUSH_QUEUE, await claimAlerts(db, now), now);
     }
   },
 } satisfies ExportedHandler<Env>;

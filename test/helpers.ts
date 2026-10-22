@@ -193,9 +193,9 @@ export function asAdmin(path: string, body: unknown): Promise<Response> {
   return call(path, { method: 'POST', body, headers: { Authorization: `Bearer ${env.ADMIN_API_TOKEN}` } });
 }
 
-/** Runs the Worker's scheduled handler, by default as the outage-detection cron. */
-export async function runCron(cron = MINUTE_CRON, scheduledTime = Date.now()): Promise<void> {
-  await worker.scheduled(createScheduledController({ scheduledTime, cron }), env);
+/** Runs the Worker's scheduled handler, by default as the outage-detection cron; `testEnv` swaps bindings, such as a stub queue. */
+export async function runCron(cron = MINUTE_CRON, scheduledTime = Date.now(), testEnv: Env = env): Promise<void> {
+  await worker.scheduled(createScheduledController({ scheduledTime, cron }), testEnv);
 }
 
 /** Outages that are open and not dismissed as false positives. */

@@ -59,6 +59,18 @@ name = "PUSH_LIMITER"
 namespace_id = "4505"
 simple = { limit = 5, period = 60 }
 
+# Push alerts: the minute cron queues pages of subscriptions (worker/lib/alerts.ts) and the
+# queue handler delivers them. One page per batch and no automatic retries: the handler retries
+# itself, up to PUSH_MAX_ATTEMPTS. Create the queue once: npx wrangler queues create lights-on-push
+[[queues.producers]]
+binding = "PUSH_QUEUE"
+queue = "lights-on-push"
+
+[[queues.consumers]]
+queue = "lights-on-push"
+max_batch_size = 1
+max_retries = 0
+
 [triggers]
 # Outage detection every minute; housekeeping (purging expired sessions) hourly.
 # The same as MINUTE_CRON and HOURLY_CRON in worker/crons.ts; change them together.
@@ -129,3 +141,12 @@ simple = { limit = 30, period = 60 }
 name = "PUSH_LIMITER"
 namespace_id = "4515"
 simple = { limit = 10, period = 60 }
+
+[[env.e2e.queues.producers]]
+binding = "PUSH_QUEUE"
+queue = "lights-on-push-e2e"
+
+[[env.e2e.queues.consumers]]
+queue = "lights-on-push-e2e"
+max_batch_size = 1
+max_retries = 0

@@ -1,8 +1,10 @@
+import { and, asc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
 import { HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { localePath } from '../../shared/locale';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n/index';
-import type { Outage } from '../db/schema';
+import type { Db } from '../db/client';
+import { type Outage, outages, pushSubscriptions } from '../db/schema';
 
 export const ALERT_KINDS = ['off', 'on'] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
@@ -56,4 +58,80 @@ export function alertMessage(
     title: push.on.title,
     body: push.on.body(formatTime(outage.endTime, locale), formatLasted(lasted, locale)),
   };
+}
+
+/** How long an outage lasts before it is worth an alert; one that ends sooner stays silent. */
+export const ALERT_DELAY_MS = 5 * MINUTE_MS;
+/** Subscriptions per queue message, so one delivery run stays inside a Worker invocation's limits. */
+export const PUSH_PAGE_SIZE = 40;
+/** How many times one page is tried before it is dropped. */
+export const PUSH_MAX_ATTEMPTS = 3;
+/** The most messages Queues accepts in one `sendBatch`. */
+const QUEUE_BATCH_LIMIT = 100;
+
+export interface AlertClaim {
+  kind: AlertKind;
+  outageId: number;
+}
+
+/** The queue message body: one page of subscription ids to alert about one outage. */
+export interface AlertPage extends AlertClaim {
+  ids: number[];
+  attempt: number;
+  queuedAt: string;
+}
+
+/**
+ * Marks the alerts that are due as sent and returns them, off before on. Each claim is one
+ * conditional UPDATE, so two concurrent runs cannot claim the same alert. A back-on alert needs
+ * the off alert to have been claimed, so nobody hears "power is back" without hearing it went off.
+ */
+export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
+  const claimedAt = now.toISOString();
+  const dueBefore = new Date(now.getTime() - ALERT_DELAY_MS).toISOString();
+  const off = await db
+    .update(outages)
+    .set({ offAlertAt: claimedAt })
+    .where(
+      and(
+        isNull(outages.endTime),
+        eq(outages.isFalsePositive, false),
+        isNull(outages.offAlertAt),
+        lte(outages.startTime, dueBefore),
+      ),
+    )
+    .returning({ id: outages.id });
+  const on = await db
+    .update(outages)
+    .set({ onAlertAt: claimedAt })
+    .where(
+      and(
+        isNotNull(outages.endTime),
+        eq(outages.isFalsePositive, false),
+        isNotNull(outages.offAlertAt),
+        isNull(outages.onAlertAt),
+      ),
+    )
+    .returning({ id: outages.id });
+  return [
+    ...off.map(({ id }) => ({ kind: 'off' as const, outageId: id })),
+    ...on.map(({ id }) => ({ kind: 'on' as const, outageId: id })),
+  ];
+}
+
+/** Queues every subscription, in pages, for each claimed alert. */
+export async function enqueueAlerts(db: Db, queue: Queue<AlertPage>, claims: AlertClaim[], now: Date): Promise<void> {
+  if (claims.length === 0) return;
+  const rows = await db.select({ id: pushSubscriptions.id }).from(pushSubscriptions).orderBy(asc(pushSubscriptions.id));
+  const ids = rows.map(({ id }) => id);
+  const queuedAt = now.toISOString();
+  const messages: MessageSendRequest<AlertPage>[] = [];
+  for (const claim of claims) {
+    for (let start = 0; start < ids.length; start += PUSH_PAGE_SIZE) {
+      messages.push({ body: { ...claim, ids: ids.slice(start, start + PUSH_PAGE_SIZE), attempt: 1, queuedAt } });
+    }
+  }
+  for (let start = 0; start < messages.length; start += QUEUE_BATCH_LIMIT) {
+    await queue.sendBatch(messages.slice(start, start + QUEUE_BATCH_LIMIT));
+  }
 }

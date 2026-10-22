@@ -203,7 +203,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 
 3. **Edit the place copy** in `src/i18n/*.ts` (for example `masthead`, `footer.measured`, `footer.operator` and `scope`) and the `<head>` copy in `src/i18n/head.ts`.
 4. **Review the prose** in `index.html`, `privacy.html`, `404.html` and `templates/` (`llms.txt`, `site.webmanifest`, `.well-known/security.txt`) that names the area or operator. Config values go in as `%site.<path>%` and the start date as `%since.<locale>%`; the build fails on an unknown placeholder.
-5. **Configure Cloudflare**: `cp wrangler.example.toml wrangler.toml` and follow the numbered steps at its top (Worker and database names, `npx wrangler d1 create`, Turnstile widget and hostnames, `SITE_URL`). Each rate limiter's `namespace_id` must be unique in your account. Keep `workers_dev = true`, or uncomment `routes` for a custom domain and set `workers_dev = false` once it is live.
+5. **Configure Cloudflare**: `cp wrangler.example.toml wrangler.toml` and follow the numbered steps at its top (Worker and database names, `npx wrangler d1 create`, Turnstile widget and hostnames, `SITE_URL`). Each rate limiter's `namespace_id` must be unique in your account. Create the queue that power alerts go through once, with `npx wrangler queues create lights-on-push`. Keep `workers_dev = true`, or uncomment `routes` for a custom domain and set `workers_dev = false` once it is live.
 6. **Set the secrets** (`npx wrangler login`, then `npx wrangler secret put <NAME>`):
 
    | Secret | Purpose |
@@ -220,7 +220,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 8. **Regenerate the images**: `npm run og` (social card) and `npm run icons` (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand. The colours come from `src/styles/palette.ts`; files that cannot import it keep copies to change with it: `src/styles/privacy.css`, the theme-color metas in `index.html`, `public/favicon*.svg`, and `background_color` and `theme_color` in `templates/site.webmanifest` (JSON, so it cannot carry a note).
 9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and terms, is written for POPIA and describes this deployment's data handling; `FORKERS` comments mark what to check. Do not use utility or municipal logos, and keep the independence disclaimer.
 
-Two crons run the Worker. Every minute it opens an outage for a silent sensor. Every hour it removes expired sessions.
+Two crons run the Worker. Every minute it opens an outage for a silent sensor, then queues the power alerts that are due (an outage that has lasted `ALERT_DELAY_MS`, set in `worker/lib/alerts.ts`, and the return of one that was alerted). Every hour it removes expired sessions.
 
 ## Extending
 
