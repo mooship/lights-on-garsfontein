@@ -38,7 +38,7 @@ function say(key: Notice) {
   noticeTimer = setTimeout(() => setNotice(null), NOTICE_MS);
 }
 
-export async function refreshAlerts(): Promise<AlertsState> {
+async function refreshAlerts(): Promise<AlertsState> {
   // A browser that cannot say still lets the visitor try; turning on reports any failure.
   const next = await alertsState().catch((): AlertsState => 'off');
   setState(next);
@@ -198,11 +198,9 @@ const Sheet: Component = () => {
   );
 };
 
-/**
- * Mounted once on the public page. `ready` once the status has loaded: the card never offers itself
- * while the page is still arriving, only ALERTS_OFFER_DELAY_MS after, and only as shouldOfferCard allows.
- */
+/** Mounted once on the public page; `ready` once the status has loaded, so the card never offers itself before. */
 export const AlertsCard: Component<{ ready: boolean }> = (props) => {
+  // ALERTS_OFFER_DELAY_MS after the status loads, and only as shouldOfferCard allows.
   let offerTimer: ReturnType<typeof setTimeout> | undefined;
 
   onMount(() => {

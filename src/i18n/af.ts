@@ -159,7 +159,7 @@ export const af = {
         'Maak die webwerf van jou tuisskerm af oop en tik op die klokkie.',
       ],
       blockedHelp:
-        'Kennisgewings vir hierdie webwerf is in jou blaaier geblokkeer. Laat dit in die blaaier se instellings toe en tik dan weer op die klokkie.',
+        'Kennisgewings vir hierdie webwerf is in jou blaaier geblokkeer. Laat kennisgewings in die blaaier se instellings toe, en tik dan weer op die klokkie.',
       unsupported: 'Hierdie blaaier kan nie kennisgewings van die webwerf ontvang nie. Probeer ’n ander blaaier.',
       failed: 'Dit het nie gewerk nie. Probeer asseblief oor ’n rukkie weer.',
       turnedOn: 'Kennisgewings is aangeskakel.',

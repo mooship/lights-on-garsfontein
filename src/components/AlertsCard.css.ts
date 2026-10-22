@@ -61,8 +61,8 @@ export const text = style({ fontSize: '0.9375rem', lineHeight: 1.45 });
 
 export const scope = style({ fontSize: '0.8125rem', lineHeight: 1.45, color: vars.color.muted });
 
-// Underlined like running text; the padding and negative margin make a 44px tap target without
-// changing the line's height.
+// The padding and negative margin make a 44px tap target without changing the line's height. The
+// underline is the global anchor style's.
 export const link = style({
   color: 'inherit',
   display: 'inline-block',

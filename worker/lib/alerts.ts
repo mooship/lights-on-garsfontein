@@ -19,7 +19,8 @@ export interface AlertPayload {
   lang: Locale;
 }
 
-// The Worker cannot import src/lib/format.ts (it reads Solid signals), so this repeats its time format.
+// The Worker cannot import src/lib/format.ts (it reads Solid signals), so this repeats its formatTime;
+// change both together.
 const timeFormats: Partial<Record<Locale, Intl.DateTimeFormat>> = {};
 function formatTime(iso: string, locale: Locale): string {
   timeFormats[locale] ??= new Intl.DateTimeFormat(site.intlLocales[locale], {

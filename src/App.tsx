@@ -242,7 +242,6 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
         </Show>
       </section>
 
-      {/* Fixed over the page, so it shifts nothing. */}
       <AlertsCard ready={data() !== undefined} />
     </>
   );

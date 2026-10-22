@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { MINUTE_MS } from '../shared/api';
-import { LOCALES, localePath } from '../shared/locale';
+import { LOCALES, localePath, nextLocale } from '../shared/locale';
 import { ADMIN_PAGE_PATH, PUSH_SUBSCRIPTION_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
 import { DICTIONARIES } from '../src/i18n';
@@ -225,6 +225,28 @@ for (const locale of LOCALES) {
       await expect(bell(page)).toHaveAttribute('aria-pressed', 'false');
       await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
       await expect(card(page)).not.toBeVisible();
+    });
+
+    test('alerts follow a language switch, but not a step within one language', async ({ page }) => {
+      await fakePush(page, { subscribed: true });
+      const calls = await recordSubscriptionCalls(page);
+      await page.goto(localePath(locale));
+      await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+      await load(page);
+      await expect(bell(page)).toHaveAttribute('aria-pressed', 'true');
+      // Back to an earlier entry of the same page, which is the same language.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) => {
+            history.pushState(null, '', `${location.pathname}#again`);
+            addEventListener('popstate', () => resolve(), { once: true });
+            history.back();
+          }),
+      );
+      const next = nextLocale(locale);
+      await page.getByRole('button', { name: DICTIONARIES[locale].lang.switchTo }).click();
+      await expect.poll(() => calls.length).toBeGreaterThan(0);
+      expect(calls).toEqual([{ method: 'POST', body: expect.objectContaining({ locale: next }) }]);
     });
 
     test('blocked permission shows help', async ({ page }) => {

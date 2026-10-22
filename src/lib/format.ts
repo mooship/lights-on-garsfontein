@@ -16,6 +16,7 @@ function lazyFormat(options: Intl.DateTimeFormatOptions): (date: Date) => string
 }
 
 const dayFormat = lazyFormat({ timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' });
+// formatTime in worker/lib/alerts.ts repeats this format for alerts; change both together.
 const timeFormat = lazyFormat({ timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const dateFormat = lazyFormat({ timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
 const shortDateFormat = lazyFormat({ timeZone: 'UTC', day: 'numeric', month: 'short' });

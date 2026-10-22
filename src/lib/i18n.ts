@@ -32,6 +32,8 @@ export const intlLocale = () => site.intlLocales[locale()];
 export const privacyHref = () => (locale() === DEFAULT_LOCALE ? PRIVACY_PAGE_PATH : `${PRIVACY_PAGE_PATH}#${locale()}`);
 
 function setLocale(next: Locale): void {
+  // Back or forward between entries of one language changes nothing, so it re-saves no alerts.
+  if (next === locale()) return;
   document.documentElement.lang = next;
   setLocaleSignal(next);
   writeStored(STORAGE_KEYS.locale, next);
