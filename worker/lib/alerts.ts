@@ -119,19 +119,45 @@ export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
   ];
 }
 
-/** Queues every subscription, in pages, for each claimed alert. */
+/** Clears a claim, if it is still the one made at `claimedAt`, so the next run claims the alert again. */
+async function releaseClaim(db: Db, { kind, outageId }: AlertClaim, claimedAt: string): Promise<void> {
+  const column = kind === 'off' ? outages.offAlertAt : outages.onAlertAt;
+  await db
+    .update(outages)
+    .set(kind === 'off' ? { offAlertAt: null } : { onAlertAt: null })
+    .where(and(eq(outages.id, outageId), eq(column, claimedAt)));
+}
+
+/**
+ * Queues every subscription, in pages, for each claimed alert. If it fails before any page of a
+ * claim is queued, that claim is released and the error rethrown, so the alert is retried rather
+ * than lost, and an "on" alert never follows an "off" that nobody got. Once a page is queued the
+ * claim stays: some subscribers hearing it beats all of them hearing it twice.
+ */
 export async function enqueueAlerts(db: Db, queue: Queue<AlertPage>, claims: AlertClaim[], now: Date): Promise<void> {
   if (claims.length === 0) return;
-  const rows = await db.select({ id: pushSubscriptions.id }).from(pushSubscriptions).orderBy(asc(pushSubscriptions.id));
-  const ids = rows.map(({ id }) => id);
   const queuedAt = now.toISOString();
-  const messages: MessageSendRequest<AlertPage>[] = [];
-  for (const claim of claims) {
-    for (let start = 0; start < ids.length; start += PUSH_PAGE_SIZE) {
-      messages.push({ body: { ...claim, ids: ids.slice(start, start + PUSH_PAGE_SIZE), attempt: 1, queuedAt } });
+  const queued = new Set<AlertClaim>();
+  try {
+    const rows = await db
+      .select({ id: pushSubscriptions.id })
+      .from(pushSubscriptions)
+      .orderBy(asc(pushSubscriptions.id));
+    const ids = rows.map(({ id }) => id);
+    const messages: { claim: AlertClaim; request: MessageSendRequest<AlertPage> }[] = [];
+    for (const claim of claims) {
+      for (let start = 0; start < ids.length; start += PUSH_PAGE_SIZE) {
+        const body = { ...claim, ids: ids.slice(start, start + PUSH_PAGE_SIZE), attempt: 1, queuedAt };
+        messages.push({ claim, request: { body } });
+      }
     }
-  }
-  for (let start = 0; start < messages.length; start += QUEUE_BATCH_LIMIT) {
-    await queue.sendBatch(messages.slice(start, start + QUEUE_BATCH_LIMIT));
+    for (let start = 0; start < messages.length; start += QUEUE_BATCH_LIMIT) {
+      const slice = messages.slice(start, start + QUEUE_BATCH_LIMIT);
+      await queue.sendBatch(slice.map(({ request }) => request));
+      for (const { claim } of slice) queued.add(claim);
+    }
+  } catch (error) {
+    for (const claim of claims) if (!queued.has(claim)) await releaseClaim(db, claim, queuedAt);
+    throw error;
   }
 }

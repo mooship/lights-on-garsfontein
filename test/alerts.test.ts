@@ -194,6 +194,54 @@ describe('enqueueAlerts', () => {
   });
 });
 
+describe('a failed enqueue', () => {
+  const failing = () => {
+    const sendBatch = vi.fn(async (_messages: Iterable<MessageSendRequest<AlertPage>>) => {
+      throw new Error('queue down');
+    });
+    return { sendBatch } as unknown as Queue<AlertPage>;
+  };
+
+  it('releases an off claim, so the next run claims it again', async () => {
+    const id = await insertOutage({ startTime: ago(ALERT_DELAY_MS) });
+    await seedSubscriptions(3);
+    const claims = await claimAlerts(db(), NOW);
+
+    await expect(enqueueAlerts(db(), failing(), claims, NOW)).rejects.toThrow('queue down');
+
+    expect((await alertColumns(id))?.off_alert_at).toBeNull();
+    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'off', outageId: id }]);
+  });
+
+  it('releases an on claim without touching the off claim', async () => {
+    const id = await insertOutage({ startTime: ago(20 * MINUTE_MS), endTime: ago(MINUTE_MS) });
+    await markOffAlerted(id);
+    await seedSubscriptions(3);
+    const claims = await claimAlerts(db(), NOW);
+
+    await expect(enqueueAlerts(db(), failing(), claims, NOW)).rejects.toThrow('queue down');
+
+    const columns = await alertColumns(id);
+    expect(columns?.on_alert_at).toBeNull();
+    expect(columns?.off_alert_at).not.toBeNull();
+    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'on', outageId: id }]);
+  });
+
+  it('keeps a claim once some of its pages are queued', async () => {
+    const id = await insertOutage({ startTime: ago(ALERT_DELAY_MS) });
+    await seedSubscriptions(4001);
+    const claims = await claimAlerts(db(), NOW);
+    const sendBatch = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('queue down'));
+
+    await expect(enqueueAlerts(db(), { sendBatch } as unknown as Queue<AlertPage>, claims, NOW)).rejects.toThrow(
+      'queue down',
+    );
+
+    expect((await alertColumns(id))?.off_alert_at).toBe(NOW.toISOString());
+    expect(await claimAlerts(db(), NOW)).toEqual([]);
+  });
+});
+
 describe('the minute cron', () => {
   it('enqueues due alerts', async () => {
     await insertOutage({ startTime: ago(ALERT_DELAY_MS) });

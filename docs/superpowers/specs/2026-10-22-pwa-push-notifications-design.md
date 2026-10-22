@@ -124,7 +124,7 @@ So an outage dismissed or closed within the delay never alerts in either directi
 
 ### Sending (queue)
 
-The cron never calls a push service. For each claimed alert it reads the subscription ids, splits them into pages of `PUSH_PAGE_SIZE` (40) and enqueues one message per page, `{ alert: 'off' | 'on', outageId, ids, attempt, queuedAt }`, with `sendBatch` (up to 100 messages per call).
+The cron never calls a push service. For each claimed alert it reads the subscription ids, splits them into pages of `PUSH_PAGE_SIZE` (40) and enqueues one message per page, `{ kind: 'off' | 'on', outageId, ids, attempt, queuedAt }`, with `sendBatch` (up to 100 messages per call).
 
 The Worker's `queue` handler (`max_batch_size = 1`, so one page per invocation, under the Free plan's 50 outbound requests) for each message:
 
