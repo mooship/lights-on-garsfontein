@@ -58,11 +58,18 @@ describe('push subscriptions', () => {
       'https://example.com/x',
       'https://fcm.googleapis.com.evil.com/x',
       'https://push.apple.com.evil/x',
+      'https://other.push.services.mozilla.com/x',
+      'https://user:pw@fcm.googleapis.com/x',
     ]) {
       expect((await subscribe({ endpoint, keys, locale: 'en' })).status, endpoint).toBe(400);
     }
     expect(await rows()).toEqual([]);
-    for (const endpoint of ['https://web.push.apple.com/x', 'https://wns2-par02p.notify.windows.com/x']) {
+    for (const endpoint of [
+      'https://web.push.apple.com/x',
+      'https://api.push.apple.com/x',
+      'https://updates.push.services.mozilla.com/x',
+      'https://wns2-par02p.notify.windows.com/x',
+    ]) {
       expect((await subscribe({ endpoint, keys, locale: 'en' })).status, endpoint).toBe(204);
     }
   });

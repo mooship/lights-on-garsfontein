@@ -16,14 +16,14 @@ import { vapidPublicKey } from '../lib/webpush';
  */
 export const PUSH_HOSTS: readonly string[] = [
   'fcm.googleapis.com',
-  'web.push.apple.com',
-  '.push.services.mozilla.com',
+  'updates.push.services.mozilla.com',
+  '.push.apple.com',
   '.notify.windows.com',
 ];
 
 export function isPushEndpoint(value: string): boolean {
   const url = URL.parse(value);
-  if (url?.protocol !== 'https:' || url.port !== '') return false;
+  if (url?.protocol !== 'https:' || url.port !== '' || url.username || url.password) return false;
   return PUSH_HOSTS.some((host) => (host.startsWith('.') ? url.hostname.endsWith(host) : url.hostname === host));
 }
 
