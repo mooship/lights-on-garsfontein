@@ -1,15 +1,15 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { fromBase64Url, toBase64Url } from '../shared/base64url';
 import { ERROR } from '../shared/errors';
 import { CSV_PATH, OUTAGES_PATH, PUSH_KEY_PATH, PUSH_SUBSCRIPTION_PATH, STATUS_PATH } from '../shared/paths';
-import { fromBase64Url, toBase64Url } from '../worker/lib/crypto';
 import { vapidPublicKey } from '../worker/lib/webpush';
 import { call, insertOutage, ORIGIN, stubLimiter } from './helpers';
+import { RFC8291_RECEIVER_KEYS } from './push-keys';
 
 describe('alert times', () => {
   it('keeps alert times out of the public views', async () => {
-    const id = await insertOutage({});
-    await env.DB.prepare('UPDATE outages SET off_alert_at = ? WHERE id = ?').bind(new Date().toISOString(), id).run();
+    await insertOutage({ offAlertAt: new Date().toISOString() });
 
     const status = await (await call(STATUS_PATH)).text();
     const outages = await (await call(OUTAGES_PATH)).text();
@@ -22,10 +22,7 @@ describe('alert times', () => {
 });
 
 const FCM = 'https://fcm.googleapis.com/fcm/send/abc';
-const keys = {
-  p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
-  auth: 'BTBZMqHH6r4Tts7J_aSIgg',
-};
+const keys = RFC8291_RECEIVER_KEYS;
 
 const subscribe = (
   body: unknown = { endpoint: FCM, keys, locale: 'af' },
@@ -42,14 +39,15 @@ describe('push subscriptions', () => {
 
   it('saves a subscription', async () => {
     const res = await subscribe();
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
     expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(await rows()).toEqual([{ endpoint: FCM, ...keys, locale: 'af' }]);
   });
 
   it('updates rather than duplicates on re-subscribe', async () => {
     await subscribe();
-    expect((await subscribe({ endpoint: FCM, keys, locale: 'en' })).status).toBe(204);
+    expect((await subscribe({ endpoint: FCM, keys, locale: 'en' })).status).toBe(200);
     expect(await rows()).toEqual([{ endpoint: FCM, ...keys, locale: 'en' }]);
   });
 
@@ -71,7 +69,7 @@ describe('push subscriptions', () => {
       'https://updates.push.services.mozilla.com/x',
       'https://wns2-par02p.notify.windows.com/x',
     ]) {
-      expect((await subscribe({ endpoint, keys, locale: 'en' })).status, endpoint).toBe(204);
+      expect((await subscribe({ endpoint, keys, locale: 'en' })).status, endpoint).toBe(200);
     }
   });
 
@@ -102,14 +100,16 @@ describe('push subscriptions', () => {
       expect((await subscribe({ endpoint: FCM, keys: bad, locale: 'en' })).status, JSON.stringify(bad)).toBe(400);
     }
     expect(await rows()).toEqual([]);
-    expect((await subscribe({ endpoint: FCM, keys, locale: 'en' })).status).toBe(204);
+    expect((await subscribe({ endpoint: FCM, keys, locale: 'en' })).status).toBe(200);
   });
 
   it('deletes a subscription, known or not', async () => {
     await subscribe();
-    expect((await unsubscribe(FCM)).status).toBe(204);
+    const res = await unsubscribe(FCM);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
     expect(await rows()).toEqual([]);
-    expect((await unsubscribe('https://fcm.googleapis.com/fcm/send/unknown')).status).toBe(204);
+    expect((await unsubscribe('https://fcm.googleapis.com/fcm/send/unknown')).status).toBe(200);
   });
 
   it('is rate limited', async () => {
@@ -125,7 +125,7 @@ describe('push subscriptions', () => {
     expect((await subscribe(undefined, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(403);
     expect(await rows()).toEqual([]);
     const same = await subscribe(undefined, { headers: { Origin: ORIGIN } });
-    expect(same.status).toBe(204);
+    expect(same.status).toBe(200);
     expect(same.headers.has('Access-Control-Allow-Origin')).toBe(false);
   });
 });

@@ -1,23 +1,22 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { fromBase64Url, toBase64Url } from '../shared/base64url';
 import { site } from '../site.config';
-import { fromBase64Url, toBase64Url } from '../worker/lib/crypto';
 import {
   buildPushRequest,
   encryptPayload,
   PUSH_TTL_SECONDS,
   type PushTarget,
-  vapidAuthorization,
   vapidPublicKey,
+  vapidSigner,
 } from '../worker/lib/webpush';
+import { RFC8291_RECEIVER_KEYS } from './push-keys';
 
 const TEST_JWK: JsonWebKey = JSON.parse(env.VAPID_PRIVATE_KEY);
 
 // RFC 8291 appendix A.
 const RFC = {
   plaintext: 'When I grow up, I want to be a watermelon',
-  receiverPublic: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
-  auth: 'BTBZMqHH6r4Tts7J_aSIgg',
   senderPrivate: 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw',
   senderPublic: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8',
   salt: 'DGv6ra1nlYgDCS1FRnbzlw',
@@ -54,17 +53,16 @@ describe('vapidPublicKey', () => {
 
 describe('web push', () => {
   it("encrypts RFC 8291's example exactly", async () => {
-    const body = await encryptPayload(
-      new TextEncoder().encode(RFC.plaintext),
-      { p256dh: RFC.receiverPublic, auth: RFC.auth },
-      { salt: fromBase64Url(RFC.salt), serverKeys: await senderKeyPair() },
-    );
+    const body = await encryptPayload(new TextEncoder().encode(RFC.plaintext), RFC8291_RECEIVER_KEYS, {
+      salt: fromBase64Url(RFC.salt),
+      serverKeys: await senderKeyPair(),
+    });
     expect(toBase64Url(body)).toBe(RFC.body);
   });
 
   it('signs a VAPID token the public key verifies', async () => {
     const now = Date.UTC(2026, 9, 22, 12, 0, 0);
-    const header = await vapidAuthorization('https://fcm.googleapis.com/fcm/send/x', TEST_JWK, now);
+    const header = await (await vapidSigner(TEST_JWK))('https://fcm.googleapis.com/fcm/send/x', now);
     const match = /^vapid t=([\w-]+)\.([\w-]+)\.([\w-]+), k=([\w-]+)$/.exec(header);
     expect(match).not.toBeNull();
     const [, head, claims, signature, k] = match as RegExpExecArray;
@@ -92,12 +90,9 @@ describe('web push', () => {
   });
 
   it('builds a push request with the delivery headers', async () => {
-    const target: PushTarget = {
-      endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
-      p256dh: RFC.receiverPublic,
-      auth: RFC.auth,
-    };
-    const request = await buildPushRequest(target, { title: 'Power is off' }, TEST_JWK, Date.now());
+    const target: PushTarget = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', ...RFC8291_RECEIVER_KEYS };
+    const authorization = await (await vapidSigner(TEST_JWK))(target.endpoint, Date.now());
+    const request = await buildPushRequest(target, { title: 'Power is off' }, authorization);
     expect(request.method).toBe('POST');
     expect(request.url).toBe(target.endpoint);
     expect(request.headers.get('Content-Encoding')).toBe('aes128gcm');
@@ -106,7 +101,7 @@ describe('web push', () => {
     expect(PUSH_TTL_SECONDS).toBe(3600);
     expect(request.headers.get('Urgency')).toBe('high');
     expect(request.headers.get('Topic')).toBe('power');
-    expect(request.headers.get('Authorization')).toMatch(/^vapid t=/);
+    expect(request.headers.get('Authorization')).toBe(authorization);
     expect((await request.arrayBuffer()).byteLength).toBeGreaterThan(86);
   });
 });

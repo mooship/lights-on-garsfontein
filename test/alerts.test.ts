@@ -9,7 +9,6 @@ import worker from '../worker/index';
 import * as alerts from '../worker/lib/alerts';
 import {
   ALERT_DELAY_MS,
-  ALERT_KINDS,
   type AlertPage,
   alertMessage,
   claimAlerts,
@@ -57,6 +56,12 @@ describe('alertMessage', () => {
     expect(alertMessage('on', whole, 'en').body).toBe(en.push.on.body('16:02', '2 h'));
   });
 
+  it('counts a long outage in hours, not days', () => {
+    const long = { ...off, endTime: '2026-10-23T14:07:00Z' };
+
+    expect(alertMessage('on', long, 'en').body).toBe(en.push.on.body('16:07', '26 h 5 min'));
+  });
+
   it("speaks the subscriber's language", () => {
     const afrikaans = alertMessage('off', off, 'af');
     const english = alertMessage('off', off, 'en');
@@ -83,10 +88,6 @@ describe('alertMessage', () => {
     expect(english.body).toBe('The earlier alert about Garsfontein Ext. 16 was not confirmed.');
     expect(afrikaans.body).toBe('Die vorige waarskuwing oor Garsfontein Uitb. 16 is nie bevestig nie.');
   });
-
-  it('uses one tag', () => {
-    for (const kind of ALERT_KINDS) expect(alertMessage(kind, back, 'en').tag).toBe('power');
-  });
 });
 
 const NOW = new Date('2026-10-22T12:00:00.000Z');
@@ -100,10 +101,8 @@ const alertColumns = async (id: number) =>
     .bind(id)
     .first<{ off_alert_at: string | null; on_alert_at: string | null }>();
 
-/** Sets `off_alert_at` straight in D1, as if the off alert had been claimed earlier. */
-async function markOffAlerted(id: number): Promise<void> {
-  await env.DB.prepare('UPDATE outages SET off_alert_at = ? WHERE id = ?').bind(ago(MINUTE_MS), id).run();
-}
+/** An `offAlertAt` for insertOutage, as if the off alert had been claimed a minute earlier. */
+const OFF_ALERTED = ago(MINUTE_MS);
 
 /** A stub queue; `sendBatch` is a spy. */
 function stubQueue() {
@@ -160,8 +159,11 @@ describe('claimAlerts', () => {
   });
 
   it('claims back on only after off was sent', async () => {
-    const sent = await insertOutage({ startTime: ago(20 * MINUTE_MS), endTime: ago(MINUTE_MS) });
-    await markOffAlerted(sent);
+    const sent = await insertOutage({
+      startTime: ago(20 * MINUTE_MS),
+      endTime: ago(MINUTE_MS),
+      offAlertAt: OFF_ALERTED,
+    });
     await insertOutage({ startTime: ago(3 * MINUTE_MS), endTime: ago(MINUTE_MS) });
 
     expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'on', outageId: sent }]);
@@ -171,8 +173,11 @@ describe('claimAlerts', () => {
 
   it('claims off and back on in one run, off first', async () => {
     const open = await insertOutage({ startTime: ago(2 * ALERT_DELAY_MS) });
-    const closed = await insertOutage({ startTime: ago(30 * MINUTE_MS), endTime: ago(MINUTE_MS) });
-    await markOffAlerted(closed);
+    const closed = await insertOutage({
+      startTime: ago(30 * MINUTE_MS),
+      endTime: ago(MINUTE_MS),
+      offAlertAt: OFF_ALERTED,
+    });
 
     const claims = await claimAlerts(db(), NOW);
 
@@ -181,10 +186,13 @@ describe('claimAlerts', () => {
   });
 
   it('claims dismissed once for a false positive whose off alert was sent', async () => {
-    const open = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1 });
-    const closed = await insertOutage({ startTime: ago(30 * MINUTE_MS), endTime: ago(MINUTE_MS), isFalsePositive: 1 });
-    await markOffAlerted(open);
-    await markOffAlerted(closed);
+    const open = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1, offAlertAt: OFF_ALERTED });
+    const closed = await insertOutage({
+      startTime: ago(30 * MINUTE_MS),
+      endTime: ago(MINUTE_MS),
+      isFalsePositive: 1,
+      offAlertAt: OFF_ALERTED,
+    });
     await insertOutage({ startTime: ago(30 * MINUTE_MS), endTime: ago(MINUTE_MS), isFalsePositive: 1 });
 
     expect(await claimAlerts(db(), NOW)).toEqual([
@@ -196,15 +204,13 @@ describe('claimAlerts', () => {
   });
 
   it('never claims dismissed for an outage that was not dismissed', async () => {
-    const id = await insertOutage({ startTime: ago(DUE_MS) });
-    await markOffAlerted(id);
+    await insertOutage({ startTime: ago(DUE_MS), offAlertAt: OFF_ALERTED });
 
     expect(await claimAlerts(db(), NOW)).toEqual([]);
   });
 
   it('never claims both back on and dismissed for one outage', async () => {
-    const id = await insertOutage({ startTime: ago(30 * MINUTE_MS), endTime: ago(MINUTE_MS) });
-    await markOffAlerted(id);
+    const id = await insertOutage({ startTime: ago(30 * MINUTE_MS), endTime: ago(MINUTE_MS), offAlertAt: OFF_ALERTED });
     expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'on', outageId: id }]);
 
     await env.DB.prepare('UPDATE outages SET is_false_positive = 1 WHERE id = ?').bind(id).run();
@@ -214,10 +220,16 @@ describe('claimAlerts', () => {
 
   it('claims off, then on, then dismissed in one run', async () => {
     const open = await insertOutage({ startTime: ago(2 * ALERT_DELAY_MS) });
-    const dismissed = await insertOutage({ startTime: ago(40 * MINUTE_MS), isFalsePositive: 1 });
-    const closed = await insertOutage({ startTime: ago(30 * MINUTE_MS), endTime: ago(MINUTE_MS) });
-    await markOffAlerted(dismissed);
-    await markOffAlerted(closed);
+    const dismissed = await insertOutage({
+      startTime: ago(40 * MINUTE_MS),
+      isFalsePositive: 1,
+      offAlertAt: OFF_ALERTED,
+    });
+    const closed = await insertOutage({
+      startTime: ago(30 * MINUTE_MS),
+      endTime: ago(MINUTE_MS),
+      offAlertAt: OFF_ALERTED,
+    });
 
     const claims = await claimAlerts(db(), NOW);
 
@@ -275,43 +287,22 @@ describe('a failed enqueue', () => {
     return { sendBatch } as unknown as Queue<AlertPage>;
   };
 
-  it('releases an off claim, so the next run claims it again', async () => {
-    const id = await insertOutage({ startTime: ago(DUE_MS) });
-    await seedSubscriptions(3);
-    const claims = await claimAlerts(db(), NOW);
-
-    await expect(enqueueAlerts(db(), failing(), claims, NOW)).rejects.toThrow('queue down');
-
-    expect((await alertColumns(id))?.off_alert_at).toBeNull();
-    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'off', outageId: id }]);
-  });
-
-  it('releases an on claim without touching the off claim', async () => {
-    const id = await insertOutage({ startTime: ago(20 * MINUTE_MS), endTime: ago(MINUTE_MS) });
-    await markOffAlerted(id);
+  it.each([
+    ['an off', { startTime: ago(DUE_MS) }, 'off'],
+    ['an on', { startTime: ago(20 * MINUTE_MS), endTime: ago(MINUTE_MS), offAlertAt: OFF_ALERTED }, 'on'],
+    ['a dismissed', { startTime: ago(DUE_MS), isFalsePositive: 1, offAlertAt: OFF_ALERTED }, 'dismissed'],
+  ] as const)('releases %s claim, and only it, so the next run claims it again', async (_name, outage, kind) => {
+    const id = await insertOutage(outage);
     await seedSubscriptions(3);
     const claims = await claimAlerts(db(), NOW);
 
     await expect(enqueueAlerts(db(), failing(), claims, NOW)).rejects.toThrow('queue down');
 
     const columns = await alertColumns(id);
-    expect(columns?.on_alert_at).toBeNull();
-    expect(columns?.off_alert_at).not.toBeNull();
-    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'on', outageId: id }]);
-  });
-
-  it('releases a dismissed claim without touching the off claim', async () => {
-    const id = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1 });
-    await markOffAlerted(id);
-    await seedSubscriptions(3);
-    const claims = await claimAlerts(db(), NOW);
-
-    await expect(enqueueAlerts(db(), failing(), claims, NOW)).rejects.toThrow('queue down');
-
-    const columns = await alertColumns(id);
-    expect(columns?.on_alert_at).toBeNull();
-    expect(columns?.off_alert_at).not.toBeNull();
-    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'dismissed', outageId: id }]);
+    expect(kind === 'off' ? columns?.off_alert_at : columns?.on_alert_at).toBeNull();
+    // A follow-up's release leaves the off claim alone.
+    if (kind !== 'off') expect(columns?.off_alert_at).toBe(OFF_ALERTED);
+    expect(await claimAlerts(db(), NOW)).toEqual([{ kind, outageId: id }]);
   });
 
   it('keeps a claim once some of its pages are queued', async () => {
@@ -460,7 +451,7 @@ describe('deliverAlertPage', () => {
     expect(send.mock.calls[0]?.[0].ids).toEqual([id]);
   });
 
-  it('logs a rejected send with the push host and the error, but never the endpoint path', async () => {
+  it('logs a rejected send with the push host and the error name, but never the endpoint path', async () => {
     const outage = await openOutage();
     const id = await insertSubscription('secret-path');
     // Some runtime errors quote the URL they failed on.
@@ -472,26 +463,26 @@ describe('deliverAlertPage', () => {
     const logged = warn.mock.calls.flat().join(' ');
     expect(logged).toContain(PUSH_TEST_HOST);
     expect(logged).toContain('TypeError');
-    expect(logged).toContain('fetch failed');
+    // The message can quote the endpoint, so it is left out.
+    expect(logged).not.toContain('fetch failed');
     expect(logged).not.toContain('secret-path');
   });
 
-  it('logs a failure of our own, such as a bad VAPID key, rather than dropping it silently', async () => {
+  it('drops the page and logs it when the VAPID key is unusable, never the key itself', async () => {
     const outage = await openOutage();
     const id = await insertSubscription('secret-path');
     const fetchSpy = mockPushService(() => 201);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { env: testEnv } = stubPushQueue();
+    const { send, env: testEnv } = stubPushQueue();
+    const badKey = '{"kty":"EC","d":"not-a-key"}';
 
-    await deliverAlertPage(
-      pageFor(outage, [id], { attempt: PUSH_MAX_ATTEMPTS }),
-      { ...testEnv, VAPID_PRIVATE_KEY: '{"kty":"EC"}' },
-      NOW,
-    );
+    await deliverAlertPage(pageFor(outage, [id]), { ...testEnv, VAPID_PRIVATE_KEY: badKey }, NOW);
 
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
     const logged = warn.mock.calls.flat().join(' ');
-    expect(logged).toContain(`Push to ${PUSH_TEST_HOST} failed`);
+    expect(logged).toContain('VAPID key');
+    expect(logged).not.toContain('not-a-key');
     expect(logged).not.toContain('secret-path');
   });
 
@@ -565,9 +556,8 @@ describe('deliverAlertPage', () => {
   });
 
   it('drops an off alert for an outage dismissed meanwhile', async () => {
-    const outage = await openOutage();
+    const outage = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1 });
     const id = await insertSubscription('a');
-    await env.DB.prepare('UPDATE outages SET is_false_positive = 1 WHERE id = ?').bind(outage).run();
     const fetchSpy = mockPushService(() => 201);
 
     await deliverAlertPage(pageFor(outage, [id]), stubPushQueue().env, NOW);
@@ -617,8 +607,7 @@ describe('deliverAlertPage', () => {
   });
 
   it('lets back on follow when a dismissal is undone and the outage later closes', async () => {
-    const outage = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1 });
-    await markOffAlerted(outage);
+    const outage = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1, offAlertAt: OFF_ALERTED });
     const id = await insertSubscription('a');
     const fetchSpy = mockPushService(() => 201);
     const [claim] = await claimAlerts(db(), NOW);
@@ -635,10 +624,12 @@ describe('deliverAlertPage', () => {
   });
 
   it('keeps a newer follow-up claim when a stale dismissed page is dropped', async () => {
-    const outage = await insertOutage({ startTime: ago(DUE_MS), endTime: ago(MINUTE_MS) });
-    await env.DB.prepare('UPDATE outages SET off_alert_at = ?, on_alert_at = ? WHERE id = ?')
-      .bind(ago(2 * MINUTE_MS), ago(MINUTE_MS), outage)
-      .run();
+    const outage = await insertOutage({
+      startTime: ago(DUE_MS),
+      endTime: ago(MINUTE_MS),
+      offAlertAt: ago(2 * MINUTE_MS),
+      onAlertAt: ago(MINUTE_MS),
+    });
     const id = await insertSubscription('a');
     const fetchSpy = mockPushService(() => 201);
 

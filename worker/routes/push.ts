@@ -1,11 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { DAY_MS } from '../../shared/api';
+import { DAY_MS, type PushSubscriptionBody } from '../../shared/api';
+import { fromBase64Url } from '../../shared/base64url';
 import { ERROR } from '../../shared/errors';
 import { PUSH_KEY_PATH, PUSH_SUBSCRIPTION_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { pushSubscriptions } from '../db/schema';
-import { fromBase64Url } from '../lib/crypto';
 import { errors, json, parseBody, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { vapidPublicKey } from '../lib/webpush';
@@ -60,11 +60,9 @@ const subscribeSchema = z.object({
   endpoint,
   keys: z.object({ p256dh, auth }),
   locale: z.enum(site.locales),
-});
+}) satisfies z.ZodType<PushSubscriptionBody>;
 
 const unsubscribeSchema = z.object({ endpoint });
-
-const noContent = () => new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
 
 // The endpoint URL is itself the capability: only its browser and push service know it, so there is
 // no ownership check, and whoever holds it may update or delete its row.
@@ -77,7 +75,7 @@ async function postSubscription({ request, db }: RouteContext): Promise<Response
     .insert(pushSubscriptions)
     .values({ endpoint: parsed.data.endpoint, ...values, createdAt: new Date().toISOString() })
     .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: values });
-  return noContent();
+  return json({ ok: true });
 }
 
 async function deleteSubscription({ request, db }: RouteContext): Promise<Response> {
@@ -85,7 +83,7 @@ async function deleteSubscription({ request, db }: RouteContext): Promise<Respon
   if ('response' in parsed) return parsed.response;
   // Unknown endpoints get the same answer, so the route does not reveal who is subscribed.
   await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, parsed.data.endpoint));
-  return noContent();
+  return json({ ok: true });
 }
 
 function getKey({ env }: RouteContext): Response {

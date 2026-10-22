@@ -1,6 +1,6 @@
 // Imported by both the Worker and the browser bundle, so nothing here may depend on either runtime.
 
-import { site } from '../site.config';
+import { type Locale, site } from '../site.config';
 
 // Public responses deliberately never say how an outage was recorded (sensor or by hand);
 // only the admin API exposes `source`.
@@ -118,6 +118,19 @@ export interface StatsResponse {
   /** Minutes without power in each local clock hour over `last30`'s window: 24 entries, index 0 is 00:00 to 01:00. */
   last30ByHour: number[];
   generatedAt: string;
+}
+
+/** A browser's push subscription, as the app sends it to PUSH_SUBSCRIPTION_PATH (shared/paths.ts). */
+export interface PushSubscriptionBody {
+  endpoint: string;
+  keys: {
+    /** Base64url, the subscription's receiver public key. */
+    p256dh: string;
+    /** Base64url, the subscription's auth secret. */
+    auth: string;
+  };
+  /** The language the alerts are written in. */
+  locale: Locale;
 }
 
 export const MINUTE_MS = 60_000;

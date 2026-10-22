@@ -1,14 +1,9 @@
-import { HOUR_MS } from '../../shared/api';
+import { HOUR_MS, type PushSubscriptionBody } from '../../shared/api';
+import { fromBase64Url, toBase64Url } from '../../shared/base64url';
 import { site } from '../../site.config';
-import { fromBase64Url, toBase64Url } from './crypto';
 
-export interface PushTarget {
-  endpoint: string;
-  /** Base64url, the subscription's receiver public key. */
-  p256dh: string;
-  /** Base64url, the subscription's auth secret. */
-  auth: string;
-}
+/** Where a push goes and the keys it is encrypted to, as a subscription row stores them. */
+export type PushTarget = Pick<PushSubscriptionBody, 'endpoint'> & PushSubscriptionBody['keys'];
 
 /** How long a push service may hold a message for an offline device; a stale outage alert misleads. */
 export const PUSH_TTL_SECONDS = 3600;
@@ -32,13 +27,14 @@ function concat(...parts: Uint8Array[]): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+const hkdfKey = (ikm: Uint8Array<ArrayBuffer>) => crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+
 async function hkdf(
+  key: CryptoKey,
   salt: Uint8Array,
-  ikm: Uint8Array,
   info: Uint8Array,
   bytes: number,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
   return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, bytes * 8));
 }
 
@@ -71,9 +67,13 @@ export async function encryptPayload(
   );
 
   const keyInfo = concat(encoder.encode('WebPush: info\0'), receiverPublic, serverPublic);
-  const ikm = await hkdf(fromBase64Url(target.auth), sharedSecret, keyInfo, 32);
-  const cek = await hkdf(salt, ikm, encoder.encode('Content-Encoding: aes128gcm\0'), 16);
-  const nonce = await hkdf(salt, ikm, encoder.encode('Content-Encoding: nonce\0'), 12);
+  const ikm = await hkdf(await hkdfKey(sharedSecret), fromBase64Url(target.auth), keyInfo, 32);
+  // Both come from the same input key, so it is imported once.
+  const prk = await hkdfKey(ikm);
+  const [cek, nonce] = await Promise.all([
+    hkdf(prk, salt, encoder.encode('Content-Encoding: aes128gcm\0'), 16),
+    hkdf(prk, salt, encoder.encode('Content-Encoding: nonce\0'), 12),
+  ]);
 
   const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
   const record = new Uint8Array(
@@ -119,19 +119,8 @@ export async function vapidSigner(privateJwk: JsonWebKey): Promise<VapidSigner> 
   };
 }
 
-/** The `Authorization` header value of RFC 8292 for the push service at `endpoint`; `now` is in milliseconds. */
-export async function vapidAuthorization(endpoint: string, privateJwk: JsonWebKey, now: number): Promise<string> {
-  return (await vapidSigner(privateJwk))(endpoint, now);
-}
-
-/** A ready-to-send push request; `now` is in milliseconds, and `authorization`, if given, is reused rather than signed again. */
-export async function buildPushRequest(
-  target: PushTarget,
-  payload: object,
-  privateJwk: JsonWebKey,
-  now: number,
-  authorization?: string,
-): Promise<Request> {
+/** A ready-to-send push request; `authorization` is a VapidSigner's value for the endpoint's push service. */
+export async function buildPushRequest(target: PushTarget, payload: object, authorization: string): Promise<Request> {
   const body = await encryptPayload(encoder.encode(JSON.stringify(payload)), target);
   return new Request(target.endpoint, {
     method: 'POST',
@@ -143,7 +132,7 @@ export async function buildPushRequest(
       Urgency: 'high',
       // A newer message with the same topic replaces one a push service still holds.
       Topic: 'power',
-      Authorization: authorization ?? (await vapidAuthorization(target.endpoint, privateJwk, now)),
+      Authorization: authorization,
     },
     body,
   });

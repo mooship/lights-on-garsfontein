@@ -22,9 +22,9 @@ body:json {
 
 tests {
   // This folder is not in `public`: `npm run test:api:prod` runs `public` only, and must never store a subscription in production.
-  test('204 with no body, not cached, closed to other sites', () => {
-    expect(res.getStatus()).to.equal(204);
-    expect(res.getBody()).to.equal('');
+  test('200 ok, not cached, closed to other sites', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.deep.equal({ ok: true });
     expect(res.getHeader('cache-control')).to.equal('no-store');
     expect(res.getHeader('access-control-allow-origin')).to.equal(undefined);
   });

@@ -1,5 +1,6 @@
 import { and, asc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
-import { HOUR_MS, MINUTE_MS } from '../../shared/api';
+import { MINUTE_MS } from '../../shared/api';
+import { formatDurationIn, formatTimeOfDay } from '../../shared/format';
 import { localePath } from '../../shared/locale';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n/index';
@@ -7,8 +8,7 @@ import type { Db } from '../db/client';
 import { type Outage, outages, pushSubscriptions } from '../db/schema';
 
 /** `dismissed` follows an `off` for an outage later found to be a false positive, replacing it on screen. */
-export const ALERT_KINDS = ['off', 'on', 'dismissed'] as const;
-export type AlertKind = (typeof ALERT_KINDS)[number];
+export type AlertKind = 'off' | 'on' | 'dismissed';
 
 /** What the service worker shows; `tag` is one value so a newer alert replaces the one on screen. */
 export interface AlertPayload {
@@ -19,27 +19,7 @@ export interface AlertPayload {
   lang: Locale;
 }
 
-// The Worker cannot import src/lib/format.ts (it reads Solid signals), so this repeats its formatTime;
-// change both together.
-const timeFormats: Partial<Record<Locale, Intl.DateTimeFormat>> = {};
-function formatTime(iso: string, locale: Locale): string {
-  timeFormats[locale] ??= new Intl.DateTimeFormat(site.intlLocales[locale], {
-    timeZone: site.timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  });
-  return timeFormats[locale].format(new Date(iso));
-}
-
-/** "2 h 13 min", "2 h" or "7 min": an alert needs no seconds or days. */
-function formatLasted(ms: number, locale: Locale): string {
-  const { h, min } = DICTIONARIES[locale].units;
-  const hours = Math.floor(ms / HOUR_MS);
-  const minutes = Math.floor((ms % HOUR_MS) / MINUTE_MS);
-  if (hours === 0) return `${minutes} ${min}`;
-  return minutes === 0 ? `${hours} ${h}` : `${hours} ${h} ${minutes} ${min}`;
-}
+const formatTime = (iso: string, locale: Locale) => formatTimeOfDay(iso, site.intlLocales[locale]);
 
 /** The alert for `outage` in the subscriber's language; an `on` alert needs a closed outage. */
 export function alertMessage(
@@ -47,7 +27,7 @@ export function alertMessage(
   outage: Pick<Outage, 'startTime' | 'endTime' | 'isPlanned'>,
   locale: Locale,
 ): AlertPayload {
-  const { push } = DICTIONARIES[locale];
+  const { push, units } = DICTIONARIES[locale];
   const base = { tag: 'power', url: `${site.url}${localePath(locale)}`, lang: locale } as const;
   if (kind === 'off') {
     const { title, body } = outage.isPlanned ? push.planned : push.off;
@@ -55,12 +35,12 @@ export function alertMessage(
   }
   if (kind === 'dismissed') return { ...base, ...push.dismissed };
   if (!outage.endTime) throw new Error('An on alert needs an outage that has ended');
-  const lasted = Date.parse(outage.endTime) - Date.parse(outage.startTime);
-  return {
-    ...base,
-    title: push.on.title,
-    body: push.on.body(formatTime(outage.endTime, locale), formatLasted(lasted, locale)),
-  };
+  // "2 h 13 min", "26 h" or "7 min": an alert needs no seconds or days.
+  const lasted = formatDurationIn(Date.parse(outage.endTime) - Date.parse(outage.startTime), units, {
+    days: false,
+    seconds: false,
+  });
+  return { ...base, title: push.on.title, body: push.on.body(formatTime(outage.endTime, locale), lasted) };
 }
 
 /**
@@ -89,43 +69,45 @@ export interface AlertPage extends AlertClaim {
 }
 
 /**
- * Marks the alerts that are due as sent and returns them: off, then on, then dismissed. Each claim
- * is one conditional UPDATE, so two concurrent runs cannot claim the same alert. A back-on or
- * dismissed alert needs the off alert to have been claimed, so nobody hears a follow-up to an alert
- * they never got. Both follow-ups set `onAlertAt`, so an outage gets one or the other, never both.
+ * Marks the alerts that are due as sent and returns them: off, then on, then dismissed. Each kind
+ * is one conditional UPDATE, all three in one batch, so two concurrent runs cannot claim the same
+ * alert. A back-on or dismissed alert needs the off alert to have been claimed, so nobody hears a
+ * follow-up to an alert they never got. Both follow-ups set `onAlertAt`, so an outage gets one or the other, never both.
  */
 export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
   const claimedAt = now.toISOString();
   const dueBefore = new Date(now.getTime() - ALERT_DELAY_MS).toISOString();
-  const off = await db
-    .update(outages)
-    .set({ offAlertAt: claimedAt })
-    .where(
-      and(
-        isNull(outages.endTime),
-        eq(outages.isFalsePositive, false),
-        isNull(outages.offAlertAt),
-        lte(outages.startTime, dueBefore),
-      ),
-    )
-    .returning({ id: outages.id });
-  const on = await db
-    .update(outages)
-    .set({ onAlertAt: claimedAt })
-    .where(
-      and(
-        isNotNull(outages.endTime),
-        eq(outages.isFalsePositive, false),
-        isNotNull(outages.offAlertAt),
-        isNull(outages.onAlertAt),
-      ),
-    )
-    .returning({ id: outages.id });
-  const dismissed = await db
-    .update(outages)
-    .set({ onAlertAt: claimedAt })
-    .where(and(eq(outages.isFalsePositive, true), isNotNull(outages.offAlertAt), isNull(outages.onAlertAt)))
-    .returning({ id: outages.id });
+  const [off, on, dismissed] = await db.batch([
+    db
+      .update(outages)
+      .set({ offAlertAt: claimedAt })
+      .where(
+        and(
+          isNull(outages.endTime),
+          eq(outages.isFalsePositive, false),
+          isNull(outages.offAlertAt),
+          lte(outages.startTime, dueBefore),
+        ),
+      )
+      .returning({ id: outages.id }),
+    db
+      .update(outages)
+      .set({ onAlertAt: claimedAt })
+      .where(
+        and(
+          isNotNull(outages.endTime),
+          eq(outages.isFalsePositive, false),
+          isNotNull(outages.offAlertAt),
+          isNull(outages.onAlertAt),
+        ),
+      )
+      .returning({ id: outages.id }),
+    db
+      .update(outages)
+      .set({ onAlertAt: claimedAt })
+      .where(and(eq(outages.isFalsePositive, true), isNotNull(outages.offAlertAt), isNull(outages.onAlertAt)))
+      .returning({ id: outages.id }),
+  ]);
   return [
     ...off.map(({ id }) => ({ kind: 'off' as const, outageId: id })),
     ...on.map(({ id }) => ({ kind: 'on' as const, outageId: id })),
@@ -135,11 +117,11 @@ export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
 
 /** Clears a claim, if it is still the one made at `claimedAt`, so the next run claims the alert again. */
 export async function releaseClaim(db: Db, { kind, outageId }: AlertClaim, claimedAt: string): Promise<void> {
-  const column = kind === 'off' ? outages.offAlertAt : outages.onAlertAt;
+  const field = kind === 'off' ? 'offAlertAt' : 'onAlertAt';
   await db
     .update(outages)
-    .set(kind === 'off' ? { offAlertAt: null } : { onAlertAt: null })
-    .where(and(eq(outages.id, outageId), eq(column, claimedAt)));
+    .set({ [field]: null })
+    .where(and(eq(outages.id, outageId), eq(outages[field], claimedAt)));
 }
 
 /**
