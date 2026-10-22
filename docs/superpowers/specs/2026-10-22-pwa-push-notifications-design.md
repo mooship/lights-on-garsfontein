@@ -91,7 +91,7 @@ Both use one tag (`power`), so "back on" replaces "off" in the tray. No text nam
 ### Keys
 
 - VAPID key pair. The private key is a new Wrangler secret, `VAPID_PRIVATE_KEY` (JWK), added to `.dev.vars.example` in order, with a test key the e2e run uses.
-- The public key is not secret and is deployment identity, so it lives in `site.config.ts`, which the app and the Worker both read.
+- The public key is derived from the secret and served at `GET /api/push/key` (`PUSH_KEY_PATH`), so the test and production key pairs stay separate and no key is in the repo.
 - `npm run vapid-keys` (`scripts/vapid-keys.ts`, WebCrypto only) prints a new pair.
 - The VAPID `sub` claim is the site URL, keeping `CONTACT_EMAIL` secret.
 
