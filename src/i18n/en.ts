@@ -118,4 +118,15 @@ export const en = {
       'The figures cover only outages recorded at the measuring point.',
     ],
   },
+  push: {
+    off: { title: 'Power is off', body: (time: string) => `No power in Garsfontein Ext 16 since ${time}.` },
+    planned: {
+      title: 'Planned outage',
+      body: (time: string) => `Started at ${time}, announced in advance.`,
+    },
+    on: {
+      title: 'Power is back on',
+      body: (time: string, duration: string) => `Back at ${time} after ${duration}.`,
+    },
+  },
 } satisfies Messages;

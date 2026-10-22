@@ -10,6 +10,8 @@
   },
   "include": [
     "worker",
-    "shared"
+    "shared",
+    "src/i18n",
+    "site.config.ts"
   ]
 }
