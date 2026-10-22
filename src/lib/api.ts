@@ -15,10 +15,13 @@ import {
   LOGIN_PATH,
   LOGOUT_PATH,
   OUTAGES_PATH,
+  PUSH_KEY_PATH,
+  PUSH_SUBSCRIPTION_PATH,
   STATS_PATH,
   STATUS_PATH,
   TIMER_PATH,
 } from '../../shared/paths';
+import type { Locale } from '../../site.config';
 
 /** A non-2xx reply: `code` is the body's ErrorCode, or `http_<status>` when it has none. */
 export class ApiError extends Error {
@@ -48,6 +51,7 @@ async function request<T>(
   });
   const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
   if (!res.ok) throw new ApiError(res.status, body?.error ?? `http_${res.status}`);
+  if (res.status === 204) return undefined as T; // no content to validate
   if (body === undefined || !valid(body)) throw new ApiError(res.status, INVALID_RESPONSE);
   return body as T;
 }
@@ -72,6 +76,9 @@ const isStats = (b: unknown) =>
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 
+/** A browser's push subscription as the Worker stores it. */
+export type PushSubscriptionBody = { endpoint: string; keys: { p256dh: string; auth: string }; locale: Locale };
+
 /** The app's calls to the Worker; each rejects with ApiError on a non-2xx reply. */
 export const api = {
   status: () => request<StatusResponse>(STATUS_PATH, undefined, isStatus),
@@ -80,6 +87,11 @@ export const api = {
   contact: (token: string) => post<{ email: string }>(CONTACT_PATH, { token }),
   login: (username: string, password: string, token: string) =>
     post<{ ok: true }>(LOGIN_PATH, { username, password, token }),
+  pushKey: () =>
+    request<{ publicKey: string }>(PUSH_KEY_PATH, undefined, (b) => isRecord(b) && typeof b.publicKey === 'string'),
+  subscribePush: (subscription: PushSubscriptionBody) => post<void>(PUSH_SUBSCRIPTION_PATH, subscription),
+  unsubscribePush: (endpoint: string) =>
+    request<void>(PUSH_SUBSCRIPTION_PATH, { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
   logout: () => post<{ ok: true }>(LOGOUT_PATH),
   outages: () => request<AdminOutagesResponse>(ADMIN_OUTAGES_PATH),
   punch: (action: TimerAction) => post(TIMER_PATH, { action }),

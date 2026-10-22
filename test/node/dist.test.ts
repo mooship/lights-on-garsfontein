@@ -71,10 +71,12 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  // sw.js only receives pushes (above); the app never registers a service worker.
-  it('never registers a service worker', () => {
+  // The admin page runs the same bundle, so the `!isAdmin` guard in src/index.tsx keeps it from registering.
+  it('registers /sw.js from the public bundle', () => {
     const scripts = readdirSync(resolve(DIST, 'assets')).filter((name) => name.endsWith('.js'));
-    expect(scripts.length).toBeGreaterThan(0);
-    for (const name of scripts) expect(read(`assets/${name}`), name).not.toContain('serviceWorker');
+    // The path is a shared constant, so it can sit in another chunk than the call.
+    const bundle = scripts.map((name) => read(`assets/${name}`)).join('\n');
+    expect(bundle).toContain('serviceWorker.register(');
+    expect(bundle).toMatch(/[`'"]\/sw\.js[`'"]/);
   });
 });

@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js';
 import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from '../../shared/locale';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../i18n';
+import { resaveAlerts } from './push';
 import { STORAGE_KEYS, writeStored } from './storage';
 
 const isLocale = (value: string | null): value is Locale => LOCALES.includes(value as Locale);
@@ -30,6 +31,9 @@ function setLocale(next: Locale): void {
   document.documentElement.lang = next;
   setLocaleSignal(next);
   writeStored(STORAGE_KEYS.locale, next);
+  resaveAlerts(next).catch(() => {
+    // The alerts keep their earlier language; the next switch or turning them on saves it again.
+  });
 }
 
 /**

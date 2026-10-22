@@ -10,6 +10,12 @@ export const STORAGE_KEYS = {
   locale: 'locale',
   /** sessionStorage: when a missing chunk last reloaded the page (src/index.tsx). */
   chunkReload: 'chunk-reload',
+  /** How many page loads this browser has made (src/lib/push.ts); the alerts card waits for a second. */
+  visits: 'visits',
+  /** Epoch ms before which the alerts card stays hidden after the visitor snoozes it. */
+  alertsSnoozedUntil: 'alerts-snoozed-until',
+  /** Set (any value) once the visitor has said no to the alerts card for good. */
+  alertsDeclined: 'alerts-declined',
 } as const;
 
 /** Stored (any value) once the visitor has closed the banner with this id. */

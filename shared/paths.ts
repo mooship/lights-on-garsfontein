@@ -29,6 +29,8 @@ export const SECURITY_TXT_PATH = '/.well-known/security.txt';
 /** The boot script in index.html repeats this as a literal (it must stay static); change both together. */
 export const ADMIN_PAGE_PATH = '/admin';
 export const PRIVACY_PAGE_PATH = '/privacy';
+/** The push-only service worker in public/, registered by src/lib/push.ts at scope '/'. */
+export const SERVICE_WORKER_PATH = '/sw.js';
 
 /**
  * Worker routes outside API_PREFIX. wrangler.toml and wrangler.example.toml list them again in
