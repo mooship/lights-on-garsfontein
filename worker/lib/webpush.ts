@@ -93,9 +93,10 @@ export async function encryptPayload(
 
 /** The uncompressed P-256 point (`0x04 || x || y`) in base64url, which is what a browser's `applicationServerKey` takes. */
 export function vapidPublicKey(privateJwk: JsonWebKey): string {
-  return toBase64Url(
-    concat(new Uint8Array([0x04]), fromBase64Url(privateJwk.x ?? ''), fromBase64Url(privateJwk.y ?? '')),
-  );
+  const { x, y } = privateJwk;
+  // A malformed key would otherwise yield a plausible-looking string that no browser can subscribe with.
+  if (!x || !y) throw new Error('VAPID key has no public coordinates');
+  return toBase64Url(concat(new Uint8Array([0x04]), fromBase64Url(x), fromBase64Url(y)));
 }
 
 /** The `Authorization` header value of RFC 8292 for the push service at `endpoint`; `now` is in milliseconds. */

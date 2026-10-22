@@ -45,6 +45,13 @@ function decodePart(part: string): Record<string, unknown> {
   return JSON.parse(new TextDecoder().decode(fromBase64Url(part)));
 }
 
+describe('vapidPublicKey', () => {
+  it('throws on a key without its public coordinates', () => {
+    expect(() => vapidPublicKey({ ...TEST_JWK, x: undefined })).toThrow();
+    expect(() => vapidPublicKey({ ...TEST_JWK, y: undefined })).toThrow();
+  });
+});
+
 describe('web push', () => {
   it("encrypts RFC 8291's example exactly", async () => {
     const body = await encryptPayload(

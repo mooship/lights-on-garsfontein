@@ -46,7 +46,7 @@ migrations_dir = "drizzle"
 # Workers Rate Limiting API. Each namespace_id is a positive integer that must be unique in your
 # account: change these if another Worker there already uses them.
 #
-# Per-connection limit on the public reads: status, statistics, CSV and feed.
+# Per-connection limit on the public reads: status, statistics, CSV, feed and the push key.
 [[ratelimits]]
 name = "STATUS_LIMITER"
 namespace_id = "4501"
@@ -69,6 +69,12 @@ simple = { limit = 5, period = 60 }
 name = "LOGIN_GLOBAL_LIMITER"
 namespace_id = "4504"
 simple = { limit = 30, period = 60 }
+
+# Per-connection limit on push alert subscriptions (/api/push/subscription), the same as CONTACT_LIMITER.
+[[ratelimits]]
+name = "PUSH_LIMITER"
+namespace_id = "4505"
+simple = { limit = 5, period = 60 }
 
 [triggers]
 # Outage detection every minute; housekeeping (purging expired sessions) hourly.
@@ -135,3 +141,8 @@ simple = { limit = 5, period = 60 }
 name = "LOGIN_GLOBAL_LIMITER"
 namespace_id = "4514"
 simple = { limit = 30, period = 60 }
+
+[[env.e2e.ratelimits]]
+name = "PUSH_LIMITER"
+namespace_id = "4515"
+simple = { limit = 10, period = 60 }

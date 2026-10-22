@@ -1,0 +1,24 @@
+meta {
+  name: push-unsubscribe
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/api/push/subscription
+  body: json
+}
+
+body:json {
+  {
+    "endpoint": "https://fcm.googleapis.com/fcm/send/bruno-test"
+  }
+}
+
+tests {
+  test('204 with no body, not cached', () => {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody()).to.equal('');
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+  });
+}

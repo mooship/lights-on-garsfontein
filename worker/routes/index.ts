@@ -3,6 +3,7 @@ import { adminRoutes } from './admin';
 import { authRoutes } from './auth';
 import { contactRoutes } from './contact';
 import { historyRoutes } from './history';
+import { pushRoutes } from './push';
 import { seoRoutes } from './seo';
 import { statusRoutes } from './status';
 
@@ -14,4 +15,5 @@ export const routes: Routes = {
   ...adminRoutes,
   ...seoRoutes,
   ...contactRoutes,
+  ...pushRoutes,
 };

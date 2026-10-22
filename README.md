@@ -31,17 +31,20 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
 | `POST /api/contact` | The privacy contact address | `no-store` | 5/min; Turnstile |
+| `GET /api/push/key` | The public key (`publicKey`, base64url) that a browser subscribes to power alerts with; `404` with `not_configured` while the key is unset | `max-age=86400` | Shared 60/min |
+| `POST`/`DELETE /api/push/subscription` | Saves or removes a browser's power alert subscription; `204` | `no-store` | 5/min |
 | `POST /api/heartbeat` | Sensor check-in, with an optional `{ "poweredFor" }` ([Sensor](#sensor)) | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/heartbeat/pause` | Pauses outage detection | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
-- "Shared 60/min" is one limit per connection across those five endpoints, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
+- "Shared 60/min" is one limit per connection across those five endpoints and `GET /api/push/key`, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` and the push subscription writes each have their own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
 - A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt.
 - Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.
 - Only the admin API exposes an outage's `source`.
 - `POST /api/contact` takes `{ "token" }`, a Turnstile token solved for the `contact` action, and answers `200` with `{ "email" }`, or `404` with `not_configured`.
+- `POST /api/push/subscription` takes `{ "endpoint", "keys": { "p256dh", "auth" }, "locale" }` from a browser's push subscription and stores exactly those four values, with the time it was saved; subscribing again with the same `endpoint` replaces the keys and language. The `endpoint` must be an `https` address on a push service's host (`PUSH_HOSTS` in `worker/routes/push.ts`), or the answer is `400`. `DELETE` takes `{ "endpoint" }` and answers `204` whether or not it was stored. Nothing that identifies the visitor is stored beyond the subscription itself.
 
 ### CSV contract
 
