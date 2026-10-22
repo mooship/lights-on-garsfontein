@@ -77,6 +77,8 @@ describe('alertMessage', () => {
 const NOW = new Date('2026-10-22T12:00:00.000Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
 const db = () => createDb(env.DB);
+/** An open outage that is clearly due for its off alert, not one sitting on the ALERT_DELAY_MS boundary. */
+const DUE_MS = ALERT_DELAY_MS + MINUTE_MS;
 
 const alertColumns = async (id: number) =>
   env.DB.prepare('SELECT off_alert_at, on_alert_at FROM outages WHERE id = ?')
@@ -108,24 +110,27 @@ const sentBodies = (sendBatch: ReturnType<typeof stubQueue>['sendBatch']) =>
 
 describe('claimAlerts', () => {
   it('claims off once the outage is ALERT_DELAY_MS old', async () => {
-    const id = await insertOutage({ startTime: ago(ALERT_DELAY_MS - MINUTE_MS) });
+    // Literal minutes on purpose: this pins the delay the owner chose, so changing it fails here.
+    const id = await insertOutage({ startTime: ago(9 * MINUTE_MS) });
     expect(await claimAlerts(db(), NOW)).toEqual([]);
 
-    await env.DB.prepare('UPDATE outages SET start_time = ? WHERE id = ?').bind(ago(ALERT_DELAY_MS), id).run();
+    await env.DB.prepare('UPDATE outages SET start_time = ? WHERE id = ?')
+      .bind(ago(10 * MINUTE_MS), id)
+      .run();
 
     expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'off', outageId: id }]);
     expect((await alertColumns(id))?.off_alert_at).toBe(NOW.toISOString());
   });
 
   it('claims each alert once', async () => {
-    await insertOutage({ startTime: ago(ALERT_DELAY_MS) });
+    await insertOutage({ startTime: ago(DUE_MS) });
 
     expect(await claimAlerts(db(), NOW)).toHaveLength(1);
     expect(await claimAlerts(db(), NOW)).toEqual([]);
   });
 
   it('claims at most once across concurrent calls', async () => {
-    await insertOutage({ startTime: ago(ALERT_DELAY_MS) });
+    await insertOutage({ startTime: ago(DUE_MS) });
 
     const claims = await Promise.all([claimAlerts(db(), NOW), claimAlerts(db(), NOW)]);
 
@@ -133,7 +138,7 @@ describe('claimAlerts', () => {
   });
 
   it('never claims a false positive', async () => {
-    await insertOutage({ startTime: ago(ALERT_DELAY_MS), isFalsePositive: 1 });
+    await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1 });
     await insertOutage({ startTime: ago(2 * ALERT_DELAY_MS), endTime: ago(ALERT_DELAY_MS), isFalsePositive: 1 });
 
     expect(await claimAlerts(db(), NOW)).toEqual([]);
@@ -208,7 +213,7 @@ describe('a failed enqueue', () => {
   };
 
   it('releases an off claim, so the next run claims it again', async () => {
-    const id = await insertOutage({ startTime: ago(ALERT_DELAY_MS) });
+    const id = await insertOutage({ startTime: ago(DUE_MS) });
     await seedSubscriptions(3);
     const claims = await claimAlerts(db(), NOW);
 
@@ -233,7 +238,7 @@ describe('a failed enqueue', () => {
   });
 
   it('keeps a claim once some of its pages are queued', async () => {
-    const id = await insertOutage({ startTime: ago(ALERT_DELAY_MS) });
+    const id = await insertOutage({ startTime: ago(DUE_MS) });
     await seedSubscriptions(4001);
     const claims = await claimAlerts(db(), NOW);
     const sendBatch = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('queue down'));
@@ -249,7 +254,7 @@ describe('a failed enqueue', () => {
 
 describe('the minute cron', () => {
   it('enqueues due alerts', async () => {
-    await insertOutage({ startTime: ago(ALERT_DELAY_MS) });
+    await insertOutage({ startTime: ago(DUE_MS) });
     await seedSubscriptions(1);
     const { queue, sendBatch } = stubQueue();
 
@@ -272,7 +277,7 @@ describe('deliverAlertPage', () => {
     queuedAt: NOW.toISOString(),
     ...overrides,
   });
-  const openOutage = () => insertOutage({ startTime: ago(10 * MINUTE_MS) });
+  const openOutage = () => insertOutage({ startTime: ago(DUE_MS) });
   const remainingIds = async () =>
     (await env.DB.prepare('SELECT id FROM push_subscriptions ORDER BY id').all<{ id: number }>()).results.map(
       ({ id }) => id,
@@ -530,7 +535,7 @@ describe('deliverAlertPage', () => {
 
 describe('the queue handler', () => {
   it('delivers each message, then acks it', async () => {
-    const outage = await insertOutage({ startTime: ago(10 * MINUTE_MS) });
+    const outage = await insertOutage({ startTime: ago(DUE_MS) });
     const id = await insertSubscription('a');
     const fetchSpy = mockPushService(() => 201);
     const body: AlertPage = {

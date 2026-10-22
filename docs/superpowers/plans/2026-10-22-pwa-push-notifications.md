@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - No new dependencies. Crypto is `crypto.subtle` only.
-- `ALERT_DELAY_MS = 5 * MINUTE_MS`; push `TTL: 3600` (`PUSH_TTL_SECONDS`); `Urgency: high`; `Topic: power`; notification tag `power`.
+- `ALERT_DELAY_MS = 10 * MINUTE_MS`; push `TTL: 3600` (`PUSH_TTL_SECONDS`); `Urgency: high`; `Topic: power`; notification tag `power`.
 - `PUSH_PAGE_SIZE = 40`; `sendBatch` at most 100 messages per call; consumer `max_batch_size = 1`; at most 3 attempts.
 - Push host allowlist: `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`; `https:` only.
 - `push_subscriptions` stores only `endpoint`, `p256dh`, `auth`, `locale`, `created_at`. No IP, no user agent.
@@ -30,7 +30,7 @@
 
 1. **Language switch after subscribing:** alerts must follow the new language. Task 8 re-posts the subscription with the new locale on `switchLocale`.
 2. **Permission revoked in browser settings:** the bell must show Blocked, not On, even if a subscription still exists. Task 9 derives state from `Notification.permission` first.
-3. **Off and back on due in the same cron run** (an outage opened and closed while the cron was down for over 5 minutes): each kind is claimed at most once, and "off" is enqueued before "back on". Task 5 tests this.
+3. **Off and back on due in the same cron run** (an outage opened and closed while the cron was down for over ten minutes): each kind is claimed at most once, and "off" is enqueued before "back on". Task 5 tests this.
 4. **Re-subscribing from a second tab, or unsubscribing an unknown endpoint:** no error, one row. Task 3 tests this.
 5. **The Worker runs in UTC:** notification times must be in `site.timeZone`. Task 4 tests a fixed instant.
 
@@ -155,14 +155,14 @@
 **Interfaces:**
 - Consumes: `outages.offAlertAt/onAlertAt`, `pushSubscriptions` (Task 2), `AlertKind` (Task 4).
 - Produces:
-  - `ALERT_DELAY_MS = 5 * MINUTE_MS`, `PUSH_PAGE_SIZE = 40`, `PUSH_MAX_ATTEMPTS = 3`
+  - `ALERT_DELAY_MS = 10 * MINUTE_MS`, `PUSH_PAGE_SIZE = 40`, `PUSH_MAX_ATTEMPTS = 3`
   - `interface AlertClaim { kind: AlertKind; outageId: number }`
   - `interface AlertPage extends AlertClaim { ids: number[]; attempt: number; queuedAt: string }` (the queue message body)
   - `claimAlerts(db: Db, now: Date): Promise<AlertClaim[]>` (all "off" claims before "on" claims)
   - `enqueueAlerts(db: Db, queue: Queue<AlertPage>, claims: AlertClaim[], now: Date): Promise<void>`
 
 - [ ] **Step 1: Write the failing tests** in `test/alerts.test.ts`. Use a stub queue `{ sendBatch: vi.fn() }`, and call `claimAlerts` and `enqueueAlerts` directly with `createDb(env.DB)`, plus one test through `runCron(MINUTE_CRON, now, { ...env, PUSH_QUEUE: stub })`:
-  - `claims off once the outage is ALERT_DELAY_MS old`: an open outage started 4 min ago gives `[]`. At 5 min it gives `[{ kind: 'off', outageId }]`, and `off_alert_at` is set.
+  - `claims off once the outage is ALERT_DELAY_MS old`: an open outage started 9 min ago gives `[]`. At 10 min it gives `[{ kind: 'off', outageId }]`, and `off_alert_at` is set.
   - `claims each alert once`: two `claimAlerts` calls in a row; the second returns `[]`. Also two concurrent calls (`Promise.all`) yield a single claim in total.
   - `never claims a false positive`: an open outage with `is_false_positive = 1` gives `[]`.
   - `claims back on only after off was sent`: a closed outage with `off_alert_at` set gives `[{ kind: 'on' }]`. A closed outage without `off_alert_at` (closed inside the delay, or backfilled) gives `[]`.

@@ -117,7 +117,7 @@ Generated with `npm run db:generate`; both changes work with the old and the new
 
 After `detectOutage`, the minute cron calls one function that claims due alerts with conditional `UPDATE … RETURNING`, so overlapping runs never claim one twice:
 
-- **Off:** an open outage, not a false positive, with no `off_alert_at`, that started at least `ALERT_DELAY_MS` (5 minutes, from `MINUTE_MS`) ago.
+- **Off:** an open outage, not a false positive, with no `off_alert_at`, that started at least `ALERT_DELAY_MS` (10 minutes, from `MINUTE_MS`) ago.
 - **Back on:** a closed outage, not a false positive, with `off_alert_at` set and no `on_alert_at`.
 
 So an outage dismissed or closed within the delay never alerts in either direction; a backfilled closed outage never alerts; an outage open at deploy time sends one "off". A dismissal after "off" was sent sends nothing (accepted gap; the delay makes it rare).

@@ -60,8 +60,12 @@ export function alertMessage(
   };
 }
 
-/** How long an outage lasts before it is worth an alert; one that ends sooner stays silent. */
-export const ALERT_DELAY_MS = 5 * MINUTE_MS;
+/**
+ * How long an outage lasts before it is worth an alert; one that ends sooner stays silent. It counts
+ * from the outage's start, which for a sensor outage is the last heartbeat, so it also covers the
+ * time to detect it. Long enough to ride out a router reboot or a longer connection drop.
+ */
+export const ALERT_DELAY_MS = 10 * MINUTE_MS;
 /** Subscriptions per queue message, so one delivery run stays inside a Worker invocation's limits. */
 export const PUSH_PAGE_SIZE = 40;
 /** How many times one page is tried before it is dropped. */
