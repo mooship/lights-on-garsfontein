@@ -353,12 +353,48 @@ describe('deliverAlertPage', () => {
     const outage = await openOutage();
     const id = await insertSubscription('a');
     mockPushService(() => new Error('network down'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { send, env: testEnv } = stubPushQueue();
 
     await deliverAlertPage(pageFor(outage, [id]), testEnv, NOW);
 
     expect(send).toHaveBeenCalledOnce();
     expect(send.mock.calls[0]?.[0].ids).toEqual([id]);
+  });
+
+  it('logs a rejected send with the push host and the error, but never the endpoint path', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('secret-path');
+    // Some runtime errors quote the URL they failed on.
+    mockPushService((endpoint) => new TypeError(`fetch failed for ${endpoint}`));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await deliverAlertPage(pageFor(outage, [id]), stubPushQueue().env, NOW);
+
+    const logged = warn.mock.calls.flat().join(' ');
+    expect(logged).toContain(PUSH_TEST_HOST);
+    expect(logged).toContain('TypeError');
+    expect(logged).toContain('fetch failed');
+    expect(logged).not.toContain('secret-path');
+  });
+
+  it('logs a failure of our own, such as a bad VAPID key, rather than dropping it silently', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('secret-path');
+    const fetchSpy = mockPushService(() => 201);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(
+      pageFor(outage, [id], { attempt: PUSH_MAX_ATTEMPTS }),
+      { ...testEnv, VAPID_PRIVATE_KEY: '{"kty":"EC"}' },
+      NOW,
+    );
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const logged = warn.mock.calls.flat().join(' ');
+    expect(logged).toContain(`Push to ${PUSH_TEST_HOST} failed`);
+    expect(logged).not.toContain('secret-path');
   });
 
   it('waits longer after each attempt and keeps queuedAt', async () => {
@@ -375,15 +411,31 @@ describe('deliverAlertPage', () => {
     expect(send.mock.calls.map(([body]) => body.queuedAt)).toEqual([queuedAt, queuedAt]);
   });
 
-  it('gives up after PUSH_MAX_ATTEMPTS', async () => {
+  it('gives up after PUSH_MAX_ATTEMPTS, and says so without naming an endpoint', async () => {
     const outage = await openOutage();
-    const id = await insertSubscription('a');
+    const id = await insertSubscription('secret-path');
     mockPushService(() => 503);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { send, env: testEnv } = stubPushQueue();
 
     await deliverAlertPage(pageFor(outage, [id], { attempt: PUSH_MAX_ATTEMPTS }), testEnv, NOW);
 
     expect(send).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    const logged = String(warn.mock.calls[0]?.[0]);
+    expect(logged).toContain(PUSH_TEST_HOST);
+    expect(logged).not.toContain('secret-path');
+  });
+
+  it('does not warn about giving up when every send succeeded or is gone', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    mockPushService(() => 410);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await deliverAlertPage(pageFor(outage, [id], { attempt: PUSH_MAX_ATTEMPTS }), stubPushQueue().env, NOW);
+
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('logs other statuses with the push host but never the endpoint path', async () => {

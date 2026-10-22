@@ -6,6 +6,22 @@ import { buildPushRequest, PUSH_TTL_SECONDS } from './webpush';
 
 const RETRY_DELAY_SECONDS = 60;
 
+/** The push service's host; an endpoint path identifies a subscriber, so logs name only this. */
+function hostOf(endpoint: string): string {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    // A row that was never a valid URL must not stop the rest of the page from being logged.
+    return 'invalid endpoint';
+  }
+}
+
+/** A rejection as one log line; the message is scrubbed because some errors quote the URL they failed on. */
+function describeRejection(reason: unknown, endpoint: string): string {
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  return `${error.name}: ${error.message.replaceAll(endpoint, '<endpoint>')}`;
+}
+
 /** The outage the page is about, or `null` if it no longer warrants the alert, which would then mislead. */
 async function loadDueOutage(db: Db, page: AlertPage): Promise<Outage | null> {
   const outage = await db.select().from(outages).where(eq(outages.id, page.outageId)).get();
@@ -34,20 +50,32 @@ export async function deliverAlertPage(page: AlertPage, env: Env, now: Date): Pr
 
   const gone: number[] = [];
   const retry: number[] = [];
+  const retryHosts = new Set<string>();
   results.forEach((result, index) => {
     const { id, endpoint } = subscriptions[index] as PushSubscriptionRow;
-    // A rejected request (network error) is as transient as a 429 or a 5xx.
+    const host = hostOf(endpoint);
+    // A rejection is retried like a 429 or a 5xx, but it may be ours (a bad key or row), so it is logged.
+    if (result.status === 'rejected') {
+      console.warn(`Push to ${host} failed: ${describeRejection(result.reason, endpoint)}`);
+    }
     const status = result.status === 'fulfilled' ? result.value : null;
-    if (status === null || status === 429 || status >= 500) retry.push(id);
-    else if (status === 404 || status === 410) gone.push(id);
-    else if (status >= 300) console.warn(`Push service ${new URL(endpoint).host} answered ${status}`);
+    if (status === null || status === 429 || status >= 500) {
+      retry.push(id);
+      retryHosts.add(host);
+    } else if (status === 404 || status === 410) gone.push(id);
+    else if (status >= 300) console.warn(`Push service ${host} answered ${status}`);
   });
 
   if (gone.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, gone));
-  if (retry.length > 0 && page.attempt < PUSH_MAX_ATTEMPTS) {
+  if (retry.length === 0) return;
+  if (page.attempt < PUSH_MAX_ATTEMPTS) {
     await env.PUSH_QUEUE.send(
       { ...page, ids: retry, attempt: page.attempt + 1 },
       { delaySeconds: RETRY_DELAY_SECONDS * page.attempt },
+    );
+  } else {
+    console.warn(
+      `Gave up on ${retry.length} push sends after ${page.attempt} attempts to ${[...retryHosts].join(', ')}`,
     );
   }
 }
