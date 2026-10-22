@@ -1,10 +1,8 @@
-import { type Component, lazy, onCleanup, onMount, Show } from 'solid-js';
+import { type Component, onCleanup, onMount, Show } from 'solid-js';
 import { followLanguage, notice, offerWhenReady, open, refreshAlerts, state } from '../lib/alerts-store';
 import { t } from '../lib/i18n';
 import * as css from './AlertsCard.css';
-
-// Loaded when it first opens: most visits never see it, and fixed over the page it shifts nothing.
-const AlertsSheet = lazy(() => import('./AlertsSheet'));
+import { AlertsSheet } from './AlertsSheet';
 
 /** Mounted once on the public page; `ready` once the status has loaded, so the card never offers itself before. */
 export const AlertsCard: Component<{ ready: boolean }> = (props) => {

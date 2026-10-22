@@ -5,8 +5,8 @@ import { privacyHref, t } from '../lib/i18n';
 import { button } from '../styles/ui.css';
 import * as css from './AlertsSheet.css';
 
-/** The alerts card itself, mounted while it is open; loaded only then (AlertsCard). */
-const AlertsSheet: Component = () => {
+/** The alerts card itself, mounted while it is open. */
+export const AlertsSheet: Component = () => {
   const [failed, setFailed] = createSignal(false);
   const m = () => t().alerts.card;
   let heading!: HTMLHeadingElement;
@@ -92,5 +92,3 @@ const AlertsSheet: Component = () => {
     </section>
   );
 };
-
-export default AlertsSheet;
