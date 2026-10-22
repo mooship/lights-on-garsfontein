@@ -2,7 +2,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { createDb, type Db } from '../db/client';
 import { type Outage, outages, type PushSubscriptionRow, pushSubscriptions } from '../db/schema';
 import { type AlertPage, alertMessage, PUSH_MAX_ATTEMPTS } from './alerts';
-import { buildPushRequest, PUSH_TTL_SECONDS } from './webpush';
+import { buildPushRequest, PUSH_TTL_SECONDS, type VapidSigner, vapidSigner } from './webpush';
 
 const RETRY_DELAY_SECONDS = 60;
 
@@ -43,9 +43,25 @@ export async function deliverAlertPage(page: AlertPage, env: Env, now: Date): Pr
   const subscriptions = await db.select().from(pushSubscriptions).where(inArray(pushSubscriptions.id, page.ids));
   const privateJwk: JsonWebKey = JSON.parse(env.VAPID_PRIVATE_KEY);
 
+  // The VAPID token depends only on the push service's origin and `now`, so one per origin serves the page.
+  // Built lazily inside each send, so a bad key fails, and is logged, per send like any other failure.
+  let signer: Promise<VapidSigner> | undefined;
+  const authorizations = new Map<string, Promise<string>>();
+  const authorizationFor = (endpoint: string): Promise<string> => {
+    const origin = new URL(endpoint).origin;
+    let authorization = authorizations.get(origin);
+    if (!authorization) {
+      signer ??= vapidSigner(privateJwk);
+      authorization = signer.then((sign) => sign(endpoint, now.getTime()));
+      authorizations.set(origin, authorization);
+    }
+    return authorization;
+  };
+
   const send = async (subscription: PushSubscriptionRow): Promise<number> => {
     const payload = alertMessage(page.kind, outage, subscription.locale);
-    const request = await buildPushRequest(subscription, payload, privateJwk, now.getTime());
+    const authorization = await authorizationFor(subscription.endpoint);
+    const request = await buildPushRequest(subscription, payload, privateJwk, now.getTime(), authorization);
     return (await fetch(request)).status;
   };
   const results = await Promise.allSettled(subscriptions.map(send));

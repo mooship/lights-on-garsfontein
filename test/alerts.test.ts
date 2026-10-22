@@ -375,6 +375,22 @@ describe('deliverAlertPage', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('imports the VAPID key and signs once per push service, not once per subscription', async () => {
+    const outage = await openOutage();
+    const ids = [await insertSubscription('a'), await insertSubscription('b'), await insertSubscription('c')];
+    const fetchSpy = mockPushService(() => 201);
+    const importKey = vi.spyOn(crypto.subtle, 'importKey');
+    const sign = vi.spyOn(crypto.subtle, 'sign');
+
+    await deliverAlertPage(pageFor(outage, ids), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(importKey.mock.calls.filter(([format]) => format === 'jwk')).toHaveLength(1);
+    expect(sign).toHaveBeenCalledOnce();
+    const authorizations = fetchSpy.mock.calls.map(([request]) => (request as Request).headers.get('Authorization'));
+    expect(new Set(authorizations).size).toBe(1);
+  });
+
   it("writes each push in its subscriber's language", async () => {
     const outage = await openOutage();
     const ids = [await insertSubscription('af', 'af'), await insertSubscription('en', 'en')];

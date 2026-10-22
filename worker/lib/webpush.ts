@@ -99,26 +99,38 @@ export function vapidPublicKey(privateJwk: JsonWebKey): string {
   return toBase64Url(concat(new Uint8Array([0x04]), fromBase64Url(x), fromBase64Url(y)));
 }
 
-/** The `Authorization` header value of RFC 8292 for the push service at `endpoint`; `now` is in milliseconds. */
-export async function vapidAuthorization(endpoint: string, privateJwk: JsonWebKey, now: number): Promise<string> {
-  const part = (value: object) => toBase64Url(encoder.encode(JSON.stringify(value)));
-  const signingInput = `${part({ typ: 'JWT', alg: 'ES256' })}.${part({
-    aud: new URL(endpoint).origin,
-    exp: Math.floor((now + VAPID_EXP_MS) / 1000),
-    sub: site.url,
-  })}`;
+/** Builds RFC 8292 `Authorization` header values for the push service at an endpoint; `now` is in milliseconds. */
+export type VapidSigner = (endpoint: string, now: number) => Promise<string>;
+
+/** A signer that imports the key once, so a page of sends does not import it for every subscription. */
+export async function vapidSigner(privateJwk: JsonWebKey): Promise<VapidSigner> {
   const key = await crypto.subtle.importKey('jwk', privateJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
-  // WebCrypto returns the raw r || s pair, which is the JWS form of ES256.
-  const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, encoder.encode(signingInput));
-  return `vapid t=${signingInput}.${toBase64Url(new Uint8Array(signature))}, k=${vapidPublicKey(privateJwk)}`;
+  const publicKey = vapidPublicKey(privateJwk);
+  const part = (value: object) => toBase64Url(encoder.encode(JSON.stringify(value)));
+  return async (endpoint, now) => {
+    const signingInput = `${part({ typ: 'JWT', alg: 'ES256' })}.${part({
+      aud: new URL(endpoint).origin,
+      exp: Math.floor((now + VAPID_EXP_MS) / 1000),
+      sub: site.url,
+    })}`;
+    // WebCrypto returns the raw r || s pair, which is the JWS form of ES256.
+    const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, encoder.encode(signingInput));
+    return `vapid t=${signingInput}.${toBase64Url(new Uint8Array(signature))}, k=${publicKey}`;
+  };
 }
 
-/** A ready-to-send push request; `now` is in milliseconds. */
+/** The `Authorization` header value of RFC 8292 for the push service at `endpoint`; `now` is in milliseconds. */
+export async function vapidAuthorization(endpoint: string, privateJwk: JsonWebKey, now: number): Promise<string> {
+  return (await vapidSigner(privateJwk))(endpoint, now);
+}
+
+/** A ready-to-send push request; `now` is in milliseconds, and `authorization`, if given, is reused rather than signed again. */
 export async function buildPushRequest(
   target: PushTarget,
   payload: object,
   privateJwk: JsonWebKey,
   now: number,
+  authorization?: string,
 ): Promise<Request> {
   const body = await encryptPayload(encoder.encode(JSON.stringify(payload)), target);
   return new Request(target.endpoint, {
@@ -131,7 +143,7 @@ export async function buildPushRequest(
       Urgency: 'high',
       // A newer message with the same topic replaces one a push service still holds.
       Topic: 'power',
-      Authorization: await vapidAuthorization(target.endpoint, privateJwk, now),
+      Authorization: authorization ?? (await vapidAuthorization(target.endpoint, privateJwk, now)),
     },
     body,
   });
