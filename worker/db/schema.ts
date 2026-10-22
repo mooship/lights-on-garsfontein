@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { DISMISSED_BY, OUTAGE_SOURCES } from '../../shared/api';
+import { site } from '../../site.config';
 
 /**
  * The sensor's last report. One row (id 1), so one sensor per instance: a second sensor needs its
@@ -28,6 +29,10 @@ export const outages = sqliteTable(
     isPlanned: integer('is_planned', { mode: 'boolean' }).notNull().default(sql`0`),
     /** Set with isFalsePositive; null when not one, or for one dismissed before this was recorded. */
     dismissedBy: text('dismissed_by', { enum: DISMISSED_BY }),
+    /** When the power-off alert went out; null until sent, so each outage alerts once. */
+    offAlertAt: text('off_alert_at'),
+    /** When the power-back alert went out; null until sent, or while the outage is open. */
+    onAlertAt: text('on_alert_at'),
   },
   (table) => [
     // "Newest first" queries (status, admin list) read only the rows they return.
@@ -48,4 +53,18 @@ export const sessions = sqliteTable('sessions', {
   passwordFingerprint: text('password_fingerprint').notNull(),
 });
 
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** The push service's URL for this browser; unique, so subscribing twice replaces the row. */
+  endpoint: text('endpoint').notNull().unique(),
+  /** The browser's public key (base64url) that the message is encrypted to. */
+  p256dh: text('p256dh').notNull(),
+  /** The browser's secret for message encryption (base64url). */
+  auth: text('auth').notNull(),
+  /** The language the alerts are written in. */
+  locale: text('locale', { enum: site.locales }).notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 export type Outage = typeof outages.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
