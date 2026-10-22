@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { MINUTE_MS } from '../shared/api';
 import { LOCALES, localePath } from '../shared/locale';
 import { ADMIN_PAGE_PATH, PUSH_SUBSCRIPTION_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
@@ -9,6 +10,8 @@ import { expect, test } from './fixtures';
 
 /** Where the fake push manager keeps its subscription, so it outlives a reload as a real one does. */
 const FAKE_SUBSCRIBED = 'e2e-push-subscribed';
+/** The window property where the fake counts calls to `Notification.requestPermission`. */
+const PERMISSION_REQUESTS = 'e2ePermissionRequests';
 
 const IPHONE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
@@ -25,13 +28,19 @@ const KEYS = {
  * The test server cannot reach a real push service, and the test browser denies notifications
  * whatever it is granted, so both are faked: notifications are allowed unless `permission` says
  * otherwise, and the push manager hands out a fake subscription. `subscribed` starts with one.
+ * Calls to `Notification.requestPermission` are counted (`permissionRequests`).
  */
 const fakePush = (page: Page, { subscribed = false, permission = 'granted' as NotificationPermission } = {}) =>
   page.addInitScript(
-    ([key, endpoint, keys, startOn, allowed]) => {
+    ([key, endpoint, keys, startOn, allowed, counter]) => {
       if (startOn && localStorage.getItem(key) === null) localStorage.setItem(key, '1');
       Object.defineProperty(Notification, 'permission', { get: () => allowed });
-      Notification.requestPermission = async () => allowed;
+      const counts = window as unknown as Record<string, number>;
+      counts[counter] = 0;
+      Notification.requestPermission = async () => {
+        counts[counter] = (counts[counter] ?? 0) + 1;
+        return allowed;
+      };
       const fake = () => ({
         endpoint,
         toJSON: () => ({ endpoint, keys }),
@@ -47,8 +56,11 @@ const fakePush = (page: Page, { subscribed = false, permission = 'granted' as No
       PushManager.prototype.getSubscription = async () =>
         (localStorage.getItem(key) ? fake() : null) as unknown as PushSubscription | null;
     },
-    [FAKE_SUBSCRIBED, ENDPOINT, KEYS, subscribed, permission] as const,
+    [FAKE_SUBSCRIBED, ENDPOINT, KEYS, subscribed, permission, PERMISSION_REQUESTS] as const,
   );
+
+const permissionRequests = (page: Page) =>
+  page.evaluate((counter) => (window as unknown as Record<string, number>)[counter], PERMISSION_REQUESTS);
 
 type Call = { method: string; body: Record<string, unknown> };
 
@@ -107,9 +119,11 @@ for (const locale of LOCALES) {
       await expect(page.getByRole('status')).toBeVisible();
       // Not while the moment after loading lasts: the card never interrupts the first look.
       await expect(card(page)).not.toBeVisible();
+      // Offered by itself, it leaves focus where the visitor put it.
+      await bell(page).focus();
       await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
       await expect(card(page)).toBeVisible();
-      await expect(card(page).getByRole('heading', { name: m.card.heading })).toBeFocused();
+      await expect(bell(page)).toBeFocused();
       await expect(card(page)).toContainText(m.card.body);
       await expect(card(page)).toContainText(m.card.scope);
       // Same page and language as the footer's privacy link.
@@ -118,11 +132,14 @@ for (const locale of LOCALES) {
         .getAttribute('href');
       await expect(card(page).getByRole('link', { name: m.card.privacy })).toHaveAttribute('href', footerHref ?? '');
 
+      // The browser asks only after the tap.
+      expect(await permissionRequests(page)).toBe(0);
       await card(page).getByRole('button', { name: m.card.turnOn }).click();
       await expect(card(page)).not.toBeVisible();
       await expect(bell(page)).toHaveAttribute('aria-pressed', 'true');
       await expect(page.getByText(m.card.turnedOn)).toBeVisible();
       expect(calls).toEqual([{ method: 'POST', body: expect.objectContaining({ locale }) }]);
+      expect(await permissionRequests(page)).toBe(1);
     });
 
     test('says so when turning on fails, and can try again', async ({ page }) => {
@@ -157,7 +174,7 @@ for (const locale of LOCALES) {
       await page.keyboard.press('Escape');
       await expect(card(page)).not.toBeVisible();
       const until = await page.evaluate((key) => Number(localStorage.getItem(key)), STORAGE_KEYS.alertsSnoozedUntil);
-      expect(until).toBeGreaterThan(Date.now() + ALERTS_SNOOZE_MS - 60_000);
+      expect(until).toBeGreaterThan(Date.now() + ALERTS_SNOOZE_MS - MINUTE_MS);
     });
 
     test('No thanks hides the card for good, and the bell still works', async ({ page }) => {
@@ -171,7 +188,12 @@ for (const locale of LOCALES) {
       await expect(card(page)).not.toBeVisible();
       await bell(page).click();
       await expect(card(page)).toBeVisible();
+      // Opened on purpose, the card takes focus.
+      await expect(card(page).getByRole('heading', { name: m.card.heading })).toBeFocused();
       await expect(card(page).getByRole('button', { name: m.card.turnOn })).toBeVisible();
+      // The bell closes it again.
+      await bell(page).click();
+      await expect(card(page)).not.toBeVisible();
     });
 
     test('turning off from the bell unsubscribes', async ({ page }) => {
@@ -188,6 +210,21 @@ for (const locale of LOCALES) {
       await expect(bell(page)).toHaveAttribute('title', m.bell.off);
       await expect(page.getByText(m.card.turnedOff)).toBeVisible();
       expect(calls).toEqual([{ method: 'DELETE', body: { endpoint: ENDPOINT } }]);
+    });
+
+    test('turning off from the bell withdraws the offer for this visit', async ({ page }) => {
+      await fakePush(page, { subscribed: true });
+      await returning(page);
+      await recordSubscriptionCalls(page);
+      await page.goto(localePath(locale));
+      await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+      await page.reload();
+      await expect(page.getByRole('status')).toBeVisible();
+      await expect(bell(page)).toHaveAttribute('aria-pressed', 'true');
+      await bell(page).click();
+      await expect(bell(page)).toHaveAttribute('aria-pressed', 'false');
+      await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
+      await expect(card(page)).not.toBeVisible();
     });
 
     test('blocked permission shows help', async ({ page }) => {

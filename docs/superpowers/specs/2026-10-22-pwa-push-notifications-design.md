@@ -45,15 +45,15 @@ The app registers it on the public pages only; `/admin` never registers it.
 An icon button in the header beside the language and theme toggles, the same size, so nothing moves. Its states:
 
 - **Off:** opens the card.
-- **On:** turns alerts off (unsubscribe and `DELETE` the subscription), with a short confirmation.
+- **On:** turns alerts off (unsubscribe and `DELETE` the subscription), with a short confirmation. The card then does not offer itself again on that visit.
 - **Blocked** (permission denied): explains how to allow notifications in the browser's settings.
 - **Unsupported, or iPhone Safari not on the home screen:** opens the card in its install-first form.
 
-Labels and `aria-pressed` reflect the state; copy is in both dictionaries.
+With the card open, the bell closes it (an offer closed this way counts as Not now). Labels and `aria-pressed` reflect the state; copy is in both dictionaries.
 
 ### The card
 
-A bottom sheet floating over the page (fixed position, so no layout shift), styled from `src/styles/palette.ts`, with a gentle entrance that respects `prefers-reduced-motion`. Focus moves to it when it opens, Escape closes it as "Not now".
+A bottom sheet floating over the page (fixed position, so no layout shift), styled from `src/styles/palette.ts`, with a gentle entrance that respects `prefers-reduced-motion`. Focus moves to it only when the bell opened it; when it offers itself, focus stays where it was and a polite live region announces it. Escape closes it as "Not now".
 
 Draft copy (final wording in `src/i18n`, Afrikaans first):
 

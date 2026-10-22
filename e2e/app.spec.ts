@@ -394,9 +394,14 @@ test.describe('public page', () => {
         await trackLayoutShift(page);
         await page.goto(localePath(locale));
         await expect(page.getByRole('status')).toBeVisible();
+        // A card in the page flow, at its end, would lengthen the page without moving anything the
+        // layout-shift API counts, so the page's own box is checked too.
+        const main = page.locator('.gg-main');
+        const before = await main.boundingBox();
         await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
         await expect(page.getByRole('dialog', { name: DICTIONARIES[locale].alerts.card.heading })).toBeVisible();
         expect(await readLayoutShift(page)).toBe(0);
+        expect(await main.boundingBox()).toEqual(before);
       });
     });
   }

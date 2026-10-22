@@ -47,13 +47,21 @@ export async function refreshAlerts(): Promise<AlertsState> {
 
 /** Where focus goes back to once the card closes. */
 let returnFocus: HTMLElement | null = null;
+/** Only a card the visitor asked for takes focus: one that offers itself would interrupt keyboard and screen reader users. */
+let focusOnOpen = false;
+/** Set once the visitor turns alerts off, so the card does not offer them again on the same visit. */
+let offerWithdrawn = false;
 
-function openCard() {
+function openCard(byVisitor: boolean) {
   if (open()) return;
   const active = document.activeElement;
   returnFocus = active instanceof HTMLElement && active !== document.body ? active : null;
+  focusOnOpen = byVisitor;
   setOpen(true);
 }
+
+/** Whether the card offers alerts, rather than only explaining why they cannot be turned on. */
+const offering = () => state() === 'off' || state() === 'ios-install';
 
 type Choice = 'notNow' | 'noThanks' | 'close';
 
@@ -68,11 +76,16 @@ function closeCard(choice: Choice) {
   target?.focus({ preventScroll: true });
 }
 
-/** The bell: turns alerts off when they are on, and otherwise opens the card in the form that fits. */
+/**
+ * The bell: closes the card when it is open, turns alerts off when they are on, and otherwise opens
+ * the card in the form that fits. Closing an offer this way counts as Not now, as Escape does.
+ */
 export async function pressBell() {
   if (busy()) return;
+  if (open()) return closeCard(offering() ? 'notNow' : 'close');
   const current = state() ?? (await refreshAlerts());
-  if (current !== 'on') return openCard();
+  if (current !== 'on') return openCard(true);
+  offerWithdrawn = true;
   setBusy(true);
   try {
     await turnOffAlerts();
@@ -89,7 +102,6 @@ export async function pressBell() {
 const Sheet: Component = () => {
   const [failed, setFailed] = createSignal(false);
   const m = () => t().alerts.card;
-  const offering = () => state() === 'off' || state() === 'ios-install';
   let heading!: HTMLHeadingElement;
 
   // Escape puts off a card that offered something, and otherwise just closes it.
@@ -97,7 +109,7 @@ const Sheet: Component = () => {
     if (event.key === 'Escape') closeCard(offering() ? 'notNow' : 'close');
   };
   onMount(() => {
-    heading.focus({ preventScroll: true });
+    if (focusOnOpen) heading.focus({ preventScroll: true });
     document.addEventListener('keydown', onKey);
   });
   onCleanup(() => document.removeEventListener('keydown', onKey));
@@ -212,6 +224,7 @@ export const AlertsCard: Component<{ ready: boolean }> = (props) => {
       (ready) => {
         if (!ready || offerTimer) return;
         offerTimer = setTimeout(async () => {
+          if (offerWithdrawn) return;
           const offer = shouldOfferCard({
             visits: Number(readStored(STORAGE_KEYS.visits)) || 0,
             snoozedUntil: Number(readStored(STORAGE_KEYS.alertsSnoozedUntil)) || null,
@@ -219,21 +232,20 @@ export const AlertsCard: Component<{ ready: boolean }> = (props) => {
             state: state() ?? (await refreshAlerts()),
             now: Date.now(),
           });
-          if (offer) openCard();
+          if (offer && !offerWithdrawn) openCard(false);
         }, ALERTS_OFFER_DELAY_MS);
       },
     ),
   );
 
   return (
-    <>
+    // Always present, so screen readers announce what goes into it: a card that offers itself does not
+    // take focus, so this is how they hear it arrive.
+    <div aria-live="polite">
       <Show when={open()}>
         <Sheet />
       </Show>
-      {/* Always present, so screen readers announce what goes into it. */}
-      <div aria-live="polite">
-        <Show when={notice()}>{(key) => <p class={css.notice}>{t().alerts.card[key()]}</p>}</Show>
-      </div>
-    </>
+      <Show when={notice()}>{(key) => <p class={css.notice}>{t().alerts.card[key()]}</p>}</Show>
+    </div>
   );
 };
