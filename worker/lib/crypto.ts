@@ -13,8 +13,13 @@ function fromBase64(value: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 }
 
-function toBase64Url(bytes: Uint8Array): string {
+export function toBase64Url(bytes: Uint8Array): string {
   return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Accepts padded or unpadded input. */
+export function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
+  return fromBase64(value.replace(/-/g, '+').replace(/_/g, '/'));
 }
 
 /** Hand-rolled: scripts/hash-password.ts runs this module in Node, which lacks Workers' `timingSafeEqual`. */

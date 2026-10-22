@@ -24,6 +24,8 @@ export default defineConfig({
                 ADMIN_USERNAME: 'admin',
                 HEARTBEAT_TOKEN: 'test-heartbeat-token',
                 ADMIN_API_TOKEN: 'test-admin-api-token',
+                VAPID_PRIVATE_KEY:
+                  '{"key_ops":["sign"],"ext":true,"kty":"EC","x":"-3Hp4KVoMjPEi9JbtKlFpP-QnlseRduXTOFZdyXyA20","y":"eDeNwmF2tJG0I2WpQfhHy5ydPHz6zyO7bzffyHoNzjQ","crv":"P-256","d":"9dxzmBrrYXeQGoMXkFCuPw3hGBggRaDrc4ffWOBJyrE"}',
               },
             },
           })),
