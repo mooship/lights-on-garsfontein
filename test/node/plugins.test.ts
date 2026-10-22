@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from '../../build/html';
+import { escapeHtml, fill, fillStaticI18n, jsonString, jsString, localeVisibilityCss } from '../../build/html';
 import { site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n';
 
@@ -10,6 +10,14 @@ describe('escaping', () => {
 
   it('escapes text for inside a JSON string in a <script>', () => {
     expect(jsonString('say "hi"\n</script>')).toBe('say \\"hi\\"\\n\\u003c/script>');
+  });
+
+  it('escapes text for inside a single- or double-quoted JS string in a service worker', () => {
+    const value = `back\\slash 'single' "double" line\nbreak </script>`;
+    const escaped = jsString(value);
+    expect(escaped).not.toContain('</');
+    expect(new Function(`return '${escaped}'`)()).toBe(value);
+    expect(new Function(`return "${escaped}"`)()).toBe(value);
   });
 });
 
