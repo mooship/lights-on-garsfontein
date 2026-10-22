@@ -72,6 +72,8 @@ describe('alertMessage', () => {
     expect(english.title).toBe(en.push.off.title);
     expect(english.lang).toBe('en');
     expect(english.url).toBe(`${site.url}/en/`);
+    // One tag, so a newer alert replaces the one on screen.
+    for (const kind of ['off', 'on', 'dismissed'] as const) expect(alertMessage(kind, back, 'en').tag).toBe('power');
   });
 
   it('words the correction as the status page does, so it claims no more than the page shows', () => {

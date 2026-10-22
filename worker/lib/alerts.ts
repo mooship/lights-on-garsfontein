@@ -70,9 +70,10 @@ export interface AlertPage extends AlertClaim {
 
 /**
  * Marks the alerts that are due as sent and returns them: off, then on, then dismissed. Each kind
- * is one conditional UPDATE, all three in one batch, so two concurrent runs cannot claim the same
- * alert. A back-on or dismissed alert needs the off alert to have been claimed, so nobody hears a
- * follow-up to an alert they never got. Both follow-ups set `onAlertAt`, so an outage gets one or the other, never both.
+ * is one conditional UPDATE, so two concurrent runs cannot claim the same alert; the three go in
+ * one batch to save round trips. A back-on or dismissed alert needs the off alert to have been
+ * claimed, so nobody hears a follow-up to an alert they never got. Both follow-ups set
+ * `onAlertAt`, so an outage gets one or the other, never both.
  */
 export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
   const claimedAt = now.toISOString();

@@ -99,17 +99,17 @@ export function vapidPublicKey(privateJwk: JsonWebKey): string {
   return toBase64Url(concat(new Uint8Array([0x04]), fromBase64Url(x), fromBase64Url(y)));
 }
 
-/** Builds RFC 8292 `Authorization` header values for the push service at an endpoint; `now` is in milliseconds. */
-export type VapidSigner = (endpoint: string, now: number) => Promise<string>;
+/** RFC 8292 `Authorization` values for the push service at `audience`, its origin or any URL on it; `now` in ms. */
+export type VapidSigner = (audience: string, now: number) => Promise<string>;
 
 /** A signer that imports the key once, so a page of sends does not import it for every subscription. */
 export async function vapidSigner(privateJwk: JsonWebKey): Promise<VapidSigner> {
   const key = await crypto.subtle.importKey('jwk', privateJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
   const publicKey = vapidPublicKey(privateJwk);
   const part = (value: object) => toBase64Url(encoder.encode(JSON.stringify(value)));
-  return async (endpoint, now) => {
+  return async (audience, now) => {
     const signingInput = `${part({ typ: 'JWT', alg: 'ES256' })}.${part({
-      aud: new URL(endpoint).origin,
+      aud: new URL(audience).origin,
       exp: Math.floor((now + VAPID_EXP_MS) / 1000),
       sub: site.url,
     })}`;
