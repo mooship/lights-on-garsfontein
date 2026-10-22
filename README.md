@@ -44,7 +44,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 - `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.
 - Only the admin API exposes an outage's `source`.
 - `POST /api/contact` takes `{ "token" }`, a Turnstile token solved for the `contact` action, and answers `200` with `{ "email" }`, or `404` with `not_configured`.
-- `POST /api/push/subscription` takes `{ "endpoint", "keys": { "p256dh", "auth" }, "locale" }` from a browser's push subscription and stores exactly those four values, with the time it was saved; subscribing again with the same `endpoint` replaces the keys and language. The `endpoint` must be an `https` address on a push service's host (`PUSH_HOSTS` in `worker/routes/push.ts`), or the answer is `400`. `DELETE` takes `{ "endpoint" }` and answers `204` whether or not it was stored. Nothing that identifies the visitor is stored beyond the subscription itself.
+- `POST /api/push/subscription` takes `{ "endpoint", "keys": { "p256dh", "auth" }, "locale" }` from a browser's push subscription and stores exactly those four values, with the time it was first saved; subscribing again with the same `endpoint` replaces the keys and language and keeps that first time. The `endpoint` must be an `https` address on a push service's host (`PUSH_HOSTS` in `worker/routes/push.ts`), or the answer is `400`. `DELETE` takes `{ "endpoint" }` and answers `204` whether or not it was stored. Nothing that identifies the visitor is stored beyond the subscription itself.
 
 ### CSV contract
 
@@ -213,6 +213,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `TURNSTILE_SECRET_KEY` | The Turnstile widget's secret key |
    | `ADMIN_API_TOKEN` | Optional: bearer token for scripts |
    | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor |
+   | `VAPID_PRIVATE_KEY` | Optional: the key that signs power alerts, an ECDSA P-256 private key as a one-line JWK: `npm run --silent vapid-keys | npx wrangler secret put VAPID_PRIVATE_KEY`. The public key is derived from it and served at `GET /api/push/key`; until it is set, that answers `404` and browsers cannot subscribe |
    | `CONTACT_EMAIL` | Optional: address for privacy requests, revealed on the privacy page only after a Turnstile check. Until it is set, requests go to public GitHub issues |
 
    For random values, use for example `openssl rand -base64 32`.
@@ -221,6 +222,15 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and terms, is written for POPIA and describes this deployment's data handling; `FORKERS` comments mark what to check. Do not use utility or municipal logos, and keep the independence disclaimer.
 
 Two crons run the Worker. Every minute it opens an outage for a silent sensor, then queues the power alerts that are due (an outage that has lasted `ALERT_DELAY_MS`, set in `worker/lib/alerts.ts`, and the return of one that was alerted). Every hour it removes expired sessions.
+
+### Power alerts
+
+Visitors can ask their browser for a notification when the power goes off and when it is back. The service worker `public/sw.js` shows it, and the subscription is stored as described under `POST /api/push/subscription` above.
+
+- **When.** An outage is alerted once it has lasted `ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, so a short dip sends nothing. If it was alerted, its end sends a "back on" alert. There is no correction alert: an outage later marked a false positive is not followed up.
+- **Delivery.** The minute cron puts pages of subscriptions on the `PUSH_QUEUE` queue (`lights-on-push`), and the queue handler sends each page to the push service, retrying a failure up to `PUSH_MAX_ATTEMPTS`. A message that is not delivered within `PUSH_TTL_SECONDS` (`worker/lib/webpush.ts`, one hour) is dropped by the push service, so nobody gets a stale alert hours later. A subscription the push service answers `404` or `410` for is deleted.
+- **Bindings.** `PUSH_QUEUE` and `PUSH_LIMITER` are in `wrangler.toml` (also under `[env.e2e]`) and `wrangler.example.toml`. `PUSH_LIMITER` is the 5/min limit on the subscription writes.
+- **Privacy.** [`privacy.html`](privacy.html) says what a subscription holds and when it is deleted; keep it accurate if that changes.
 
 ## Extending
 
@@ -256,6 +266,8 @@ cp .dev.vars.example .dev.vars   # local test keys; sign in as "admin" / "test-p
 npm run db:migrate:local
 npm run preview                  # build, then serve on http://localhost:8787
 ```
+
+`wrangler dev` needs `VAPID_PRIVATE_KEY` in your own `.dev.vars`, so copy it from `.dev.vars.example` as above; without it `GET /api/push/key` answers `404` and power alerts cannot be turned on locally.
 
 For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm run dev:worker` and `npm run dev` side by side; Vite serves the UI on port 5173 and proxies the API to the Worker.
 
