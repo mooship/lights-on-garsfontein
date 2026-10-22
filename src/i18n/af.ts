@@ -145,6 +145,7 @@ export const af = {
       heading: 'Wil jy op hoogte bly?',
       body: 'Kry ’n kennisgewing wanneer die krag in Uitbreiding 16 afgaan, en wanneer dit weer aan is.',
       scope: 'Daar word by een punt in Uitbreiding 16 gemeet, so sommige strate kan verskil.',
+      privacy: 'Wat ons stoor',
       turnOn: 'Skakel kennisgewings aan',
       notNow: 'Nie nou nie',
       noThanks: 'Nee dankie',

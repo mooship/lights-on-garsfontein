@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from '../../shared/locale';
+import { PRIVACY_PAGE_PATH } from '../../shared/paths';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../i18n';
 import { resaveAlerts } from './push';
@@ -26,6 +27,9 @@ export { locale };
 export const t = () => DICTIONARIES[locale()];
 
 export const intlLocale = () => site.intlLocales[locale()];
+
+// privacy.html gives each language a section with the locale as its id, the default language first.
+export const privacyHref = () => (locale() === DEFAULT_LOCALE ? PRIVACY_PAGE_PATH : `${PRIVACY_PAGE_PATH}#${locale()}`);
 
 function setLocale(next: Locale): void {
   document.documentElement.lang = next;

@@ -61,6 +61,15 @@ export const text = style({ fontSize: '0.9375rem', lineHeight: 1.45 });
 
 export const scope = style({ fontSize: '0.8125rem', lineHeight: 1.45, color: vars.color.muted });
 
+// Underlined like running text; the padding and negative margin make a 44px tap target without
+// changing the line's height.
+export const link = style({
+  color: 'inherit',
+  display: 'inline-block',
+  paddingBlock: '0.8125rem',
+  marginBlock: '-0.8125rem',
+});
+
 export const steps = style({ margin: 0, paddingLeft: '1.25rem', fontSize: '0.9375rem', lineHeight: 1.45 });
 
 // The live region stays in the card so it announces reliably; empty, it gives back its gap.

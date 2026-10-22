@@ -130,6 +130,7 @@ export const en = {
       heading: 'Want a heads-up?',
       body: 'Get a notification when the power goes off in Extension 16, and when it’s back.',
       scope: 'It’s measured at one point in Extension 16, so some streets may differ.',
+      privacy: 'What we store',
       turnOn: 'Turn on alerts',
       notNow: 'Not now',
       noThanks: 'No thanks',

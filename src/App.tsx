@@ -17,8 +17,7 @@ import {
   type StatusResponse,
   TRACKING_SINCE,
 } from '../shared/api';
-import { DEFAULT_LOCALE } from '../shared/locale';
-import { ADMIN_PAGE_PATH, CSV_PATH, FEED_PATH, PRIVACY_PAGE_PATH } from '../shared/paths';
+import { ADMIN_PAGE_PATH, CSV_PATH, FEED_PATH } from '../shared/paths';
 import { site } from '../site.config';
 import * as css from './App.css';
 import { bannersPending } from './banners';
@@ -35,7 +34,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { HowWeMeasure, Trends } from './components/Trends';
 import { api } from './lib/api';
 import { formatDate, formatDuration, formatEnd, formatRelativeDay, formatTime } from './lib/format';
-import { locale, t } from './lib/i18n';
+import { privacyHref, t } from './lib/i18n';
 import { useMinute, useNow } from './lib/now';
 import { createPoll, POLL_MS, STATS_POLL_MS, whenVisible } from './lib/poll';
 import { useStatusTab } from './lib/tab';
@@ -68,9 +67,6 @@ const Masthead: Component<{ isPublic: boolean }> = (props) => (
     </Show>
   </>
 );
-
-// privacy.html gives each language a section with the locale as its id, the default language first.
-const privacyHref = () => (locale() === DEFAULT_LOCALE ? PRIVACY_PAGE_PATH : `${PRIVACY_PAGE_PATH}#${locale()}`);
 
 /** `isPublic` adds sharing and the sign-in link, which the admin page doesn't need. */
 const Footer: Component<{ isPublic: boolean }> = (props) => (

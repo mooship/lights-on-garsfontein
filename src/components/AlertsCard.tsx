@@ -1,7 +1,7 @@
 import BellRing from 'lucide-solid/icons/bell-ring';
 import { type Component, createEffect, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from 'solid-js';
 import { MINUTE_MS } from '../../shared/api';
-import { locale, t } from '../lib/i18n';
+import { locale, privacyHref, t } from '../lib/i18n';
 import {
   ALERTS_OFFER_DELAY_MS,
   ALERTS_SNOOZE_MS,
@@ -147,7 +147,15 @@ const Sheet: Component = () => {
           </Show>
         </Match>
       </Switch>
-      <p class={css.scope}>{m().scope}</p>
+      <p class={css.scope}>
+        {m().scope}
+        <Show when={offering()}>
+          {' '}
+          <a class={css.link} href={privacyHref()}>
+            {m().privacy}
+          </a>
+        </Show>
+      </p>
       <p class={css.failed} aria-live="polite">
         {failed() ? m().failed : ''}
       </p>

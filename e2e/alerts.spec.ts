@@ -107,6 +107,11 @@ for (const locale of LOCALES) {
       await expect(card(page).getByRole('heading', { name: m.card.heading })).toBeFocused();
       await expect(card(page)).toContainText(m.card.body);
       await expect(card(page)).toContainText(m.card.scope);
+      // Same page and language as the footer's privacy link.
+      const footerHref = await page
+        .getByRole('link', { name: DICTIONARIES[locale].footer.privacy })
+        .getAttribute('href');
+      await expect(card(page).getByRole('link', { name: m.card.privacy })).toHaveAttribute('href', footerHref ?? '');
 
       await card(page).getByRole('button', { name: m.card.turnOn }).click();
       await expect(card(page)).not.toBeVisible();
