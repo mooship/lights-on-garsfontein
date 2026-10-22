@@ -15,6 +15,11 @@ const IPHONE_UA =
 
 /** The fake push service's address for this browser, on a host the Worker accepts. */
 const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/e2e';
+/** Receiver keys the Worker accepts (RFC 8291 appendix A), so a request that reaches it is not refused for them. */
+const KEYS = {
+  p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
+  auth: 'BTBZMqHH6r4Tts7J_aSIgg',
+};
 
 /**
  * The test server cannot reach a real push service, and the test browser denies notifications
@@ -23,13 +28,13 @@ const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/e2e';
  */
 const fakePush = (page: Page, { subscribed = false, permission = 'granted' as NotificationPermission } = {}) =>
   page.addInitScript(
-    ([key, endpoint, startOn, allowed]) => {
+    ([key, endpoint, keys, startOn, allowed]) => {
       if (startOn && localStorage.getItem(key) === null) localStorage.setItem(key, '1');
       Object.defineProperty(Notification, 'permission', { get: () => allowed });
       Notification.requestPermission = async () => allowed;
       const fake = () => ({
         endpoint,
-        toJSON: () => ({ endpoint, keys: { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4', auth: 'tBHItJI5svbpez7K' } }),
+        toJSON: () => ({ endpoint, keys }),
         unsubscribe: async () => {
           localStorage.removeItem(key);
           return true;
@@ -42,7 +47,7 @@ const fakePush = (page: Page, { subscribed = false, permission = 'granted' as No
       PushManager.prototype.getSubscription = async () =>
         (localStorage.getItem(key) ? fake() : null) as unknown as PushSubscription | null;
     },
-    [FAKE_SUBSCRIBED, ENDPOINT, subscribed, permission] as const,
+    [FAKE_SUBSCRIBED, ENDPOINT, KEYS, subscribed, permission] as const,
   );
 
 type Call = { method: string; body: Record<string, unknown> };

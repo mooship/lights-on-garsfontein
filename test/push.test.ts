@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ERROR } from '../shared/errors';
 import { CSV_PATH, OUTAGES_PATH, PUSH_KEY_PATH, PUSH_SUBSCRIPTION_PATH, STATUS_PATH } from '../shared/paths';
+import { fromBase64Url, toBase64Url } from '../worker/lib/crypto';
 import { vapidPublicKey } from '../worker/lib/webpush';
 import { call, insertOutage, ORIGIN, stubLimiter } from './helpers';
 
@@ -82,6 +83,26 @@ describe('push subscriptions', () => {
     ];
     for (const body of bodies) expect((await subscribe(body)).status).toBe(400);
     expect(await rows()).toEqual([]);
+  });
+
+  it('refuses keys a push could never be encrypted to', async () => {
+    const point = fromBase64Url(keys.p256dh);
+    const notUncompressed = toBase64Url(new Uint8Array([0x02, ...point.slice(1)]));
+    const short = toBase64Url(point.slice(0, 33));
+    const longAuth = toBase64Url(new Uint8Array(17));
+    const shortAuth = toBase64Url(new Uint8Array(15));
+    for (const bad of [
+      { p256dh: notUncompressed, auth: keys.auth },
+      { p256dh: short, auth: keys.auth },
+      { p256dh: 'p256dh', auth: keys.auth },
+      { p256dh: keys.p256dh, auth: longAuth },
+      { p256dh: keys.p256dh, auth: shortAuth },
+      { p256dh: keys.p256dh, auth: 'auth' },
+    ]) {
+      expect((await subscribe({ endpoint: FCM, keys: bad, locale: 'en' })).status, JSON.stringify(bad)).toBe(400);
+    }
+    expect(await rows()).toEqual([]);
+    expect((await subscribe({ endpoint: FCM, keys, locale: 'en' })).status).toBe(204);
   });
 
   it('deletes a subscription, known or not', async () => {

@@ -5,6 +5,7 @@ import { ERROR } from '../../shared/errors';
 import { PUSH_KEY_PATH, PUSH_SUBSCRIPTION_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { pushSubscriptions } from '../db/schema';
+import { fromBase64Url } from '../lib/crypto';
 import { errors, json, parseBody, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { vapidPublicKey } from '../lib/webpush';
@@ -32,11 +33,32 @@ const base64Url = z
   .regex(/^[\w-]+$/)
   .max(256);
 
+/** The decoded bytes, or `null` if `value` is not base64url. */
+function decoded(value: string): Uint8Array | null {
+  try {
+    return fromBase64Url(value);
+  } catch {
+    // Not base64url at all, which the schema refuses like a key of the wrong size.
+    return null;
+  }
+}
+
+// RFC 8291 needs an uncompressed P-256 point and a 16-byte auth secret. Anything else can never be
+// encrypted to, and the push service would never report it gone, so the row would never be deleted.
+const P256_POINT_BYTES = 65;
+const UNCOMPRESSED_POINT = 0x04;
+const AUTH_SECRET_BYTES = 16;
+const p256dh = base64Url.refine((value) => {
+  const bytes = decoded(value);
+  return bytes?.length === P256_POINT_BYTES && bytes[0] === UNCOMPRESSED_POINT;
+});
+const auth = base64Url.refine((value) => decoded(value)?.length === AUTH_SECRET_BYTES);
+
 const endpoint = z.string().max(2048).refine(isPushEndpoint);
 
 const subscribeSchema = z.object({
   endpoint,
-  keys: z.object({ p256dh: base64Url, auth: base64Url }),
+  keys: z.object({ p256dh, auth }),
   locale: z.enum(site.locales),
 });
 
@@ -44,6 +66,8 @@ const unsubscribeSchema = z.object({ endpoint });
 
 const noContent = () => new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
 
+// The endpoint URL is itself the capability: only its browser and push service know it, so there is
+// no ownership check, and whoever holds it may update or delete its row.
 async function postSubscription({ request, db }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, subscribeSchema);
   if ('response' in parsed) return parsed.response;
