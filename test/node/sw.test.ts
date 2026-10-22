@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
+import { site } from '../../site.config';
 
 type Listener = (event: unknown) => void;
 
@@ -80,6 +81,29 @@ describe('the service worker', () => {
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       data: { url: payload.url },
+    });
+  });
+
+  it.each([
+    ['has no data', null],
+    [
+      'has data that is not JSON',
+      {
+        json: () => {
+          throw new SyntaxError('Unexpected token');
+        },
+      },
+    ],
+  ])('shows a neutral notification when a push %s', async (_case, data) => {
+    const { self, dispatch } = loadWorker();
+    await expect(dispatch('push', { data })).resolves.toBeUndefined();
+    expect(self.registration.showNotification).toHaveBeenCalledWith(site.brand.full, {
+      body: undefined,
+      tag: 'power',
+      lang: undefined,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: '/' },
     });
   });
 

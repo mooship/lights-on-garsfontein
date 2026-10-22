@@ -4,6 +4,11 @@
 // be served as live. Activation still deletes every cache, because browsers that visited on 17 or 18
 // October 2026 run an earlier offline worker whose cached status this file replaces.
 
+// Shown when a push has no readable payload: a push that shows nothing counts as a silent push, which
+// browsers penalise. It claims nothing about the power. The title repeats site.brand.full in
+// site.config.ts, because the build does not fill placeholders in this file.
+const FALLBACK = { title: 'Lights On, Garsfontein?', tag: 'power', url: '/' };
+
 self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (event) => {
@@ -17,7 +22,14 @@ self.addEventListener('activate', (event) => {
 
 // The payload is AlertPayload in worker/lib/alerts.ts; `tag` makes a newer alert replace an older one.
 self.addEventListener('push', (event) => {
-  const { title, body, tag, lang, url } = event.data.json();
+  let alert;
+  try {
+    alert = event.data.json();
+  } catch {
+    // No data, or data that is not JSON: fall back to the neutral notification.
+    alert = FALLBACK;
+  }
+  const { title, body, tag, lang, url } = alert;
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
