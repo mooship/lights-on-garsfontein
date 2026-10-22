@@ -51,6 +51,8 @@ import {
   patchJson,
   pollNow,
   readLayoutShift,
+  returningVisitor,
+  scrollsSideways,
   test,
   trackLayoutShift,
   withLocale,
@@ -387,10 +389,8 @@ test.describe('public page', () => {
       test(`has zero cumulative layout shift with the alerts card open (${locale})`, async ({ page }) => {
         await page.clock.install();
         // A return visit in a browser that allows notifications (the test browser denies them).
-        await page.addInitScript((key) => {
-          localStorage.setItem(key, '1');
-          Object.defineProperty(Notification, 'permission', { get: () => 'default' });
-        }, STORAGE_KEYS.visits);
+        await returningVisitor(page);
+        await page.addInitScript(() => Object.defineProperty(Notification, 'permission', { get: () => 'default' }));
         await trackLayoutShift(page);
         await page.goto(localePath(locale));
         await expect(page.getByRole('status')).toBeVisible();
@@ -864,12 +864,7 @@ test.describe('narrow screens', () => {
       test(`${path} has no horizontal scroll at 320px (${locale})`, async ({ page }) => {
         await withLocale(page, locale);
         await page.goto(path);
-        await page.evaluate(() => document.fonts.ready);
-        const { scroll, client } = await page.evaluate(() => ({
-          scroll: document.documentElement.scrollWidth,
-          client: document.documentElement.clientWidth,
-        }));
-        expect(scroll).toBeLessThanOrEqual(client);
+        expect(await scrollsSideways(page)).toBe(false);
       });
     }
 
@@ -1163,12 +1158,7 @@ test.describe('all outages', () => {
         await page.getByRole('button', { name: DICTIONARIES[locale].history.showAll }).click();
         const pager = page.getByRole('navigation', { name: DICTIONARIES[locale].history.pages });
         await expect(pager).toBeVisible();
-        await page.evaluate(() => document.fonts.ready);
-        const { scroll, client } = await page.evaluate(() => ({
-          scroll: document.documentElement.scrollWidth,
-          client: document.documentElement.clientWidth,
-        }));
-        expect(scroll).toBeLessThanOrEqual(client);
+        expect(await scrollsSideways(page)).toBe(false);
         // One row: the buttons and the page label all share one line.
         const boxes = await pager.locator(':scope > *').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
         expect(boxes).toHaveLength(3);

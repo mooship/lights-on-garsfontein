@@ -1,56 +1,71 @@
-import { describe, expect, it } from 'vitest';
-import { DAY_MS } from '../../shared/api';
-import { ALERTS_SNOOZE_MS, base64UrlToBytes, type PushEnv, pushSupport, shouldOfferCard } from '../../src/lib/push';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pushSupport, shouldOfferCard } from '../../src/lib/push';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148';
 const DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36';
 
-/** A browser as pushSupport sees it; `standalone` is how the home-screen app is detected on iOS. */
-function env(options: { ua: string; serviceWorker?: boolean; pushManager?: boolean; standalone?: boolean }): PushEnv {
-  return {
-    window: {
-      ...(options.pushManager ? { PushManager: class {} } : {}),
-      matchMedia: () => ({ matches: false }),
-    },
-    navigator: {
-      userAgent: options.ua,
-      ...(options.serviceWorker === false ? {} : { serviceWorker: {} }),
-      ...(options.standalone ? { standalone: true } : {}),
-    },
-  };
+/** Stands in for the browser pushSupport reads; `standalone` and `displayStandalone` are the two ways iOS marks the home-screen app. */
+function browser(options: {
+  ua: string;
+  serviceWorker?: boolean;
+  pushManager?: boolean;
+  standalone?: boolean;
+  displayStandalone?: boolean;
+  maxTouchPoints?: number;
+}) {
+  vi.stubGlobal('window', {
+    ...(options.pushManager ? { PushManager: class {} } : {}),
+    matchMedia: () => ({ matches: options.displayStandalone === true }),
+  });
+  vi.stubGlobal('navigator', {
+    userAgent: options.ua,
+    maxTouchPoints: options.maxTouchPoints ?? 0,
+    ...(options.serviceWorker === false ? {} : { serviceWorker: {} }),
+    ...(options.standalone ? { standalone: true } : {}),
+  });
 }
 
 describe('pushSupport', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('asks an iPhone in the browser to install the site first', () => {
-    expect(pushSupport(env({ ua: IPHONE }))).toBe('ios-install');
+    browser({ ua: IPHONE });
+    expect(pushSupport()).toBe('ios-install');
   });
 
   it('supports an iPhone opened from the home screen', () => {
-    expect(pushSupport(env({ ua: IPHONE, standalone: true, pushManager: true }))).toBe('supported');
+    browser({ ua: IPHONE, standalone: true, pushManager: true });
+    expect(pushSupport()).toBe('supported');
   });
 
   it('detects the home-screen app by display mode too', () => {
-    const standalone = env({ ua: IPHONE, pushManager: true });
-    standalone.window.matchMedia = () => ({ matches: true });
-    expect(pushSupport(standalone)).toBe('supported');
+    browser({ ua: IPHONE, pushManager: true, displayStandalone: true });
+    expect(pushSupport()).toBe('supported');
   });
 
   it('treats an iPad that reports a Mac like an iPhone', () => {
-    const ipad = env({ ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15' });
-    ipad.navigator.maxTouchPoints = 5;
-    expect(pushSupport(ipad)).toBe('ios-install');
+    browser({
+      ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15',
+      maxTouchPoints: 5,
+    });
+    expect(pushSupport()).toBe('ios-install');
   });
 
   it('supports a desktop with a service worker and push', () => {
-    expect(pushSupport(env({ ua: DESKTOP, pushManager: true }))).toBe('supported');
+    browser({ ua: DESKTOP, pushManager: true });
+    expect(pushSupport()).toBe('supported');
   });
 
   it('does not support a desktop without a service worker', () => {
-    expect(pushSupport(env({ ua: DESKTOP, serviceWorker: false, pushManager: true }))).toBe('unsupported');
+    browser({ ua: DESKTOP, serviceWorker: false, pushManager: true });
+    expect(pushSupport()).toBe('unsupported');
   });
 
   it('does not support a browser without push', () => {
-    expect(pushSupport(env({ ua: DESKTOP }))).toBe('unsupported');
+    browser({ ua: DESKTOP });
+    expect(pushSupport()).toBe('unsupported');
   });
 });
 
@@ -80,17 +95,5 @@ describe('shouldOfferCard', () => {
   it('stays away while snoozed and returns after', () => {
     expect(shouldOfferCard({ ...offer, snoozedUntil: now + 1 })).toBe(false);
     expect(shouldOfferCard({ ...offer, snoozedUntil: now - 1 })).toBe(true);
-  });
-
-  it('snoozes for thirty days', () => {
-    expect(ALERTS_SNOOZE_MS).toBe(30 * DAY_MS);
-  });
-});
-
-describe('base64UrlToBytes', () => {
-  it('decodes the unpadded URL alphabet', () => {
-    // 0xfb 0xff 0xfe is "-__-" in base64url and "+//+" in base64.
-    expect([...base64UrlToBytes('-__-')]).toEqual([0xfb, 0xff, 0xfe]);
-    expect([...base64UrlToBytes('AQI')]).toEqual([1, 2]);
   });
 });

@@ -71,7 +71,7 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  // The admin page runs the same bundle, so the `!isAdmin` guard in src/index.tsx keeps it from registering.
+  // Turning alerts on registers it; the admin page has no bell, so it never does.
   it('registers /sw.js from the public bundle', () => {
     const scripts = readdirSync(resolve(DIST, 'assets')).filter((name) => name.endsWith('.js'));
     // The path is a shared constant, so it can sit in another chunk than the call.

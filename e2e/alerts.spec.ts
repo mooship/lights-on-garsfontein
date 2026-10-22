@@ -1,12 +1,13 @@
 import type { Page } from '@playwright/test';
 import { MINUTE_MS } from '../shared/api';
 import { LOCALES, localePath, nextLocale } from '../shared/locale';
-import { ADMIN_PAGE_PATH, PUSH_SUBSCRIPTION_PATH } from '../shared/paths';
+import { ADMIN_PAGE_PATH, PUSH_SUBSCRIPTION_PATH, SERVICE_WORKER_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
 import { DICTIONARIES } from '../src/i18n';
 import { ALERTS_OFFER_DELAY_MS, ALERTS_SNOOZE_MS } from '../src/lib/push';
 import { STORAGE_KEYS } from '../src/lib/storage';
-import { expect, test } from './fixtures';
+import { RFC8291_RECEIVER_KEYS } from '../test/push-keys';
+import { expect, returningVisitor, scrollsSideways, storeBeforeLoad, test } from './fixtures';
 
 /** Where the fake push manager keeps its subscription, so it outlives a reload as a real one does. */
 const FAKE_SUBSCRIBED = 'e2e-push-subscribed';
@@ -18,11 +19,6 @@ const IPHONE_UA =
 
 /** The fake push service's address for this browser, on a host the Worker accepts. */
 const ENDPOINT = 'https://fcm.googleapis.com/fcm/send/e2e';
-/** Receiver keys the Worker accepts (RFC 8291 appendix A), so a request that reaches it is not refused for them. */
-const KEYS = {
-  p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
-  auth: 'BTBZMqHH6r4Tts7J_aSIgg',
-};
 
 /**
  * The test server cannot reach a real push service, and the test browser denies notifications
@@ -56,7 +52,7 @@ const fakePush = (page: Page, { subscribed = false, permission = 'granted' as No
       PushManager.prototype.getSubscription = async () =>
         (localStorage.getItem(key) ? fake() : null) as unknown as PushSubscription | null;
     },
-    [FAKE_SUBSCRIBED, ENDPOINT, KEYS, subscribed, permission, PERMISSION_REQUESTS] as const,
+    [FAKE_SUBSCRIBED, ENDPOINT, RFC8291_RECEIVER_KEYS, subscribed, permission, PERMISSION_REQUESTS] as const,
   );
 
 const permissionRequests = (page: Page) =>
@@ -64,22 +60,23 @@ const permissionRequests = (page: Page) =>
 
 type Call = { method: string; body: Record<string, unknown> };
 
-/** Answers the subscription endpoint as the Worker would, and records each call. */
-async function recordSubscriptionCalls(page: Page, status = 204): Promise<Call[]> {
+/** Answers the subscription endpoint as the Worker would, or with `status`, and records each call. */
+async function recordSubscriptionCalls(page: Page, status = 200): Promise<Call[]> {
   const calls: Call[] = [];
   await page.route(`**${PUSH_SUBSCRIPTION_PATH}`, (route) => {
     const request = route.request();
     calls.push({ method: request.method(), body: request.postDataJSON() });
-    return route.fulfill({ status });
+    return route.fulfill({ status, json: { ok: true } });
   });
   return calls;
 }
 
-/** Makes every load of `page` a return visit. */
-const returning = (page: Page) =>
-  page.addInitScript((key) => {
-    if (localStorage.getItem(key) === null) localStorage.setItem(key, '1');
-  }, STORAGE_KEYS.visits);
+/** Registers the service worker, as a subscriber's browser has it from turning alerts on, and waits until it is active. */
+const workerReady = (page: Page) =>
+  page.evaluate(async (path) => {
+    await navigator.serviceWorker.register(path);
+    await navigator.serviceWorker.ready;
+  }, SERVICE_WORKER_PATH);
 
 for (const locale of LOCALES) {
   const m = DICTIONARIES[locale].alerts;
@@ -105,7 +102,6 @@ for (const locale of LOCALES) {
     test('does not offer alerts on a first visit', async ({ page }) => {
       await fakePush(page);
       await load(page);
-      await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
       await expect(card(page)).not.toBeVisible();
       await expect(bell(page)).toHaveAttribute('aria-pressed', 'false');
     });
@@ -144,7 +140,7 @@ for (const locale of LOCALES) {
 
     test('says so when turning on fails, and can try again', async ({ page }) => {
       await fakePush(page);
-      await returning(page);
+      await returningVisitor(page);
       await recordSubscriptionCalls(page, 500);
       await load(page);
       const turnOn = card(page).getByRole('button', { name: m.card.turnOn });
@@ -156,7 +152,7 @@ for (const locale of LOCALES) {
 
     test('Not now hides the card for the snooze period', async ({ page }) => {
       await fakePush(page);
-      await returning(page);
+      await returningVisitor(page);
       await load(page);
       await card(page).getByRole('button', { name: m.card.notNow }).click();
       await expect(card(page)).not.toBeVisible();
@@ -164,10 +160,7 @@ for (const locale of LOCALES) {
       await load(page);
       await expect(card(page)).not.toBeVisible();
 
-      await page.evaluate(([key, until]) => localStorage.setItem(key, String(until)), [
-        STORAGE_KEYS.alertsSnoozedUntil,
-        Date.now() - 1,
-      ] as const);
+      await storeBeforeLoad(page, STORAGE_KEYS.alertsSnoozedUntil, String(Date.now() - 1));
       await load(page);
       await expect(card(page)).toBeVisible();
       // Escape is Not now too.
@@ -179,7 +172,7 @@ for (const locale of LOCALES) {
 
     test('No thanks hides the card for good, and the bell still works', async ({ page }) => {
       await fakePush(page);
-      await returning(page);
+      await returningVisitor(page);
       await load(page);
       await card(page).getByRole('button', { name: m.card.noThanks }).click();
       await expect(card(page)).not.toBeVisible();
@@ -199,9 +192,8 @@ for (const locale of LOCALES) {
     test('turning off from the bell unsubscribes', async ({ page }) => {
       await fakePush(page, { subscribed: true });
       const calls = await recordSubscriptionCalls(page);
-      // A subscriber's browser has the worker from an earlier visit; this first load registers it.
       await page.goto(localePath(locale));
-      await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+      await workerReady(page);
       await load(page);
       await expect(bell(page)).toHaveAttribute('aria-pressed', 'true');
       await expect(bell(page)).toHaveAttribute('title', m.bell.on);
@@ -214,10 +206,10 @@ for (const locale of LOCALES) {
 
     test('turning off from the bell withdraws the offer for this visit', async ({ page }) => {
       await fakePush(page, { subscribed: true });
-      await returning(page);
+      await returningVisitor(page);
       await recordSubscriptionCalls(page);
       await page.goto(localePath(locale));
-      await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+      await workerReady(page);
       await page.reload();
       await expect(page.getByRole('status')).toBeVisible();
       await expect(bell(page)).toHaveAttribute('aria-pressed', 'true');
@@ -231,7 +223,7 @@ for (const locale of LOCALES) {
       await fakePush(page, { subscribed: true });
       const calls = await recordSubscriptionCalls(page);
       await page.goto(localePath(locale));
-      await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+      await workerReady(page);
       await load(page);
       await expect(bell(page)).toHaveAttribute('aria-pressed', 'true');
       // Back to an earlier entry of the same page, which is the same language.
@@ -275,7 +267,7 @@ for (const locale of LOCALES) {
           // Safari outside a home-screen app has no push manager at all.
           delete (window as { PushManager?: unknown }).PushManager;
         });
-        await returning(page);
+        await returningVisitor(page);
         await load(page);
         await expect(card(page)).toBeVisible();
         await expect(card(page).getByRole('listitem')).toHaveText(m.card.iosSteps);
@@ -291,14 +283,10 @@ for (const locale of LOCALES) {
     test('the open card fits a 320px screen', async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 640 });
       await fakePush(page);
-      await returning(page);
+      await returningVisitor(page);
       await load(page);
       await expect(card(page)).toBeVisible();
-      const { scroll, client } = await page.evaluate(() => ({
-        scroll: document.documentElement.scrollWidth,
-        client: document.documentElement.clientWidth,
-      }));
-      expect(scroll).toBeLessThanOrEqual(client);
+      expect(await scrollsSideways(page)).toBe(false);
       // Measured where it settles, after the entrance.
       await card(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
       const box = await card(page).boundingBox();

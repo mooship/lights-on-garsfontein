@@ -29,6 +29,13 @@ export function readStored(key: string): string | null {
   }
 }
 
+/** The stored value as a number, or null when it is missing or not one. */
+export function readStoredNumber(key: string): number | null {
+  const value = readStored(key);
+  const number = Number(value);
+  return value === null || Number.isNaN(number) ? null : number;
+}
+
 export function writeStored(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);

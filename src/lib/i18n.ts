@@ -3,7 +3,6 @@ import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from '../../shared/lo
 import { PRIVACY_PAGE_PATH } from '../../shared/paths';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../i18n';
-import { resaveAlerts } from './push';
 import { STORAGE_KEYS, writeStored } from './storage';
 
 const isLocale = (value: string | null): value is Locale => LOCALES.includes(value as Locale);
@@ -32,14 +31,9 @@ export const intlLocale = () => site.intlLocales[locale()];
 export const privacyHref = () => (locale() === DEFAULT_LOCALE ? PRIVACY_PAGE_PATH : `${PRIVACY_PAGE_PATH}#${locale()}`);
 
 function setLocale(next: Locale): void {
-  // Back or forward between entries of one language changes nothing, so it re-saves no alerts.
-  if (next === locale()) return;
   document.documentElement.lang = next;
   setLocaleSignal(next);
   writeStored(STORAGE_KEYS.locale, next);
-  resaveAlerts(next).catch(() => {
-    // The alerts keep their earlier language; the next switch or turning them on saves it again.
-  });
 }
 
 /**

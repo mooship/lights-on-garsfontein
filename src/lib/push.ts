@@ -1,8 +1,9 @@
-import { DAY_MS, MINUTE_MS } from '../../shared/api';
+import { DAY_MS, MINUTE_MS, type PushSubscriptionBody } from '../../shared/api';
+import { fromBase64Url } from '../../shared/base64url';
 import { SERVICE_WORKER_PATH } from '../../shared/paths';
 import type { Locale } from '../../site.config';
 import { api } from './api';
-import { readStored, STORAGE_KEYS, writeStored } from './storage';
+import { readStoredNumber, STORAGE_KEYS, writeStored } from './storage';
 
 export type PushSupport = 'supported' | 'ios-install' | 'unsupported';
 export type AlertsState = 'on' | 'off' | 'blocked' | 'ios-install' | 'unsupported';
@@ -16,23 +17,18 @@ export const ALERTS_OFFER_DELAY_MS = MINUTE_MS / 20;
 /** The alerts card waits for a return visit, so it never greets someone on their first page load. */
 const MIN_VISITS = 2;
 
-/** The parts of the browser that pushSupport reads, so Node tests can pass fakes. */
-export type PushEnv = {
-  window: { PushManager?: unknown; matchMedia?: (query: string) => { matches: boolean } };
-  navigator: { userAgent: string; maxTouchPoints?: number; serviceWorker?: unknown; standalone?: boolean };
-};
-
-const browser = (): PushEnv => ({ window, navigator }) as unknown as PushEnv;
-
-export function pushSupport(env: PushEnv = browser()): PushSupport {
-  const { window: win, navigator: nav } = env;
+export function pushSupport(): PushSupport {
+  const { userAgent, maxTouchPoints } = navigator;
+  const hasPush = 'PushManager' in window;
   // iPadOS 13 and later reports a Mac, so a Mac with a touch screen is an iPad.
-  const ios =
-    /iPhone|iPad|iPod/.test(nav.userAgent) || (/Macintosh/.test(nav.userAgent) && (nav.maxTouchPoints ?? 0) > 1);
-  const standalone = nav.standalone === true || win.matchMedia?.('(display-mode: standalone)').matches === true;
+  const ios = /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1);
+  // `standalone` is Safari's own flag for a site opened from the home screen.
+  const standalone =
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
   // iOS offers push only to a site added to the home screen: until then it has no PushManager.
-  if (ios && !standalone && !win.PushManager) return 'ios-install';
-  return nav.serviceWorker && win.PushManager ? 'supported' : 'unsupported';
+  if (ios && !standalone && !hasPush) return 'ios-install';
+  return 'serviceWorker' in navigator && hasPush ? 'supported' : 'unsupported';
 }
 
 /** The registration, or undefined when the worker was never registered. Only call when push is supported. */
@@ -50,35 +46,30 @@ export async function alertsState(): Promise<AlertsState> {
   return (await currentSubscription()) ? 'on' : 'off';
 }
 
-/** `applicationServerKey` wants bytes; the Worker serves the key as unpadded base64url. */
-export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
-  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-  return Uint8Array.from(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')), (c) => c.charCodeAt(0));
-}
-
 /** The same call saves a new subscription and updates the language of an existing one. */
 function save(subscription: PushSubscription, locale: Locale) {
-  const { endpoint, keys } = subscription.toJSON();
-  return api.subscribePush({
-    endpoint: endpoint ?? subscription.endpoint,
-    keys: keys as { p256dh: string; auth: string },
-    locale,
-  });
+  const keys = subscription.toJSON().keys as PushSubscriptionBody['keys'];
+  return api.subscribePush({ endpoint: subscription.endpoint, keys, locale });
 }
 
 /** Rejects when the key, the subscription or the save fails; the caller says so. Must run from a tap. */
 export async function turnOnAlerts(locale: Locale): Promise<AlertsState> {
   // First, because a browser only shows the prompt while the tap that asked for it is recent.
-  const permission = await Notification.requestPermission();
+  const asked = Notification.requestPermission();
+  // Fetched and registered while the prompt is open; registering again is harmless, and `ready`
+  // waits for ever if the worker was never registered.
+  const prepared = Promise.all([api.pushKey(), navigator.serviceWorker.register(SERVICE_WORKER_PATH)]);
+  prepared.catch(() => {
+    // Awaited below; this only stops an unhandled rejection when the visitor says no first.
+  });
+  const permission = await asked;
   if (permission === 'denied') return 'blocked';
   if (permission !== 'granted') return 'off';
-  const { publicKey } = await api.pushKey();
-  // Repeating register() is harmless, and `ready` alone would wait for ever if the page start never registered.
-  await navigator.serviceWorker.register(SERVICE_WORKER_PATH);
+  const [{ publicKey }] = await prepared;
   const { pushManager } = await navigator.serviceWorker.ready;
   const subscription = await pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: base64UrlToBytes(publicKey),
+    applicationServerKey: fromBase64Url(publicKey),
   });
   try {
     await save(subscription, locale);
@@ -118,12 +109,10 @@ export function shouldOfferCard(input: {
   return state === 'off' || state === 'ios-install';
 }
 
-/** Counts this page load, and registers the push worker where push can work. */
-export function startPush(): void {
-  writeStored(STORAGE_KEYS.visits, String((Number(readStored(STORAGE_KEYS.visits)) || 0) + 1));
-  if (pushSupport() === 'supported') {
-    navigator.serviceWorker.register(SERVICE_WORKER_PATH).catch(() => {
-      // Without a worker alerts cannot be turned on, and turnOnAlerts reports that when asked.
-    });
-  }
+/**
+ * Counts this page load. The worker is registered only when alerts are turned on: a browser
+ * re-checks a registered worker on its own as pages load, so a subscriber's stays up to date.
+ */
+export function countVisit(): void {
+  writeStored(STORAGE_KEYS.visits, String((readStoredNumber(STORAGE_KEYS.visits) ?? 0) + 1));
 }
