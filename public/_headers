@@ -19,7 +19,7 @@
 /favicon*
   Cache-Control: public, max-age=86400
 
-# Browsers must see a new copy at once (public/sw.js says why).
+# A change to the worker must reach browsers on their next visit, not after a cached copy expires.
 /sw.js
   Cache-Control: no-cache
 

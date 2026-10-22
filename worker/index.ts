@@ -1,6 +1,8 @@
 import { API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
 import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
+import { type AlertPage, claimAlerts, enqueueAlerts } from './lib/alerts';
+import { deliverAlertPage } from './lib/deliver';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
 import { errors } from './lib/http';
 import { dispatch, purgeEdgeCache } from './lib/router';
@@ -54,6 +56,15 @@ export default {
       await purgeExpiredSessions(db, now);
     } else {
       if (await detectOutage(db, now)) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);
+      await enqueueAlerts(db, env.PUSH_QUEUE, await claimAlerts(db, now), now);
     }
   },
-} satisfies ExportedHandler<Env>;
+
+  /** One page of an alert per message; see worker/lib/deliver.ts. */
+  async queue(batch, env) {
+    for (const message of batch.messages) {
+      await deliverAlertPage(message.body, env, new Date());
+      message.ack();
+    }
+  },
+} satisfies ExportedHandler<Env, AlertPage>;

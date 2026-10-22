@@ -5,7 +5,7 @@ import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
 import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from './shared/locale.ts';
-import { ADMIN_PAGE_PATH, API_PREFIX, SECURITY_TXT_PATH, WORKER_PAGES } from './shared/paths.ts';
+import { ADMIN_PAGE_PATH, API_PREFIX, SECURITY_TXT_PATH, SERVICE_WORKER_PATH, WORKER_PAGES } from './shared/paths.ts';
 import { type Locale, site } from './site.config.ts';
 import { HEAD } from './src/i18n/head.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
@@ -44,6 +44,7 @@ const GENERATED = {
   '/site.webmanifest': { mode: 'json', type: 'application/manifest+json', dev: true },
   '/llms.txt': { mode: 'text', type: 'text/plain; charset=utf-8', dev: true },
   [SECURITY_TXT_PATH]: { mode: 'text', type: 'text/plain; charset=utf-8', dev: false },
+  [SERVICE_WORKER_PATH]: { mode: 'js', type: 'text/javascript; charset=utf-8', dev: true },
 } as const;
 
 const generated = (url: keyof typeof GENERATED) =>

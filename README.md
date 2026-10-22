@@ -31,17 +31,20 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
 | `POST /api/contact` | The privacy contact address | `no-store` | 5/min; Turnstile |
+| `GET /api/push/key` | The public key (`publicKey`, base64url) that a browser subscribes to power alerts with; `404` with `not_configured` while the key is unset | `max-age=86400` | Shared 60/min |
+| `POST`/`DELETE /api/push/subscription` | Saves or removes a browser's power alert subscription; `{ "ok": true }` | `no-store` | 5/min |
 | `POST /api/heartbeat` | Sensor check-in, with an optional `{ "poweredFor" }` ([Sensor](#sensor)) | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/heartbeat/pause` | Pauses outage detection | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
-- "Shared 60/min" is one limit per connection across those five endpoints, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` has its own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
+- "Shared 60/min" is one limit per connection across those five endpoints and `GET /api/push/key`, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` and the push subscription writes each have their own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
 - A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt.
 - Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.
 - Only the admin API exposes an outage's `source`.
 - `POST /api/contact` takes `{ "token" }`, a Turnstile token solved for the `contact` action, and answers `200` with `{ "email" }`, or `404` with `not_configured`.
+- `POST /api/push/subscription` takes `{ "endpoint", "keys": { "p256dh", "auth" }, "locale" }` from a browser's push subscription and stores exactly those four values, with the time it was first saved; subscribing again with the same `endpoint` replaces the keys and language and keeps that first time. The `endpoint` must be an `https` address on a push service's host (`PUSH_HOSTS` in `worker/routes/push.ts`), or the answer is `400`. So is a `p256dh` that is not a 65-byte uncompressed P-256 point or an `auth` that is not 16 bytes (both base64url), since no alert could ever be encrypted to them. Both answer `{ "ok": true }`; `DELETE` takes `{ "endpoint" }` and answers so whether or not it was stored. Nothing that identifies the visitor is stored beyond the subscription itself.
 
 ### CSV contract
 
@@ -200,7 +203,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 
 3. **Edit the place copy** in `src/i18n/*.ts` (for example `masthead`, `footer.measured`, `footer.operator` and `scope`) and the `<head>` copy in `src/i18n/head.ts`.
 4. **Review the prose** in `index.html`, `privacy.html`, `404.html` and `templates/` (`llms.txt`, `site.webmanifest`, `.well-known/security.txt`) that names the area or operator. Config values go in as `%site.<path>%` and the start date as `%since.<locale>%`; the build fails on an unknown placeholder.
-5. **Configure Cloudflare**: `cp wrangler.example.toml wrangler.toml` and follow the numbered steps at its top (Worker and database names, `npx wrangler d1 create`, Turnstile widget and hostnames, `SITE_URL`). Each rate limiter's `namespace_id` must be unique in your account. Keep `workers_dev = true`, or uncomment `routes` for a custom domain and set `workers_dev = false` once it is live.
+5. **Configure Cloudflare**: `cp wrangler.example.toml wrangler.toml` and follow the numbered steps at its top (Worker and database names, `npx wrangler d1 create`, Turnstile widget and hostnames, `SITE_URL`). Each rate limiter's `namespace_id` must be unique in your account. Create the queue that power alerts go through once, with `npx wrangler queues create lights-on-push`. Keep `workers_dev = true`, or uncomment `routes` for a custom domain and set `workers_dev = false` once it is live.
 6. **Set the secrets** (`npx wrangler login`, then `npx wrangler secret put <NAME>`):
 
    | Secret | Purpose |
@@ -210,6 +213,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `TURNSTILE_SECRET_KEY` | The Turnstile widget's secret key |
    | `ADMIN_API_TOKEN` | Optional: bearer token for scripts |
    | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor |
+   | `VAPID_PRIVATE_KEY` | Optional: the key that signs power alerts, an ECDSA P-256 private key as a one-line JWK: `npm run --silent vapid-keys | npx wrangler secret put VAPID_PRIVATE_KEY`. The public key is derived from it and served at `GET /api/push/key`; until it is set, that answers `404` and browsers cannot subscribe |
    | `CONTACT_EMAIL` | Optional: address for privacy requests, revealed on the privacy page only after a Turnstile check. Until it is set, requests go to public GitHub issues |
 
    For random values, use for example `openssl rand -base64 32`.
@@ -217,7 +221,16 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
 8. **Regenerate the images**: `npm run og` (social card) and `npm run icons` (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand. The colours come from `src/styles/palette.ts`; files that cannot import it keep copies to change with it: `src/styles/privacy.css`, the theme-color metas in `index.html`, `public/favicon*.svg`, and `background_color` and `theme_color` in `templates/site.webmanifest` (JSON, so it cannot carry a note).
 9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and terms, is written for POPIA and describes this deployment's data handling; `FORKERS` comments mark what to check. Do not use utility or municipal logos, and keep the independence disclaimer.
 
-Two crons run the Worker. Every minute it opens an outage for a silent sensor. Every hour it removes expired sessions.
+Two crons run the Worker. Every minute it opens an outage for a silent sensor, then queues the power alerts that are due (an outage that has lasted `ALERT_DELAY_MS`, set in `worker/lib/alerts.ts`, and the follow-up to one that was alerted: its return, or its dismissal as a false positive). Every hour it removes expired sessions.
+
+### Power alerts
+
+Visitors can ask their browser for a notification when the power goes off and when it is back. The service worker `templates/sw.js` shows it, and the subscription is stored as described under `POST /api/push/subscription` above.
+
+- **When.** An outage is alerted once it has lasted `ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, so a short dip sends nothing. If it was alerted, its end sends a "back on" alert. If it is instead marked a false positive, by the sensor or an admin, every subscriber gets one calm follow-up ("No outage reported", "The earlier alert … was not confirmed", the status page's own wording) that replaces the "off" alert on screen and never says why. An outage gets one follow-up or the other, never both.
+- **Delivery.** The minute cron puts pages of subscriptions on the `PUSH_QUEUE` queue (`lights-on-push`), and the queue handler sends each page to the push service, retrying transient failures (429, 5xx, network errors) up to `PUSH_MAX_ATTEMPTS`. A message that is not delivered within `PUSH_TTL_SECONDS` (`worker/lib/webpush.ts`, one hour) is dropped by the push service, so nobody gets a stale alert hours later. A subscription the push service answers `404` or `410` for is deleted.
+- **Bindings.** `PUSH_QUEUE` and `PUSH_LIMITER` are in `wrangler.toml` (also under `[env.e2e]`) and `wrangler.example.toml`. `PUSH_LIMITER` is the 5/min limit on the subscription writes.
+- **Privacy.** [`privacy.html`](privacy.html) says what a subscription holds and when it is deleted; keep it accurate if that changes.
 
 ## Extending
 
@@ -225,13 +238,13 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor. E
 | --- | --- |
 | `site.config.ts` | Deployment identity (see [Run it for your area](#run-it-for-your-area)) |
 | `src/` | SolidJS app: `components/`, `lib/`, `styles/` (colours in `palette.ts`), `banners.ts` |
-| `public/` | Static files copied as they are: icons, `_headers`, and `sw.js`, a kill switch for an earlier offline service worker (the file says why); the app registers none |
+| `public/` | Static files copied as they are: icons and `_headers` |
 | `src/i18n/` | Public copy: one dictionary per language (`af.ts` is the source) and `head.ts` for the `<head>` |
 | `src/admin/` | The `/admin` page; its copy is English-only, in `copy.ts`, outside the dictionaries |
 | `worker/` | Worker: `index.ts` (security headers, crons), `routes/` (handlers; the route table is in `routes/index.ts`), `lib/` (router, grid, stats, auth, Turnstile), `crons.ts`, `db/schema.ts` |
 | `shared/` | Types and constants for both the app and the Worker: `api.ts` (API types, `OUTAGE_SOURCES`, `UTC_OFFSET_MS`, `localDate`), `paths.ts`, `errors.ts`, `locale.ts` (`LOCALES`, `DEFAULT_LOCALE`, `pageLocale`) |
 | `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload |
-| `index.html`, `privacy.html`, `404.html`, `templates/` | Static pages (`404.html` answers any unknown path with status 404, so the build also writes `admin.html` for `/admin`), `llms.txt`, `site.webmanifest` and `.well-known/security.txt`, filled from `site.config.ts` at build time |
+| `index.html`, `privacy.html`, `404.html`, `templates/` | Static pages (`404.html` answers any unknown path with status 404, so the build also writes `admin.html` for `/admin`), `llms.txt`, `site.webmanifest`, `.well-known/security.txt` and `sw.js` (the service worker that only shows power alerts pushed to the browser; it has no fetch handler, so it caches nothing), filled from `site.config.ts` at build time |
 | `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the MacBook sensor |
 | `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 
@@ -253,6 +266,8 @@ cp .dev.vars.example .dev.vars   # local test keys; sign in as "admin" / "test-p
 npm run db:migrate:local
 npm run preview                  # build, then serve on http://localhost:8787
 ```
+
+`wrangler dev` needs `VAPID_PRIVATE_KEY` in your own `.dev.vars`, so copy it from `.dev.vars.example` as above; without it `GET /api/push/key` answers `404` and power alerts cannot be turned on locally.
 
 For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm run dev:worker` and `npm run dev` side by side; Vite serves the UI on port 5173 and proxies the API to the Worker.
 

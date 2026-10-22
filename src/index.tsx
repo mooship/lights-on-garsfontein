@@ -3,6 +3,7 @@ import { ADMIN_PAGE_PATH } from '../shared/paths';
 import { App, type InitialData } from './App';
 import { api } from './lib/api';
 import { leaving } from './lib/i18n';
+import { countVisit } from './lib/push';
 import { STORAGE_KEYS } from './lib/storage';
 import './styles/theme.css';
 import './styles/global.css';
@@ -16,6 +17,7 @@ function start() {
     // createPoll reports failures; these only stop an unhandled rejection before it subscribes.
     initial.status.catch(() => {});
     initial.stats.catch(() => {});
+    countVisit();
   }
 
   const root = document.getElementById('root');

@@ -5,6 +5,7 @@ import {
   type OutagesResponse,
   POWER_STATUSES,
   type PowerStatus,
+  type PushSubscriptionBody,
   type StatsResponse,
   type StatusResponse,
   type TimerAction,
@@ -15,6 +16,8 @@ import {
   LOGIN_PATH,
   LOGOUT_PATH,
   OUTAGES_PATH,
+  PUSH_KEY_PATH,
+  PUSH_SUBSCRIPTION_PATH,
   STATS_PATH,
   STATUS_PATH,
   TIMER_PATH,
@@ -80,6 +83,11 @@ export const api = {
   contact: (token: string) => post<{ email: string }>(CONTACT_PATH, { token }),
   login: (username: string, password: string, token: string) =>
     post<{ ok: true }>(LOGIN_PATH, { username, password, token }),
+  pushKey: () =>
+    request<{ publicKey: string }>(PUSH_KEY_PATH, undefined, (b) => isRecord(b) && typeof b.publicKey === 'string'),
+  subscribePush: (subscription: PushSubscriptionBody) => post<{ ok: true }>(PUSH_SUBSCRIPTION_PATH, subscription),
+  unsubscribePush: (endpoint: string) =>
+    request<{ ok: true }>(PUSH_SUBSCRIPTION_PATH, { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
   logout: () => post<{ ok: true }>(LOGOUT_PATH),
   outages: () => request<AdminOutagesResponse>(ADMIN_OUTAGES_PATH),
   punch: (action: TimerAction) => post(TIMER_PATH, { action }),

@@ -1,3 +1,6 @@
+// The extension, because scripts/hash-password.ts runs this module in Node.
+import { toBase64Url } from '../../shared/base64url.ts';
+
 const encoder = new TextEncoder();
 
 // Cloudflare Workers caps PBKDF2 at 100k iterations.
@@ -11,10 +14,6 @@ function toBase64(bytes: Uint8Array): string {
 
 function fromBase64(value: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-  return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /** Hand-rolled: scripts/hash-password.ts runs this module in Node, which lacks Workers' `timingSafeEqual`. */

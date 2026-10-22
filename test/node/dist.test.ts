@@ -46,16 +46,17 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  it('serves a /sw.js that clears and unregisters the removed service worker', () => {
+  it('serves a /sw.js that clears old caches, shows pushes and never answers requests', () => {
     const sw = read('sw.js');
-    expect(sw).toContain('registration.unregister()');
     expect(sw).toContain('caches.delete');
-    // No fetch handler: from the moment it installs, every request goes to the network.
+    expect(sw).toContain('showNotification');
+    expect(sw).not.toContain('unregister');
+    // No fetch handler: every request goes to the network, so a stale status is never served as live.
     expect(sw).not.toMatch(/addEventListener\(\s*['"]fetch/);
   });
 
   it('leaves no placeholder unfilled', () => {
-    for (const file of [...HTML, 'site.webmanifest', 'llms.txt']) {
+    for (const file of [...HTML, 'site.webmanifest', 'llms.txt', 'sw.js']) {
       // index.html's own comment names the placeholders.
       const text = stripRepeatedly(read(file), /<!--[\s\S]*?-->/g);
       expect(text, file).not.toMatch(/%(?:site|since|page)\./);
@@ -70,10 +71,12 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  // sw.js is only the kill switch above; the app never registers a service worker.
-  it('never registers a service worker', () => {
+  // Turning alerts on registers it; the admin page has no bell, so it never does.
+  it('registers /sw.js from the public bundle', () => {
     const scripts = readdirSync(resolve(DIST, 'assets')).filter((name) => name.endsWith('.js'));
-    expect(scripts.length).toBeGreaterThan(0);
-    for (const name of scripts) expect(read(`assets/${name}`), name).not.toContain('serviceWorker');
+    // The path is a shared constant, so it can sit in another chunk than the call.
+    const bundle = scripts.map((name) => read(`assets/${name}`)).join('\n');
+    expect(bundle).toContain('serviceWorker.register(');
+    expect(bundle).toMatch(/[`'"]\/sw\.js[`'"]/);
   });
 });

@@ -1,0 +1,24 @@
+meta {
+  name: push-key
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/push/key
+}
+
+tests {
+  test('200 JSON with the public key, cached for a day, closed to other sites', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('application/json; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=86400');
+    expect(res.getHeader('access-control-allow-origin')).to.equal(undefined);
+  });
+
+  test('publicKey is an uncompressed P-256 point in base64url', () => {
+    const body = res.getBody();
+    expect(body).to.have.all.keys('publicKey');
+    expect(body.publicKey).to.match(/^B[\w-]{86}$/);
+  });
+}

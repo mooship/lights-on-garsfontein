@@ -158,6 +158,8 @@ export async function recordHeartbeat(
       isFalsePositive: sql<boolean>`0`.as('is_false_positive'),
       isPlanned: sql<boolean>`0`.as('is_planned'),
       dismissedBy: sql<null>`null`.as('dismissed_by'),
+      offAlertAt: sql<null>`null`.as('off_alert_at'),
+      onAlertAt: sql<null>`null`.as('on_alert_at'),
     })
     .from(heartbeats)
     .where(

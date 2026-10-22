@@ -12,8 +12,17 @@ export const escapeHtml = (text: string) =>
 /** `text` as the inside of a JSON string, with < escaped so it cannot close a <script>. */
 export const jsonString = (text: string) => JSON.stringify(text).slice(1, -1).replace(/</g, '\\u003c');
 
-/** How `fill` escapes a value: for HTML, inside a JSON string, or not at all. */
-type Mode = 'html' | 'json' | 'text';
+/**
+ * `text` as the inside of a single- or double-quoted JS string. JSON.stringify covers backslashes
+ * and double quotes; < and ' become \u escapes in the same pass, so none needs a backslash of its own.
+ */
+export const jsString = (text: string) =>
+  JSON.stringify(text)
+    .slice(1, -1)
+    .replace(/[<']/g, (char) => (char === '<' ? '\\u003c' : '\\u0027'));
+
+/** How `fill` escapes a value: for HTML, inside a JSON string, inside a quoted JS string, or not at all. */
+type Mode = 'html' | 'json' | 'js' | 'text';
 
 /** The value behind a placeholder name: `site.<path>` or `since.<locale>`. */
 function placeholder(name: string): string | readonly string[] {
@@ -45,6 +54,7 @@ export function fill(text: string, mode: Mode, file: string): string {
       return Array.isArray(value) ? JSON.stringify(value).replace(/</g, '\\u003c') : jsonString(value as string);
     }
     const plain = Array.isArray(value) ? value.join(' ') : (value as string);
+    if (mode === 'js') return jsString(plain);
     return mode === 'html' ? escapeHtml(plain) : plain;
   });
   const leftover = /%(?:site|since)\.[\w.-]*%?/.exec(out);

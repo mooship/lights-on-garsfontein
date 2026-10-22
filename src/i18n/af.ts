@@ -1,6 +1,9 @@
 // Afrikaans is the default and the source of truth: en.ts must match this shape.
 // Public copy never says how an outage was recorded (no "sensor" or "met die hand").
 
+// The status page's NONE, which the correction alert repeats: it claims no more than the page shows.
+const NO_OUTAGE_REPORTED = 'Geen onderbreking aangemeld nie';
+
 export const af = {
   // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
   lang: { switchTo: 'Switch to English', next: 'English' },
@@ -54,7 +57,7 @@ export const af = {
     ON: 'Die krag is aan',
     OFF: 'Die krag is af',
     // ON without a fresh live reading: no outage is known, but nothing measured the power as on.
-    NONE: 'Geen onderbreking aangemeld nie',
+    NONE: NO_OUTAGE_REPORTED,
     for: (duration: string) => `Al ${duration}`,
     loading: 'Laai tans die huidige status…',
     // `day` is formatRelativeDay's: vandag, gister or "op Sa. 17 Okt.".
@@ -130,6 +133,57 @@ export const af = {
       '’n Dag tel as daar op enige tydstip daardie dag ’n onderbreking was.',
       'Die syfers dek net onderbrekings wat by die meetpunt aangeteken is.',
     ],
+  },
+  // The alerts bell (src/components/AlertsBell.tsx) and card (AlertsCard.tsx). The bell's name is
+  // `label`; the others describe its state. The card never claims more than the scope line says.
+  alerts: {
+    bell: {
+      label: 'Kragkennisgewings',
+      on: 'Skakel kragkennisgewings af',
+      off: 'Skakel kragkennisgewings aan',
+      blocked: 'Kragkennisgewings is in jou blaaier geblokkeer',
+      install: 'Hoe om kragkennisgewings te kry',
+    },
+    card: {
+      heading: 'Wil jy op hoogte bly?',
+      body: 'Kry ’n kennisgewing wanneer die krag in Uitbreiding 16 afgaan, en wanneer dit weer aan is.',
+      scope: 'Daar word by een punt in Uitbreiding 16 gemeet, so sommige strate kan verskil.',
+      privacy: 'Wat ons stoor',
+      turnOn: 'Skakel kennisgewings aan',
+      notNow: 'Nie nou nie',
+      noThanks: 'Nee dankie',
+      close: 'Maak toe',
+      // An iPhone offers notifications only to a site opened from the home screen. iOS has no
+      // Afrikaans, so the menu item keeps its English name.
+      iosIntro: 'Op ’n iPhone moet jy die webwerf eers by jou tuisskerm voeg:',
+      iosSteps: [
+        'Tik op die deelknoppie in Safari.',
+        'Kies “Add to Home Screen”.',
+        'Maak die webwerf van jou tuisskerm af oop en tik op die klokkie.',
+      ],
+      blockedHelp:
+        'Kennisgewings vir hierdie webwerf is in jou blaaier geblokkeer. Laat kennisgewings in die blaaier se instellings toe, en tik dan weer op die klokkie.',
+      unsupported: 'Hierdie blaaier kan nie kennisgewings van die webwerf ontvang nie. Probeer ’n ander blaaier.',
+      failed: 'Dit het nie gewerk nie. Probeer asseblief oor ’n rukkie weer.',
+      turnedOn: 'Kennisgewings is aangeskakel.',
+      turnedOff: 'Kennisgewings is afgeskakel.',
+    },
+  },
+  // Web push alerts. `on` takes the time it came back and how long it was off (formatted with `units`).
+  push: {
+    off: { title: 'Die krag is af', body: (time: string) => `Geen krag in Garsfontein Uitb. 16 sedert ${time} nie.` },
+    planned: {
+      title: 'Beplande onderbreking',
+      body: (time: string) => `Dit het om ${time} begin en is vooraf aangekondig.`,
+    },
+    on: {
+      title: 'Die krag is weer aan',
+      body: (time: string, duration: string) => `Weer aan om ${time} na ${duration}.`,
+    },
+    dismissed: {
+      title: NO_OUTAGE_REPORTED,
+      body: 'Die vorige waarskuwing oor Garsfontein Uitb. 16 is nie bevestig nie.',
+    },
   },
 };
 

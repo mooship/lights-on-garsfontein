@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from '../../build/html';
+import { escapeHtml, fill, fillStaticI18n, jsonString, jsString, localeVisibilityCss } from '../../build/html';
 import { site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n';
 
@@ -11,6 +11,14 @@ describe('escaping', () => {
   it('escapes text for inside a JSON string in a <script>', () => {
     expect(jsonString('say "hi"\n</script>')).toBe('say \\"hi\\"\\n\\u003c/script>');
   });
+
+  it('escapes text for inside a single- or double-quoted JS string in a service worker', () => {
+    const value = `back\\slash 'single' "double" line\nbreak </script>`;
+    const escaped = jsString(value);
+    expect(escaped).not.toContain('</');
+    expect(new Function(`return '${escaped}'`)()).toBe(value);
+    expect(new Function(`return "${escaped}"`)()).toBe(value);
+  });
 });
 
 describe('fill', () => {
@@ -20,6 +28,8 @@ describe('fill', () => {
     expect(fill('%since.en% / %since.af%', 'text', 'f')).toBe('17 October 2026 / 17 Oktober 2026');
     const json = JSON.parse(fill('{"name": "%site.brand.full%", "inLanguage": %site.locales%}', 'json', 'f'));
     expect(json).toEqual({ name: site.brand.full, inLanguage: site.locales });
+    const js = fill(`['%site.brand.full%', '%site.locales%']`, 'js', 'f');
+    expect(new Function(`return ${js}`)()).toEqual([site.brand.full, site.locales.join(' ')]);
   });
 
   it('fails the build on an unknown, malformed or misplaced placeholder', () => {

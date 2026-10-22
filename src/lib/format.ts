@@ -1,4 +1,5 @@
-import { DAY_MS, HOUR_MS, MINUTE_MS, UTC_OFFSET_MS } from '../../shared/api';
+import { DAY_MS, UTC_OFFSET_MS } from '../../shared/api';
+import { formatDurationIn, formatTimeOfDay, splitDuration } from '../../shared/format';
 import { site } from '../../site.config';
 import { intlLocale, t } from './i18n';
 import { pad2, zoned } from './zone';
@@ -16,7 +17,6 @@ function lazyFormat(options: Intl.DateTimeFormatOptions): (date: Date) => string
 }
 
 const dayFormat = lazyFormat({ timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' });
-const timeFormat = lazyFormat({ timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const dateFormat = lazyFormat({ timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
 const shortDateFormat = lazyFormat({ timeZone: 'UTC', day: 'numeric', month: 'short' });
 
@@ -41,7 +41,7 @@ export function formatHours(hours: number): string {
   return `${formatNumber(hours >= 100 ? Math.round(hours) : hours)} ${t().units.h}`;
 }
 /** "14:05" in the configured zone, from an ISO time or epoch ms. */
-export const formatTime = (at: string | number) => timeFormat(new Date(at));
+export const formatTime = (at: string | number) => formatTimeOfDay(at, intlLocale());
 
 const zoneDay = lazyFormat({ timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
 
@@ -59,26 +59,8 @@ export function formatRelativeDay(iso: string, now: number): string {
   return t().day.on(formatDay(iso));
 }
 
-/** Whole days, the hours and minutes left over, and the total seconds (negative counts as 0). */
-function splitDuration(ms: number) {
-  const clamped = Math.max(0, ms);
-  return {
-    days: Math.floor(clamped / DAY_MS),
-    hours: Math.floor((clamped % DAY_MS) / HOUR_MS),
-    minutes: Math.floor((clamped % HOUR_MS) / MINUTE_MS),
-    seconds: Math.floor(clamped / 1000),
-  };
-}
-
 /** "3 d 4 u", "2 u 14 min", "2 u", "5 min", "40 s" ("h" in English); a zero remainder is left out. */
-export function formatDuration(ms: number): string {
-  const { days, hours, minutes, seconds } = splitDuration(ms);
-  const u = t().units;
-  if (days > 0) return hours > 0 ? `${days} ${u.d} ${hours} ${u.h}` : `${days} ${u.d}`;
-  if (hours > 0) return minutes > 0 ? `${hours} ${u.h} ${minutes} ${u.min}` : `${hours} ${u.h}`;
-  if (minutes > 0) return `${minutes} ${u.min}`;
-  return `${seconds} ${u.s}`;
-}
+export const formatDuration = (ms: number) => formatDurationIn(ms, t().units);
 
 /** Tab-friendly duration: "3d 4u", "1u 5m", "5m" ("h" in English). */
 export function formatCompactDuration(ms: number): string {

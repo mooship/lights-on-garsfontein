@@ -54,9 +54,22 @@ export async function logOutage(request: APIRequestContext, daysAgo: number): Pr
   return ((await res.json()) as { outage: { id: number } }).outage.id;
 }
 
+/** Stores `value` under `key` in localStorage before every load of `page`. */
+export const storeBeforeLoad = (page: Page, key: string, value: string) =>
+  page.addInitScript(([k, v]) => localStorage.setItem(k, v), [key, value] as const);
+
 /** Stores the app's language before every load of `page` (the app's own default is site.locales[0]). */
-export const withLocale = (page: Page, locale: Locale) =>
-  page.addInitScript(([key, l]) => localStorage.setItem(key, l), [STORAGE_KEYS.locale, locale] as const);
+export const withLocale = (page: Page, locale: Locale) => storeBeforeLoad(page, STORAGE_KEYS.locale, locale);
+
+/** Makes every load of `page` a return visit, which the alerts card waits for. */
+export const returningVisitor = (page: Page) => storeBeforeLoad(page, STORAGE_KEYS.visits, '1');
+
+/** Whether the page scrolls sideways, once its fonts have painted. */
+export const scrollsSideways = (page: Page) =>
+  page.evaluate(async () => {
+    await document.fonts.ready;
+    return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+  });
 
 /**
  * Every test starts with no outages, as the tests share one database. Rate-limit counts carry

@@ -29,7 +29,7 @@ migrations_dir = "drizzle"
 
 # Workers Rate Limiting API. namespace_id must be unique per account.
 #
-# Per-connection limit on the public reads: status, statistics, CSV and feed.
+# Per-connection limit on the public reads: status, statistics, CSV, feed and the push key.
 [[ratelimits]]
 name = "STATUS_LIMITER"
 namespace_id = "4501"
@@ -52,6 +52,24 @@ simple = { limit = 5, period = 60 }
 name = "LOGIN_GLOBAL_LIMITER"
 namespace_id = "4504"
 simple = { limit = 30, period = 60 }
+
+# Per-connection limit on push alert subscriptions (/api/push/subscription), the same as CONTACT_LIMITER.
+[[ratelimits]]
+name = "PUSH_LIMITER"
+namespace_id = "4505"
+simple = { limit = 5, period = 60 }
+
+# Push alerts: the minute cron queues pages of subscriptions (worker/lib/alerts.ts) and the
+# queue handler delivers them. One page per batch and no automatic retries: the handler retries
+# itself, up to PUSH_MAX_ATTEMPTS. Create the queue once: npx wrangler queues create lights-on-push
+[[queues.producers]]
+binding = "PUSH_QUEUE"
+queue = "lights-on-push"
+
+[[queues.consumers]]
+queue = "lights-on-push"
+max_batch_size = 1
+max_retries = 0
 
 [triggers]
 # Outage detection every minute; housekeeping (purging expired sessions) hourly.
@@ -78,7 +96,8 @@ persist = true
 enabled = true
 
 # Secrets (set with `wrangler secret put <NAME>`, see README):
-# ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, TURNSTILE_SECRET_KEY, CONTACT_EMAIL
+# ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, TURNSTILE_SECRET_KEY, CONTACT_EMAIL,
+# VAPID_PRIVATE_KEY (npm run vapid-keys)
 
 # The Playwright suite only (`wrangler dev --env e2e`, playwright.config.ts); never deployed. The
 # suite loads the page far more often than a reader, so the status limit is out of its way.
@@ -118,3 +137,17 @@ simple = { limit = 5, period = 60 }
 name = "LOGIN_GLOBAL_LIMITER"
 namespace_id = "4514"
 simple = { limit = 30, period = 60 }
+
+[[env.e2e.ratelimits]]
+name = "PUSH_LIMITER"
+namespace_id = "4515"
+simple = { limit = 10, period = 60 }
+
+[[env.e2e.queues.producers]]
+binding = "PUSH_QUEUE"
+queue = "lights-on-push-e2e"
+
+[[env.e2e.queues.consumers]]
+queue = "lights-on-push-e2e"
+max_batch_size = 1
+max_retries = 0

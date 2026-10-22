@@ -39,6 +39,7 @@ import { HEAD } from '../src/i18n/head';
 import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
 import { PAGE_SIZE } from '../src/lib/pages';
 import { STATS_POLL_MS } from '../src/lib/poll';
+import { ALERTS_OFFER_DELAY_MS } from '../src/lib/push';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
 import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
@@ -50,6 +51,8 @@ import {
   patchJson,
   pollNow,
   readLayoutShift,
+  returningVisitor,
+  scrollsSideways,
   test,
   trackLayoutShift,
   withLocale,
@@ -381,6 +384,24 @@ test.describe('public page', () => {
         await page.goto(localePath(locale));
         await expect(page.locator('html')).toHaveAttribute('lang', locale);
         expect(await readLayoutShift(page)).toBe(0);
+      });
+
+      test(`has zero cumulative layout shift with the alerts card open (${locale})`, async ({ page }) => {
+        await page.clock.install();
+        // A return visit in a browser that allows notifications (the test browser denies them).
+        await returningVisitor(page);
+        await page.addInitScript(() => Object.defineProperty(Notification, 'permission', { get: () => 'default' }));
+        await trackLayoutShift(page);
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('status')).toBeVisible();
+        // A card in the page flow, at its end, would lengthen the page without moving anything the
+        // layout-shift API counts, so the page's own box is checked too.
+        const main = page.locator('.gg-main');
+        const before = await main.boundingBox();
+        await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
+        await expect(page.getByRole('dialog', { name: DICTIONARIES[locale].alerts.card.heading })).toBeVisible();
+        expect(await readLayoutShift(page)).toBe(0);
+        expect(await main.boundingBox()).toEqual(before);
       });
     });
   }
@@ -843,12 +864,7 @@ test.describe('narrow screens', () => {
       test(`${path} has no horizontal scroll at 320px (${locale})`, async ({ page }) => {
         await withLocale(page, locale);
         await page.goto(path);
-        await page.evaluate(() => document.fonts.ready);
-        const { scroll, client } = await page.evaluate(() => ({
-          scroll: document.documentElement.scrollWidth,
-          client: document.documentElement.clientWidth,
-        }));
-        expect(scroll).toBeLessThanOrEqual(client);
+        expect(await scrollsSideways(page)).toBe(false);
       });
     }
 
@@ -1142,12 +1158,7 @@ test.describe('all outages', () => {
         await page.getByRole('button', { name: DICTIONARIES[locale].history.showAll }).click();
         const pager = page.getByRole('navigation', { name: DICTIONARIES[locale].history.pages });
         await expect(pager).toBeVisible();
-        await page.evaluate(() => document.fonts.ready);
-        const { scroll, client } = await page.evaluate(() => ({
-          scroll: document.documentElement.scrollWidth,
-          client: document.documentElement.clientWidth,
-        }));
-        expect(scroll).toBeLessThanOrEqual(client);
+        expect(await scrollsSideways(page)).toBe(false);
         // One row: the buttons and the page label all share one line.
         const boxes = await pager.locator(':scope > *').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
         expect(boxes).toHaveLength(3);
@@ -1416,7 +1427,7 @@ test.describe('unexpected responses', () => {
     await expect(page.locator('#username')).toHaveAttribute('maxlength', String(CREDENTIAL_MAX_LENGTH.username));
   });
 
-  test('serves the service worker kill switch at /sw.js, never cached', async ({ request }) => {
+  test('serves the push service worker at /sw.js, never cached', async ({ request }) => {
     const response = await request.get('/sw.js');
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toMatch(/javascript/);

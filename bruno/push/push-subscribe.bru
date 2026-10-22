@@ -1,0 +1,31 @@
+meta {
+  name: push-subscribe
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/push/subscription
+  body: json
+}
+
+body:json {
+  {
+    "endpoint": "https://fcm.googleapis.com/fcm/send/bruno-test",
+    "keys": {
+      "p256dh": "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+      "auth": "BTBZMqHH6r4Tts7J_aSIgg"
+    },
+    "locale": "en"
+  }
+}
+
+tests {
+  // This folder is not in `public`: `npm run test:api:prod` runs `public` only, and must never store a subscription in production.
+  test('200 ok, not cached, closed to other sites', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.deep.equal({ ok: true });
+    expect(res.getHeader('cache-control')).to.equal('no-store');
+    expect(res.getHeader('access-control-allow-origin')).to.equal(undefined);
+  });
+}

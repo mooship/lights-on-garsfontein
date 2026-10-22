@@ -33,10 +33,10 @@
       <p class="jump"><a href="/">← %site.brand.full%</a></p>
       <p class="jump"><a href="#af">Afrikaans</a> · <a href="#en" hreflang="en" lang="en">English</a></p>
 
-      <!-- Each section's id is its locale: privacyHref in src/App.tsx links to it. -->
+      <!-- Each section's id is its locale: privacyHref in src/lib/i18n.ts links to it. -->
       <section id="af">
         <h1>Privaatheid en gebruiks&shy;voorwaardes</h1>
-        <p class="updated">Laas bygewerk op 19 Oktober 2026</p>
+        <p class="updated">Laas bygewerk op 22 Oktober 2026</p>
 
         <p>
           Hierdie webwerf hou ’n rekord van kragonderbrekings in Garsfontein, Pretoria. Die toevoer word by een punt in
@@ -85,8 +85,16 @@
             Engels).
           </li>
           <li>
-            <strong>Instellings in jou blaaier.</strong> Jou blaaier stoor jou tema (lig of donker), jou taal en watter
-            kennisgewings jy toegemaak het. Dit bly op jou toestel en word nie
+            <strong>Kragkennisgewings (net as jy dit aanskakel).</strong> Wanneer jy kragkennisgewings aanskakel, gee
+            jou blaaier die webwerf ’n adres by sy kennisgewingdiens, ’n sogenaamde intekening. Dit is nie aan ’n naam
+            of ’n IP-adres gekoppel nie. Ons stoor daardie adres, die twee sleutels wat nodig is om ’n boodskap vir
+            jou blaaier te enkripteer, jou taal en die tyd waarop dit die eerste keer gestoor is. Ons stoor nie jou
+            IP-adres of jou blaaier se tipe saam nie.
+          </li>
+          <li>
+            <strong>Instellings in jou blaaier.</strong> Jou blaaier stoor jou tema (lig of donker), jou taal, watter
+            kennisgewings jy toegemaak het, hoeveel keer jy die webwerf oopgemaak het en of jy gevra het dat die kaartjie
+            vir kragkennisgewings later weer of nooit weer verskyn nie. Dit bly op jou toestel en word nie
             na ons gestuur nie.
           </li>
         </ul>
@@ -94,8 +102,10 @@
 
         <h3>Doel en regsgrondslag</h3>
         <p>
-          Ons verwerk hierdie inligting om die webwerf te laat werk en misbruik te voorkom. Die regsgrondslag is ons regmatige belang daarin (artikel 11(1)(f) van POPIA). Ons gebruik dit vir
-          niks anders nie.
+          Ons verwerk hierdie inligting om die webwerf te laat werk en misbruik te voorkom. Die regsgrondslag is ons regmatige belang daarin (artikel 11(1)(f) van POPIA). Ons stoor ’n
+          kragkennisgewing-intekening net omdat jy dit self aangeskakel het; jou toestemming is die regsgrondslag
+          daarvoor (artikel 11(1)(a)), en ons gebruik dit net om jou te laat weet wanneer die krag afgaan en weer aan
+          is. Ons gebruik niks hiervan vir enigiets anders nie.
         </p>
 
         <h3>Wie die inligting verwerk</h3>
@@ -109,11 +119,20 @@
           <a href="https://www.cloudflare.com/privacypolicy/" hreflang="en">Cloudflare se privaatheidsbeleid</a> (in
           Engels). Ons deel jou inligting met niemand anders nie, tensy die wet dit vereis.
         </p>
+        <p>
+          Kragkennisgewings word afgelewer deur die kennisgewingdiens van Google, Mozilla, Apple of Microsoft, na
+          gelang van jou blaaier. Hulle ontvang die intekening se adres en ’n geënkripteerde boodskap wat net jou blaaier kan lees,
+          en hul eie privaatheidsbeleid geld vir wat hulle daarmee doen.
+        </p>
 
         <h3>Hoe lank ons dit hou</h3>
         <ul>
           <li>Onderbrekings: as ’n openbare rekord.</li>
           <li>Versoeklogs by Cloudflare: tot 7 dae.</li>
+          <li>
+            Kragkennisgewing-intekenings: totdat jy kennisgewings afskakel, wat die intekening dadelik skrap. Ons skrap
+            dit ook outomaties wanneer die kennisgewingdiens sê die adres bestaan nie meer nie.
+          </li>
         </ul>
         <p>
           Inwoners kon voorheen self aandui dat hul krag af is. Die onomkeerbare kodes wat daarvoor gestoor is, is op
@@ -124,7 +143,8 @@
         <p>
           Jy kan vra om te sien watter inligting ons oor jou hou, en om dit reg te stel of te skrap. Jy kan ook beswaar
           maak teen die verwerking. Die webwerf self stoor niks wat aan jou gekoppel kan word nie, behalwe die
-          versoeklogs.
+          versoeklogs en enige kragkennisgewing-intekening wat jy aanskakel. ’n Intekening is nie aan jou naam of
+          IP-adres gekoppel nie, en jy kan dit self skrap deur kennisgewings af te skakel.
         </p>
 
         <h3>Klagtes</h3>
@@ -179,7 +199,7 @@
 
       <section id="en" lang="en">
         <h1>Privacy and terms of use</h1>
-        <p class="updated">Last updated 19 October 2026</p>
+        <p class="updated">Last updated 22 October 2026</p>
 
         <p>
           This site keeps a record of power outages in Garsfontein, Pretoria. The supply is measured at one point in
@@ -223,8 +243,15 @@
             <a href="https://www.cloudflare.com/web-analytics/">how Cloudflare Web Analytics works</a>.
           </li>
           <li>
-            <strong>Settings in your browser.</strong> Your browser stores your theme (light or dark), your language
-            and which notices you have dismissed. These stay on your
+            <strong>Power alerts (only if you turn them on).</strong> When you turn on power alerts, your browser gives
+            the site an address at its push service, called a subscription. It is not linked to a name or an IP
+            address. We store that address, the two keys needed to encrypt a message for your browser, your language
+            and the time it was first saved. We do not store your IP address or your browser type with it.
+          </li>
+          <li>
+            <strong>Settings in your browser.</strong> Your browser stores your theme (light or dark), your language,
+            which notices you have dismissed, how many times you have opened the site and whether you asked for the
+            power alerts card to appear later or never again. These stay on your
             device and are not sent to us.
           </li>
         </ul>
@@ -233,8 +260,10 @@
         <h3>Purpose and legal basis</h3>
         <p>
           We process this information to run the site and to prevent abuse.
-          The legal basis is our legitimate interest in doing so (section 11(1)(f) of POPIA). We use it for nothing
-          else.
+          The legal basis is our legitimate interest in doing so (section 11(1)(f) of POPIA). We store a power alert
+          subscription only because you turned it on yourself; your consent is the legal basis for it (section
+          11(1)(a)), and we use it only to tell you when the power goes off and when it is back. We use none of this
+          for anything else.
         </p>
 
         <h3>Who processes the information</h3>
@@ -247,11 +276,20 @@
           <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare’s privacy policy</a>. We share your information
           with no one else, unless the law requires it.
         </p>
+        <p>
+          Power alerts are delivered by the push service of Google, Mozilla, Apple or Microsoft, depending on your browser.
+          They receive the subscription’s address and an encrypted message that only your browser can read, and their
+          own privacy policies cover what they do with them.
+        </p>
 
         <h3>How long we keep it</h3>
         <ul>
           <li>Outages: as a public record.</li>
           <li>Request logs at Cloudflare: up to 7 days.</li>
+          <li>
+            Power alert subscriptions: until you turn alerts off, which deletes the subscription straight away. We also
+            delete it automatically when the push service reports that the address no longer exists.
+          </li>
         </ul>
         <p>
           Residents could previously report that their power was off. The irreversible codes stored for that were
@@ -261,7 +299,9 @@
         <h3>Your rights</h3>
         <p>
           You can ask to see what information we hold about you, and to have it corrected or deleted. You can also object
-          to the processing. The site itself stores nothing that can be linked to you, apart from the request logs.
+          to the processing. The site itself stores nothing that can be linked to you, apart from the request logs and any power alert
+          subscription you turn on. A subscription is not linked to your name or IP address, and you can delete it
+          yourself by turning alerts off.
         </p>
 
         <h3>Complaints</h3>

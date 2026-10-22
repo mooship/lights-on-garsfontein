@@ -33,6 +33,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "cf-typegen": "wrangler types worker/worker-configuration.d.ts",
     "hash-password": "node scripts/hash-password.ts",
+    "vapid-keys": "node scripts/vapid-keys.ts",
     "og": "node scripts/build-og.ts",
     "deploy": "npm run build && npm run deploy:ci",
     "prepare": "lefthook install",
