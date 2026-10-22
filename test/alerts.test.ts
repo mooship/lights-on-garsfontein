@@ -69,13 +69,17 @@ describe('alertMessage', () => {
     expect(english.url).toBe(`${site.url}/en/`);
   });
 
-  it('says calmly that the earlier alert was not confirmed', () => {
+  it('words the correction as the status page does, so it claims no more than the page shows', () => {
     const afrikaans = alertMessage('dismissed', off, 'af');
     const english = alertMessage('dismissed', off, 'en');
 
+    expect(english.title).toBe(en.status.NONE);
+    expect(afrikaans.title).toBe(af.status.NONE);
     expect(english).toMatchObject({ title: en.push.dismissed.title, body: en.push.dismissed.body, lang: 'en' });
     expect(afrikaans).toMatchObject({ title: af.push.dismissed.title, body: af.push.dismissed.body, lang: 'af' });
     // One literal smoke string per language.
+    expect(english.title).toBe('No outage reported');
+    expect(afrikaans.title).toBe('Geen onderbreking aangemeld nie');
     expect(english.body).toBe('The earlier alert about Garsfontein Ext. 16 was not confirmed.');
     expect(afrikaans.body).toBe('Die vorige waarskuwing oor Garsfontein Uitb. 16 is nie bevestig nie.');
   });
@@ -610,6 +614,38 @@ describe('deliverAlertPage', () => {
     await env.DB.prepare('UPDATE outages SET is_false_positive = 0 WHERE id = ?').bind(outage).run();
     await deliverAlertPage(pageFor(outage, [id], { kind: 'dismissed' }), testEnv, NOW);
     expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it('lets back on follow when a dismissal is undone and the outage later closes', async () => {
+    const outage = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1 });
+    await markOffAlerted(outage);
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+    const [claim] = await claimAlerts(db(), NOW);
+    expect(claim).toEqual({ kind: 'dismissed', outageId: outage });
+
+    await env.DB.prepare('UPDATE outages SET is_false_positive = 0 WHERE id = ?').bind(outage).run();
+    await deliverAlertPage(pageFor(outage, [id], { kind: 'dismissed' }), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect((await alertColumns(outage))?.on_alert_at).toBeNull();
+
+    await env.DB.prepare('UPDATE outages SET end_time = ? WHERE id = ?').bind(ago(MINUTE_MS), outage).run();
+    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'on', outageId: outage }]);
+  });
+
+  it('keeps a newer follow-up claim when a stale dismissed page is dropped', async () => {
+    const outage = await insertOutage({ startTime: ago(DUE_MS), endTime: ago(MINUTE_MS) });
+    await env.DB.prepare('UPDATE outages SET off_alert_at = ?, on_alert_at = ? WHERE id = ?')
+      .bind(ago(2 * MINUTE_MS), ago(MINUTE_MS), outage)
+      .run();
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+
+    await deliverAlertPage(pageFor(outage, [id], { kind: 'dismissed' }), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect((await alertColumns(outage))?.on_alert_at).toBe(ago(MINUTE_MS));
   });
 
   it('drops a page whose outage no longer exists', async () => {

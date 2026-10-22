@@ -1,5 +1,8 @@
 import type { Messages } from './af.ts';
 
+// The status page's NONE, which the correction alert repeats: it claims no more than the page shows.
+const NO_OUTAGE_REPORTED = 'No outage reported';
+
 export const en = {
   lang: { switchTo: 'Skakel oor na Afrikaans', next: 'Afrikaans' },
   theme: { label: 'Switch theme', toDark: 'Switch to dark theme', toLight: 'Switch to light theme' },
@@ -46,7 +49,7 @@ export const en = {
     heading: 'Current status',
     ON: 'The power is on',
     OFF: 'The power is off',
-    NONE: 'No outage reported',
+    NONE: NO_OUTAGE_REPORTED,
     for: (duration: string) => `for ${duration}`,
     loading: 'Loading the current status…',
     wentOff: (time: string, day: string) => `Outage started at ${time} ${day}.`,
@@ -159,6 +162,6 @@ export const en = {
       title: 'Power is back on',
       body: (time: string, duration: string) => `Back at ${time} after ${duration}.`,
     },
-    dismissed: { title: 'Power is on', body: 'The earlier alert about Garsfontein Ext. 16 was not confirmed.' },
+    dismissed: { title: NO_OUTAGE_REPORTED, body: 'The earlier alert about Garsfontein Ext. 16 was not confirmed.' },
   },
 } satisfies Messages;

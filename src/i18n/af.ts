@@ -1,6 +1,9 @@
 // Afrikaans is the default and the source of truth: en.ts must match this shape.
 // Public copy never says how an outage was recorded (no "sensor" or "met die hand").
 
+// The status page's NONE, which the correction alert repeats: it claims no more than the page shows.
+const NO_OUTAGE_REPORTED = 'Geen onderbreking aangemeld nie';
+
 export const af = {
   // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
   lang: { switchTo: 'Switch to English', next: 'English' },
@@ -54,7 +57,7 @@ export const af = {
     ON: 'Die krag is aan',
     OFF: 'Die krag is af',
     // ON without a fresh live reading: no outage is known, but nothing measured the power as on.
-    NONE: 'Geen onderbreking aangemeld nie',
+    NONE: NO_OUTAGE_REPORTED,
     for: (duration: string) => `Al ${duration}`,
     loading: 'Laai tans die huidige status…',
     // `day` is formatRelativeDay's: vandag, gister or "op Sa. 17 Okt.".
@@ -178,7 +181,7 @@ export const af = {
       body: (time: string, duration: string) => `Weer aan om ${time} na ${duration}.`,
     },
     dismissed: {
-      title: 'Die krag is aan',
+      title: NO_OUTAGE_REPORTED,
       body: 'Die vorige waarskuwing oor Garsfontein Uitb. 16 is nie bevestig nie.',
     },
   },

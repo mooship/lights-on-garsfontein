@@ -9,7 +9,7 @@ Residents want to know when the power goes off in Extension 16 and when it is ba
 ## Goals
 
 - The site installs as a PWA (the manifest already exists) and can receive Web Push on Android, desktop browsers, and iPhone once added to the home screen (iOS 16.4+).
-- Two notifications per outage: "off" and "back on", in the subscriber's language.
+- Two notifications per outage, "off" and "back on", or a correction if the outage turns out to be a false alarm, in the subscriber's language.
 - A friendly, good-looking opt-in that never asks cold and never nags.
 - Both languages; zero layout shift; no horizontal scroll at 320px.
 
@@ -81,7 +81,7 @@ Draft text (from `src/i18n`, in the subscriber's locale):
 
 - Off: "Power is off", "No power in Garsfontein Ext 16 since 14:02."
 - Back on: "Power is back on", "Back at 16:15 after 2 h 13 min."
-- Dismissed, for an outage alerted "off" and later found to be a false positive: "Power is on", "The earlier alert about Garsfontein Ext. 16 was not confirmed." It never says why or how.
+- Dismissed, for an outage alerted "off" and later found to be a false positive: "No outage reported", "The earlier alert about Garsfontein Ext. 16 was not confirmed." The title is the status page's own "No outage reported" (`status.NONE`), because an admin can dismiss while the sensor is silent and the page then reads no more than that. It never says why or how.
 - Planned outages use the calm planned wording: "Planned outage", "Started at 14:02, announced in advance."
 
 All use one tag (`power`), so "back on" or "dismissed" replaces "off" in the tray. No text names or hints at the recording method.
@@ -129,7 +129,7 @@ The cron never calls a push service. For each claimed alert it reads the subscri
 
 The Worker's `queue` handler (`max_batch_size = 1`, so one page per invocation, under the Free plan's 50 outbound requests) for each message:
 
-1. Loads the outage. Drops the message if an "off" outage is now a false positive or already closed, a "dismissed" outage is no longer a false positive, or if `queuedAt` is older than the push TTL.
+1. Loads the outage. Drops the message if an "off" outage is now a false positive or already closed, a "dismissed" outage is no longer a false positive (it then also releases the claim, so the outage's real end can still send "back on"), or if `queuedAt` is older than the push TTL.
 2. Loads the page's subscriptions and builds each payload from `src/i18n` in the subscription's locale (the Worker imports the dictionaries).
 3. Encrypts (RFC 8291, `aes128gcm`) and signs (VAPID, ES256) with `worker/lib/webpush.ts`, WebCrypto only, and POSTs with `TTL: 3600`, `Urgency: high` and `Topic: power`.
 4. With `Promise.allSettled`: 404 or 410 deletes the subscription; 429 or 5xx collects the id for retry; anything else is logged.
@@ -152,7 +152,7 @@ Red first for each unit.
 - **Worker (workerd, real D1, `test/helpers.ts`):**
   - Subscription endpoints: validation, the host allowlist, rate limit (`stubLimiter`), idempotent upsert, delete.
   - Claims: off only after `ALERT_DELAY_MS`; never for a false positive; back on only when off was sent; dismissed only for a false positive whose off was sent, and never alongside back on; no double claim; closed backfill never alerts; open-at-migration sends one off.
-  - Consumer (push service mocked): 404/410 delete; 5xx re-enqueue with `attempt + 1`; drop after 3 attempts and past the TTL; a dismissed outage sends nothing; payload language follows the subscription.
+  - Consumer (push service mocked): 404/410 delete; 5xx re-enqueue with `attempt + 1`; drop after 3 attempts and past the TTL; an "off" page for a dismissed outage is dropped; a "dismissed" page is dropped, and its claim released so "back on" can still follow, if the dismissal was undone; payload language follows the subscription.
 - **Dictionaries:** the new strings are covered by the existing recording-method word check in `test/node/dictionaries.test.ts`.
 - **e2e, both languages** (granted notification permission and a stubbed `PushManager`): the card appears only on a return visit; Not now and No thanks are respected; bell states; the iPhone install variant; `/admin` registers no service worker; zero layout shift and no horizontal scroll at 320px still hold.
 - **CSP:** inline boot scripts are unchanged; `test/csp.test.ts` should still pass.

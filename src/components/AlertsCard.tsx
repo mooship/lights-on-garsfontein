@@ -76,10 +76,7 @@ function closeCard(choice: Choice) {
   target?.focus({ preventScroll: true });
 }
 
-/**
- * The bell: closes the card when it is open, turns alerts off when they are on, and otherwise opens
- * the card in the form that fits. Closing an offer this way counts as Not now, as Escape does.
- */
+/** The bell: closes the card if open, turns alerts off if on, else opens it; closing an offer counts as Not now. */
 export async function pressBell() {
   if (busy()) return;
   if (open()) return closeCard(offering() ? 'notNow' : 'close');
