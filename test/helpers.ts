@@ -73,6 +73,46 @@ export function mockSiteverify(answer: () => Response | Promise<Response>) {
   return spy;
 }
 
+/** The host of the subscriptions `insertSubscription` writes, and the one `mockPushService` answers for. */
+export const PUSH_TEST_HOST = 'push.example';
+
+/** A subscription's receiver keys, from RFC 8291 appendix A, so a real payload can be encrypted to them. */
+const RECEIVER_KEYS = {
+  p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4',
+  auth: 'BTBZMqHH6r4Tts7J_aSIgg',
+};
+
+/** Writes a subscription straight to D1 and returns its id; `name` makes its endpoint unique. */
+export async function insertSubscription(name: string, locale: 'af' | 'en' = 'en'): Promise<number> {
+  const row = await env.DB.prepare(
+    'INSERT INTO push_subscriptions (endpoint, p256dh, auth, locale, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+  )
+    .bind(
+      `https://${PUSH_TEST_HOST}/${name}`,
+      RECEIVER_KEYS.p256dh,
+      RECEIVER_KEYS.auth,
+      locale,
+      '2026-10-22T12:00:00.000Z',
+    )
+    .first<{ id: number }>();
+  if (!row) throw new Error('insert failed');
+  return row.id;
+}
+
+/** Stubs the push service at `PUSH_TEST_HOST`: it answers with `statusFor(endpoint)`, or rejects if that is an `Error`. */
+export function mockPushService(statusFor: (endpoint: string) => number | Error) {
+  const realFetch = globalThis.fetch;
+  const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (new URL(url).hostname !== PUSH_TEST_HOST) return realFetch(input, init);
+    const answer = statusFor(url);
+    if (answer instanceof Error) throw answer;
+    return new Response(null, { status: answer });
+  });
+  vi.stubGlobal('fetch', spy);
+  return spy;
+}
+
 /** Stubs the Turnstile siteverify call: a token solved on our host for `action`. */
 export function mockTurnstile(
   success: boolean,

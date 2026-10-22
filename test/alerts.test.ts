@@ -5,6 +5,8 @@ import { site } from '../site.config';
 import { DICTIONARIES } from '../src/i18n/index';
 import { MINUTE_CRON } from '../worker/crons';
 import { createDb } from '../worker/db/client';
+import worker from '../worker/index';
+import * as alerts from '../worker/lib/alerts';
 import {
   ALERT_DELAY_MS,
   ALERT_KINDS,
@@ -12,9 +14,12 @@ import {
   alertMessage,
   claimAlerts,
   enqueueAlerts,
+  PUSH_MAX_ATTEMPTS,
   PUSH_PAGE_SIZE,
 } from '../worker/lib/alerts';
-import { insertOutage, runCron } from './helpers';
+import { deliverAlertPage } from '../worker/lib/deliver';
+import { PUSH_TTL_SECONDS } from '../worker/lib/webpush';
+import { insertOutage, insertSubscription, mockPushService, PUSH_TEST_HOST, runCron } from './helpers';
 
 const { af, en } = DICTIONARIES;
 
@@ -251,5 +256,243 @@ describe('the minute cron', () => {
     await runCron(MINUTE_CRON, NOW.getTime(), { ...env, PUSH_QUEUE: queue });
 
     expect(sendBatch).toHaveBeenCalledOnce();
+  });
+});
+
+describe('deliverAlertPage', () => {
+  const stubPushQueue = () => {
+    const send = vi.fn(async (_body: AlertPage, _options?: QueueSendOptions) => {});
+    return { send, env: { ...env, PUSH_QUEUE: { send } as unknown as Queue<AlertPage> } };
+  };
+  const pageFor = (outageId: number, ids: number[], overrides: Partial<AlertPage> = {}): AlertPage => ({
+    kind: 'off',
+    outageId,
+    ids,
+    attempt: 1,
+    queuedAt: NOW.toISOString(),
+    ...overrides,
+  });
+  const openOutage = () => insertOutage({ startTime: ago(10 * MINUTE_MS) });
+  const remainingIds = async () =>
+    (await env.DB.prepare('SELECT id FROM push_subscriptions ORDER BY id').all<{ id: number }>()).results.map(
+      ({ id }) => id,
+    );
+
+  it('sends one push per subscription on the page', async () => {
+    const outage = await openOutage();
+    const ids = [await insertSubscription('a'), await insertSubscription('b'), await insertSubscription('c')];
+    const fetchSpy = mockPushService(() => 201);
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, ids), testEnv, NOW);
+
+    const requests = fetchSpy.mock.calls.map(([request]) => request as Request);
+    expect(requests.map((request) => request.url).sort()).toEqual(
+      ['a', 'b', 'c'].map((name) => `https://${PUSH_TEST_HOST}/${name}`),
+    );
+    for (const request of requests) {
+      expect(request.method).toBe('POST');
+      expect(request.headers.get('Topic')).toBe('power');
+    }
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("writes each push in its subscriber's language", async () => {
+    const outage = await openOutage();
+    const ids = [await insertSubscription('af', 'af'), await insertSubscription('en', 'en')];
+    mockPushService(() => 201);
+    const spy = vi.spyOn(alerts, 'alertMessage');
+
+    await deliverAlertPage(pageFor(outage, ids), stubPushQueue().env, NOW);
+
+    expect(spy.mock.calls.map(([, , locale]) => locale).sort()).toEqual(['af', 'en']);
+  });
+
+  it('sends the back-on alert for a closed outage', async () => {
+    const outage = await insertOutage({ startTime: ago(30 * MINUTE_MS), endTime: ago(MINUTE_MS) });
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+
+    await deliverAlertPage(pageFor(outage, [id], { kind: 'on' }), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it('deletes subscriptions the push service says are gone', async () => {
+    const outage = await openOutage();
+    const gone = await insertSubscription('gone');
+    const missing = await insertSubscription('missing');
+    const fine = await insertSubscription('fine');
+    mockPushService((endpoint) => (endpoint.endsWith('/gone') ? 410 : endpoint.endsWith('/missing') ? 404 : 201));
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [gone, missing, fine]), testEnv, NOW);
+
+    expect(await remainingIds()).toEqual([fine]);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('re-queues only transient failures', async () => {
+    const outage = await openOutage();
+    const ok = await insertSubscription('ok');
+    const limited = await insertSubscription('limited');
+    const down = await insertSubscription('down');
+    mockPushService((endpoint) => (endpoint.endsWith('/limited') ? 429 : endpoint.endsWith('/down') ? 503 : 201));
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [ok, limited, down]), testEnv, NOW);
+
+    expect(send).toHaveBeenCalledOnce();
+    const [body, options] = send.mock.calls[0] ?? [];
+    expect(body).toEqual(pageFor(outage, [limited, down], { attempt: 2 }));
+    expect(options?.delaySeconds).toBeGreaterThan(0);
+    expect(await remainingIds()).toEqual([ok, limited, down]);
+  });
+
+  it('treats a rejected fetch as transient', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    mockPushService(() => new Error('network down'));
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [id]), testEnv, NOW);
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0].ids).toEqual([id]);
+  });
+
+  it('waits longer after each attempt and keeps queuedAt', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    mockPushService(() => 503);
+    const { send, env: testEnv } = stubPushQueue();
+    const queuedAt = ago(10 * MINUTE_MS);
+
+    await deliverAlertPage(pageFor(outage, [id], { attempt: 1, queuedAt }), testEnv, NOW);
+    await deliverAlertPage(pageFor(outage, [id], { attempt: 2, queuedAt }), testEnv, NOW);
+
+    expect(send.mock.calls.map(([, options]) => options?.delaySeconds)).toEqual([60, 120]);
+    expect(send.mock.calls.map(([body]) => body.queuedAt)).toEqual([queuedAt, queuedAt]);
+  });
+
+  it('gives up after PUSH_MAX_ATTEMPTS', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    mockPushService(() => 503);
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [id], { attempt: PUSH_MAX_ATTEMPTS }), testEnv, NOW);
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('logs other statuses with the push host but never the endpoint path', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('secret-path');
+    mockPushService(() => 400);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [id]), testEnv, NOW);
+
+    const logged = warn.mock.calls.flat().join(' ');
+    expect(logged).toContain('400');
+    expect(logged).toContain(PUSH_TEST_HOST);
+    expect(logged).not.toContain('secret-path');
+    expect(send).not.toHaveBeenCalled();
+    expect(await remainingIds()).toEqual([id]);
+  });
+
+  it('drops a page older than the push TTL', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+    const queuedAt = ago((PUSH_TTL_SECONDS + 1) * 1000);
+
+    await deliverAlertPage(pageFor(outage, [id], { queuedAt }), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('drops an off alert for an outage dismissed meanwhile', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    await env.DB.prepare('UPDATE outages SET is_false_positive = 1 WHERE id = ?').bind(outage).run();
+    const fetchSpy = mockPushService(() => 201);
+
+    await deliverAlertPage(pageFor(outage, [id]), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('drops an off alert for an outage that has closed since', async () => {
+    const outage = await insertOutage({ startTime: ago(10 * MINUTE_MS), endTime: ago(MINUTE_MS) });
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+
+    await deliverAlertPage(pageFor(outage, [id]), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('drops an on alert for an outage that is not closed or was dismissed', async () => {
+    const open = await openOutage();
+    const dismissed = await insertOutage({
+      startTime: ago(30 * MINUTE_MS),
+      endTime: ago(MINUTE_MS),
+      isFalsePositive: 1,
+    });
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+    const { env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(open, [id], { kind: 'on' }), testEnv, NOW);
+    await deliverAlertPage(pageFor(dismissed, [id], { kind: 'on' }), testEnv, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('drops a page whose outage no longer exists', async () => {
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+
+    await deliverAlertPage(pageFor(9999, [id]), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips ids that no longer exist', async () => {
+    const outage = await openOutage();
+    const kept = await insertSubscription('kept');
+    const removed = await insertSubscription('removed');
+    await env.DB.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(removed).run();
+    const fetchSpy = mockPushService(() => 201);
+
+    await deliverAlertPage(pageFor(outage, [kept, removed]), stubPushQueue().env, NOW);
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [request] = fetchSpy.mock.calls[0] ?? [];
+    expect((request as Request).url).toBe(`https://${PUSH_TEST_HOST}/kept`);
+  });
+});
+
+describe('the queue handler', () => {
+  it('delivers each message, then acks it', async () => {
+    const outage = await insertOutage({ startTime: ago(10 * MINUTE_MS) });
+    const id = await insertSubscription('a');
+    const fetchSpy = mockPushService(() => 201);
+    const body: AlertPage = {
+      kind: 'off',
+      outageId: outage,
+      ids: [id],
+      attempt: 1,
+      queuedAt: new Date().toISOString(),
+    };
+    const message = { body, ack: vi.fn() };
+
+    await worker.queue({ messages: [message] } as unknown as MessageBatch<AlertPage>, env);
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(message.ack).toHaveBeenCalledOnce();
   });
 });
