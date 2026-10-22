@@ -5,9 +5,8 @@
 // October 2026 run an earlier offline worker whose cached status this file replaces.
 
 // Shown when a push has no readable payload: a push that shows nothing counts as a silent push, which
-// browsers penalise. It claims nothing about the power. The title repeats site.brand.full in
-// site.config.ts, because the build does not fill placeholders in this file.
-const FALLBACK = { title: 'Lights On, Garsfontein?', tag: 'power', url: '/' };
+// browsers penalise. It claims nothing about the power.
+const FALLBACK = { title: '%site.brand.full%', tag: 'power', url: '/' };
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -42,9 +41,10 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// A status page is / or /<locale>/, as localePath in shared/locale.ts builds it; change both together.
-// The admin and privacy pages do not show the status, so a click never lands on them.
-const STATUS_PAGE = /^\/([a-z]{2,3}\/)?$/;
+// The status pages, where localePath (shared/locale.ts) puts them. The admin and privacy pages do
+// not show the status, so a click never lands on them.
+const [, ...otherLocales] = '%site.locales%'.split(' ');
+const STATUS_PAGES = new Set(['/', ...otherLocales.map((locale) => `/${locale}/`)]);
 
 // An open status page is only focused, not navigated: it polls the status itself and the reader keeps
 // their place. Focusing can be refused, so the alert's page is then opened instead.
@@ -54,7 +54,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const page = windows.find((client) => STATUS_PAGE.test(new URL(client.url).pathname));
+      const page = windows.find((client) => STATUS_PAGES.has(new URL(client.url).pathname));
       try {
         if (page) return await page.focus();
       } catch {

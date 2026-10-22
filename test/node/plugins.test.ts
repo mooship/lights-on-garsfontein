@@ -20,6 +20,8 @@ describe('fill', () => {
     expect(fill('%since.en% / %since.af%', 'text', 'f')).toBe('17 October 2026 / 17 Oktober 2026');
     const json = JSON.parse(fill('{"name": "%site.brand.full%", "inLanguage": %site.locales%}', 'json', 'f'));
     expect(json).toEqual({ name: site.brand.full, inLanguage: site.locales });
+    const js = fill(`['%site.brand.full%', '%site.locales%']`, 'js', 'f');
+    expect(new Function(`return ${js}`)()).toEqual([site.brand.full, site.locales.join(' ')]);
   });
 
   it('fails the build on an unknown, malformed or misplaced placeholder', () => {

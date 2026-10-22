@@ -225,7 +225,7 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor, t
 
 ### Power alerts
 
-Visitors can ask their browser for a notification when the power goes off and when it is back. The service worker `public/sw.js` shows it, and the subscription is stored as described under `POST /api/push/subscription` above.
+Visitors can ask their browser for a notification when the power goes off and when it is back. The service worker `templates/sw.js` shows it, and the subscription is stored as described under `POST /api/push/subscription` above.
 
 - **When.** An outage is alerted once it has lasted `ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, so a short dip sends nothing. If it was alerted, its end sends a "back on" alert. If it is instead marked a false positive, by the sensor or an admin, every subscriber gets one calm follow-up ("No outage reported", "The earlier alert … was not confirmed", the status page's own wording) that replaces the "off" alert on screen and never says why. An outage gets one follow-up or the other, never both.
 - **Delivery.** The minute cron puts pages of subscriptions on the `PUSH_QUEUE` queue (`lights-on-push`), and the queue handler sends each page to the push service, retrying transient failures (429, 5xx, network errors) up to `PUSH_MAX_ATTEMPTS`. A message that is not delivered within `PUSH_TTL_SECONDS` (`worker/lib/webpush.ts`, one hour) is dropped by the push service, so nobody gets a stale alert hours later. A subscription the push service answers `404` or `410` for is deleted.
@@ -238,13 +238,13 @@ Visitors can ask their browser for a notification when the power goes off and wh
 | --- | --- |
 | `site.config.ts` | Deployment identity (see [Run it for your area](#run-it-for-your-area)) |
 | `src/` | SolidJS app: `components/`, `lib/`, `styles/` (colours in `palette.ts`), `banners.ts` |
-| `public/` | Static files copied as they are: icons, `_headers`, and `sw.js`, the service worker that only shows power alerts pushed to the browser (it has no fetch handler, so it caches nothing) |
+| `public/` | Static files copied as they are: icons and `_headers` |
 | `src/i18n/` | Public copy: one dictionary per language (`af.ts` is the source) and `head.ts` for the `<head>` |
 | `src/admin/` | The `/admin` page; its copy is English-only, in `copy.ts`, outside the dictionaries |
 | `worker/` | Worker: `index.ts` (security headers, crons), `routes/` (handlers; the route table is in `routes/index.ts`), `lib/` (router, grid, stats, auth, Turnstile), `crons.ts`, `db/schema.ts` |
 | `shared/` | Types and constants for both the app and the Worker: `api.ts` (API types, `OUTAGE_SOURCES`, `UTC_OFFSET_MS`, `localDate`), `paths.ts`, `errors.ts`, `locale.ts` (`LOCALES`, `DEFAULT_LOCALE`, `pageLocale`) |
 | `build/`, `vite.config.ts` | Build plugins: placeholders, static shell, locale pages and CSS, font preload |
-| `index.html`, `privacy.html`, `404.html`, `templates/` | Static pages (`404.html` answers any unknown path with status 404, so the build also writes `admin.html` for `/admin`), `llms.txt`, `site.webmanifest` and `.well-known/security.txt`, filled from `site.config.ts` at build time |
+| `index.html`, `privacy.html`, `404.html`, `templates/` | Static pages (`404.html` answers any unknown path with status 404, so the build also writes `admin.html` for `/admin`), `llms.txt`, `site.webmanifest`, `.well-known/security.txt` and `sw.js` (the service worker that only shows power alerts pushed to the browser; it has no fetch handler, so it caches nothing), filled from `site.config.ts` at build time |
 | `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the MacBook sensor |
 | `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 

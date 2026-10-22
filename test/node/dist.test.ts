@@ -56,7 +56,7 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
   });
 
   it('leaves no placeholder unfilled', () => {
-    for (const file of [...HTML, 'site.webmanifest', 'llms.txt']) {
+    for (const file of [...HTML, 'site.webmanifest', 'llms.txt', 'sw.js']) {
       // index.html's own comment names the placeholders.
       const text = stripRepeatedly(read(file), /<!--[\s\S]*?-->/g);
       expect(text, file).not.toMatch(/%(?:site|since|page)\./);

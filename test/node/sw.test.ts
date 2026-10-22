@@ -2,15 +2,18 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
+import { fill } from '../../build/html';
 import { LOCALES, localePath } from '../../shared/locale';
 import { ADMIN_PAGE_PATH, PRIVACY_PAGE_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 
 type Listener = (event: unknown) => void;
 
-const SOURCE = readFileSync(resolve(import.meta.dirname, '../../public/sw.js'), 'utf8');
+const TEMPLATE = 'templates/sw.js';
+/** The service worker as the build fills it. */
+const SOURCE = fill(readFileSync(resolve(import.meta.dirname, '../..', TEMPLATE), 'utf8'), 'js', TEMPLATE);
 
-/** Runs public/sw.js against fakes of the worker globals it uses, and returns them with its listeners. */
+/** Runs the service worker against fakes of the worker globals it uses, and returns them with its listeners. */
 function loadWorker(options: { caches?: string[]; clients?: { url?: string; focus: () => Promise<unknown> }[] } = {}) {
   const listeners = new Map<string, Listener>();
   const cacheNames = new Set(options.caches ?? []);
@@ -120,9 +123,11 @@ describe('the service worker', () => {
     const privacy = windowAt(PRIVACY_PAGE_PATH);
     const status = windowAt(localePath(locale));
     const { self, dispatch } = loadWorker({ clients: [admin, privacy, status] });
+    const event = clickEvent();
 
-    await dispatch('notificationclick', clickEvent());
+    await dispatch('notificationclick', event);
 
+    expect(event.notification.close).toHaveBeenCalledOnce();
     expect(status.focus).toHaveBeenCalled();
     expect(admin.focus).not.toHaveBeenCalled();
     expect(privacy.focus).not.toHaveBeenCalled();
@@ -133,9 +138,11 @@ describe('the service worker', () => {
     const admin = windowAt(ADMIN_PAGE_PATH);
     const privacy = windowAt(`${PRIVACY_PAGE_PATH}#en`);
     const { self, dispatch } = loadWorker({ clients: [admin, privacy] });
+    const event = clickEvent();
 
-    await dispatch('notificationclick', clickEvent());
+    await dispatch('notificationclick', event);
 
+    expect(event.notification.close).toHaveBeenCalledOnce();
     expect(admin.focus).not.toHaveBeenCalled();
     expect(privacy.focus).not.toHaveBeenCalled();
     expect(self.clients.openWindow).toHaveBeenCalledWith(payload.url);
@@ -151,22 +158,5 @@ describe('the service worker', () => {
     await dispatch('notificationclick', clickEvent());
 
     expect(self.clients.openWindow).toHaveBeenCalledWith(payload.url);
-  });
-
-  it('focuses an open page or opens the alert’s page on click', async () => {
-    const close = vi.fn();
-    const event = { notification: { close, data: { url: payload.url } } };
-
-    const page = windowAt('/en/');
-    const open = loadWorker({ clients: [page] });
-    await open.dispatch('notificationclick', event);
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(page.focus).toHaveBeenCalled();
-    expect(open.self.clients.openWindow).not.toHaveBeenCalled();
-
-    const none = loadWorker();
-    await none.dispatch('notificationclick', event);
-    expect(close).toHaveBeenCalledTimes(2);
-    expect(none.self.clients.openWindow).toHaveBeenCalledWith(payload.url);
   });
 });
