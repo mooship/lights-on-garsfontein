@@ -34,8 +34,8 @@ Residents want to know when the power goes off in Extension 16 and when it is ba
 `public/sw.js` becomes a small static push-only worker, replacing the kill switch:
 
 - `install` / `activate`: delete every cache (the job the kill switch does for browsers that ran the 17 to 18 October offline worker), `skipWaiting` and `clients.claim`. It no longer unregisters itself or reloads pages.
-- `push`: show the notification in the payload (`title`, `body`, `tag`, `url`, `lang`) with the site icon and badge.
-- `notificationclick`: focus an open window on the site, or open the payload's `url` (the page in the subscriber's language).
+- `push`: show the notification in the payload (`title`, `body`, `tag`, `url`, `lang`) with the site icon and badge. A payload that is not an object with a string `title` gets a neutral fallback.
+- `notificationclick`: focus an open status page (`/` or a locale page, never `/admin` or `/privacy`), or open the payload's `url` (the page in the subscriber's language), also when focusing is refused.
 - No `fetch` handler, so it never answers a request from a cache. `/sw.js` keeps `Cache-Control: no-cache`.
 
 The app registers it on the public pages only; `/admin` never registers it.

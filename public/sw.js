@@ -26,9 +26,9 @@ self.addEventListener('push', (event) => {
   try {
     alert = event.data.json();
   } catch {
-    // No data, or data that is not JSON: fall back to the neutral notification.
-    alert = FALLBACK;
+    // No data, or data that is not JSON: fall back to the neutral notification below.
   }
+  if (typeof alert?.title !== 'string') alert = FALLBACK;
   const { title, body, tag, lang, url } = alert;
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -42,14 +42,25 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// An open page is only focused, not navigated: it polls the status itself and the reader keeps their place.
+// A status page is / or /<locale>/, as localePath in shared/locale.ts builds it; change both together.
+// The admin and privacy pages do not show the status, so a click never lands on them.
+const STATUS_PAGE = /^\/([a-z]{2,3}\/)?$/;
+
+// An open status page is only focused, not navigated: it polls the status itself and the reader keeps
+// their place. Focusing can be refused, so the alert's page is then opened instead.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const { url } = event.notification.data;
   event.waitUntil(
     (async () => {
-      const [page] = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      if (page) await page.focus();
-      else await self.clients.openWindow(event.notification.data.url);
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const page = windows.find((client) => STATUS_PAGE.test(new URL(client.url).pathname));
+      try {
+        if (page) return await page.focus();
+      } catch {
+        // A refused focus falls through to opening the alert's page.
+      }
+      await self.clients.openWindow(url);
     })(),
   );
 });

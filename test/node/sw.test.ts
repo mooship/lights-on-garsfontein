@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
+import { LOCALES, localePath } from '../../shared/locale';
+import { ADMIN_PAGE_PATH, PRIVACY_PAGE_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 
 type Listener = (event: unknown) => void;
@@ -9,7 +11,7 @@ type Listener = (event: unknown) => void;
 const SOURCE = readFileSync(resolve(import.meta.dirname, '../../public/sw.js'), 'utf8');
 
 /** Runs public/sw.js against fakes of the worker globals it uses, and returns them with its listeners. */
-function loadWorker(options: { caches?: string[]; clients?: { focus: () => Promise<unknown> }[] } = {}) {
+function loadWorker(options: { caches?: string[]; clients?: { url?: string; focus: () => Promise<unknown> }[] } = {}) {
   const listeners = new Map<string, Listener>();
   const cacheNames = new Set(options.caches ?? []);
   const self = {
@@ -26,7 +28,7 @@ function loadWorker(options: { caches?: string[]; clients?: { focus: () => Promi
     keys: async () => [...cacheNames],
     delete: vi.fn(async (name: string) => cacheNames.delete(name)),
   };
-  vm.runInNewContext(SOURCE, { self, caches });
+  vm.runInNewContext(SOURCE, { self, caches, URL });
 
   /** Dispatches an event and returns what the worker passed to waitUntil. */
   const dispatch = async (name: string, event: Record<string, unknown> = {}) => {
@@ -94,6 +96,8 @@ describe('the service worker', () => {
         },
       },
     ],
+    ['has JSON null', { json: () => null }],
+    ['has an object without a string title', { json: () => ({ ...payload, title: 7 }) }],
   ])('shows a neutral notification when a push %s', async (_case, data) => {
     const { self, dispatch } = loadWorker();
     await expect(dispatch('push', { data })).resolves.toBeUndefined();
@@ -107,11 +111,53 @@ describe('the service worker', () => {
     });
   });
 
+  const ORIGIN = 'https://example.test';
+  const windowAt = (path: string, focus = vi.fn(async () => {})) => ({ url: `${ORIGIN}${path}`, focus });
+  const clickEvent = () => ({ notification: { close: vi.fn(), data: { url: payload.url } } });
+
+  it.each(LOCALES)('focuses an open status page in %s rather than the admin or privacy page', async (locale) => {
+    const admin = windowAt(ADMIN_PAGE_PATH);
+    const privacy = windowAt(PRIVACY_PAGE_PATH);
+    const status = windowAt(localePath(locale));
+    const { self, dispatch } = loadWorker({ clients: [admin, privacy, status] });
+
+    await dispatch('notificationclick', clickEvent());
+
+    expect(status.focus).toHaveBeenCalled();
+    expect(admin.focus).not.toHaveBeenCalled();
+    expect(privacy.focus).not.toHaveBeenCalled();
+    expect(self.clients.openWindow).not.toHaveBeenCalled();
+  });
+
+  it('opens the alert’s page when only the admin or privacy page is open', async () => {
+    const admin = windowAt(ADMIN_PAGE_PATH);
+    const privacy = windowAt(`${PRIVACY_PAGE_PATH}#en`);
+    const { self, dispatch } = loadWorker({ clients: [admin, privacy] });
+
+    await dispatch('notificationclick', clickEvent());
+
+    expect(admin.focus).not.toHaveBeenCalled();
+    expect(privacy.focus).not.toHaveBeenCalled();
+    expect(self.clients.openWindow).toHaveBeenCalledWith(payload.url);
+  });
+
+  it('opens the alert’s page when focusing the open one fails', async () => {
+    const status = windowAt(
+      '/',
+      vi.fn(() => Promise.reject(new Error('not allowed'))),
+    );
+    const { self, dispatch } = loadWorker({ clients: [status] });
+
+    await dispatch('notificationclick', clickEvent());
+
+    expect(self.clients.openWindow).toHaveBeenCalledWith(payload.url);
+  });
+
   it('focuses an open page or opens the alert’s page on click', async () => {
     const close = vi.fn();
     const event = { notification: { close, data: { url: payload.url } } };
 
-    const page = { focus: vi.fn(async () => {}) };
+    const page = windowAt('/en/');
     const open = loadWorker({ clients: [page] });
     await open.dispatch('notificationclick', event);
     expect(close).toHaveBeenCalledTimes(1);
