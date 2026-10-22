@@ -177,6 +177,10 @@ export const af = {
       title: 'Die krag is weer aan',
       body: (time: string, duration: string) => `Weer aan om ${time} na ${duration}.`,
     },
+    dismissed: {
+      title: 'Die krag is aan',
+      body: 'Die vorige waarskuwing oor Garsfontein Uitb. 16 is nie bevestig nie.',
+    },
   },
 };
 

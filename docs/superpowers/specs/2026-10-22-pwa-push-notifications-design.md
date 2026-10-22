@@ -16,7 +16,6 @@ Residents want to know when the power goes off in Extension 16 and when it is ba
 ## Non-goals
 
 - Offline caching or any `fetch` handler in the service worker.
-- A "false alarm" correction notification.
 - Letting each subscriber choose which events they get.
 - Telegram alerts (on hold).
 
@@ -82,9 +81,10 @@ Draft text (from `src/i18n`, in the subscriber's locale):
 
 - Off: "Power is off", "No power in Garsfontein Ext 16 since 14:02."
 - Back on: "Power is back on", "Back at 16:15 after 2 h 13 min."
+- Dismissed, for an outage alerted "off" and later found to be a false positive: "Power is on", "The earlier alert about Garsfontein Ext. 16 was not confirmed." It never says why or how.
 - Planned outages use the calm planned wording: "Planned outage", "Started at 14:02, announced in advance."
 
-Both use one tag (`power`), so "back on" replaces "off" in the tray. No text names or hints at the recording method.
+All use one tag (`power`), so "back on" or "dismissed" replaces "off" in the tray. No text names or hints at the recording method.
 
 ## Server
 
@@ -119,16 +119,17 @@ After `detectOutage`, the minute cron calls one function that claims due alerts 
 
 - **Off:** an open outage, not a false positive, with no `off_alert_at`, that started at least `ALERT_DELAY_MS` (10 minutes, from `MINUTE_MS`) ago.
 - **Back on:** a closed outage, not a false positive, with `off_alert_at` set and no `on_alert_at`.
+- **Dismissed:** a false positive, open or closed, with `off_alert_at` set and no `on_alert_at`. It sets `on_alert_at` as well (the column records the one follow-up to "off"), so an outage gets "back on" or "dismissed", never both.
 
-So an outage dismissed or closed within the delay never alerts in either direction; a backfilled closed outage never alerts; an outage open at deploy time sends one "off". A dismissal after "off" was sent sends nothing (accepted gap; the delay makes it rare).
+So an outage dismissed or closed within the delay never alerts in either direction; a backfilled closed outage never alerts; an outage open at deploy time sends one "off". A dismissal after "off" was sent sends one calm "dismissed" follow-up; a dismissal after "back on" sends nothing more. Claims run off, then back on, then dismissed, and a claim whose enqueue fails is released like the others.
 
 ### Sending (queue)
 
-The cron never calls a push service. For each claimed alert it reads the subscription ids, splits them into pages of `PUSH_PAGE_SIZE` (40) and enqueues one message per page, `{ kind: 'off' | 'on', outageId, ids, attempt, queuedAt }`, with `sendBatch` (up to 100 messages per call).
+The cron never calls a push service. For each claimed alert it reads the subscription ids, splits them into pages of `PUSH_PAGE_SIZE` (40) and enqueues one message per page, `{ kind: 'off' | 'on' | 'dismissed', outageId, ids, attempt, queuedAt }`, with `sendBatch` (up to 100 messages per call).
 
 The Worker's `queue` handler (`max_batch_size = 1`, so one page per invocation, under the Free plan's 50 outbound requests) for each message:
 
-1. Loads the outage. Drops the message if an "off" outage is now a false positive or already closed, or if `queuedAt` is older than the push TTL.
+1. Loads the outage. Drops the message if an "off" outage is now a false positive or already closed, a "dismissed" outage is no longer a false positive, or if `queuedAt` is older than the push TTL.
 2. Loads the page's subscriptions and builds each payload from `src/i18n` in the subscription's locale (the Worker imports the dictionaries).
 3. Encrypts (RFC 8291, `aes128gcm`) and signs (VAPID, ES256) with `worker/lib/webpush.ts`, WebCrypto only, and POSTs with `TTL: 3600`, `Urgency: high` and `Topic: power`.
 4. With `Promise.allSettled`: 404 or 410 deletes the subscription; 429 or 5xx collects the id for retry; anything else is logged.
@@ -150,7 +151,7 @@ Red first for each unit.
 - **Crypto:** RFC 8291's published test vector for encryption; a VAPID JWT that verifies against the public key.
 - **Worker (workerd, real D1, `test/helpers.ts`):**
   - Subscription endpoints: validation, the host allowlist, rate limit (`stubLimiter`), idempotent upsert, delete.
-  - Claims: off only after `ALERT_DELAY_MS`; never for a false positive; back on only when off was sent; no double claim; closed backfill never alerts; open-at-migration sends one off.
+  - Claims: off only after `ALERT_DELAY_MS`; never for a false positive; back on only when off was sent; dismissed only for a false positive whose off was sent, and never alongside back on; no double claim; closed backfill never alerts; open-at-migration sends one off.
   - Consumer (push service mocked): 404/410 delete; 5xx re-enqueue with `attempt + 1`; drop after 3 attempts and past the TTL; a dismissed outage sends nothing; payload language follows the subscription.
 - **Dictionaries:** the new strings are covered by the existing recording-method word check in `test/node/dictionaries.test.ts`.
 - **e2e, both languages** (granted notification permission and a stubbed `PushManager`): the card appears only on a return visit; Not now and No thanks are respected; bell states; the iPhone install variant; `/admin` registers no service worker; zero layout shift and no horizontal scroll at 320px still hold.

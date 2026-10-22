@@ -25,7 +25,9 @@ function describeRejection(reason: unknown, endpoint: string): string {
 /** The outage the page is about, or `null` if it no longer warrants the alert, which would then mislead. */
 async function loadDueOutage(db: Db, page: AlertPage): Promise<Outage | null> {
   const outage = await db.select().from(outages).where(eq(outages.id, page.outageId)).get();
-  if (!outage || outage.isFalsePositive) return null;
+  if (!outage) return null;
+  if (page.kind === 'dismissed') return outage.isFalsePositive ? outage : null;
+  if (outage.isFalsePositive) return null;
   return (outage.endTime !== null) === (page.kind === 'on') ? outage : null;
 }
 

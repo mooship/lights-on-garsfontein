@@ -31,7 +31,7 @@ export const outages = sqliteTable(
     dismissedBy: text('dismissed_by', { enum: DISMISSED_BY }),
     /** When the power-off alert went out; null until sent, so each outage alerts once. */
     offAlertAt: text('off_alert_at'),
-    /** When the power-back alert went out; null until sent, or while the outage is open. */
+    /** When the follow-up to the off alert went out (back on, or dismissed as a false positive); null until sent. */
     onAlertAt: text('on_alert_at'),
   },
   (table) => [

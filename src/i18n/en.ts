@@ -159,5 +159,6 @@ export const en = {
       title: 'Power is back on',
       body: (time: string, duration: string) => `Back at ${time} after ${duration}.`,
     },
+    dismissed: { title: 'Power is on', body: 'The earlier alert about Garsfontein Ext. 16 was not confirmed.' },
   },
 } satisfies Messages;

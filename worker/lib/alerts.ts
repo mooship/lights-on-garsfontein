@@ -6,7 +6,8 @@ import { DICTIONARIES } from '../../src/i18n/index';
 import type { Db } from '../db/client';
 import { type Outage, outages, pushSubscriptions } from '../db/schema';
 
-export const ALERT_KINDS = ['off', 'on'] as const;
+/** `dismissed` follows an `off` for an outage later found to be a false positive, replacing it on screen. */
+export const ALERT_KINDS = ['off', 'on', 'dismissed'] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
 /** What the service worker shows; `tag` is one value so a newer alert replaces the one on screen. */
@@ -51,6 +52,7 @@ export function alertMessage(
     const { title, body } = outage.isPlanned ? push.planned : push.off;
     return { ...base, title, body: body(formatTime(outage.startTime, locale)) };
   }
+  if (kind === 'dismissed') return { ...base, ...push.dismissed };
   if (!outage.endTime) throw new Error('An on alert needs an outage that has ended');
   const lasted = Date.parse(outage.endTime) - Date.parse(outage.startTime);
   return {
@@ -86,9 +88,10 @@ export interface AlertPage extends AlertClaim {
 }
 
 /**
- * Marks the alerts that are due as sent and returns them, off before on. Each claim is one
- * conditional UPDATE, so two concurrent runs cannot claim the same alert. A back-on alert needs
- * the off alert to have been claimed, so nobody hears "power is back" without hearing it went off.
+ * Marks the alerts that are due as sent and returns them: off, then on, then dismissed. Each claim
+ * is one conditional UPDATE, so two concurrent runs cannot claim the same alert. A back-on or
+ * dismissed alert needs the off alert to have been claimed, so nobody hears a follow-up to an alert
+ * they never got. Both follow-ups set `onAlertAt`, so an outage gets one or the other, never both.
  */
 export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
   const claimedAt = now.toISOString();
@@ -117,9 +120,15 @@ export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
       ),
     )
     .returning({ id: outages.id });
+  const dismissed = await db
+    .update(outages)
+    .set({ onAlertAt: claimedAt })
+    .where(and(eq(outages.isFalsePositive, true), isNotNull(outages.offAlertAt), isNull(outages.onAlertAt)))
+    .returning({ id: outages.id });
   return [
     ...off.map(({ id }) => ({ kind: 'off' as const, outageId: id })),
     ...on.map(({ id }) => ({ kind: 'on' as const, outageId: id })),
+    ...dismissed.map(({ id }) => ({ kind: 'dismissed' as const, outageId: id })),
   ];
 }
 
