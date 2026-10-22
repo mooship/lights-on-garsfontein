@@ -22,6 +22,8 @@ import { ADMIN_PAGE_PATH, CSV_PATH, FEED_PATH, PRIVACY_PAGE_PATH } from '../shar
 import { site } from '../site.config';
 import * as css from './App.css';
 import { bannersPending } from './banners';
+import { AlertsBell } from './components/AlertsBell';
+import { AlertsCard } from './components/AlertsCard';
 import { SiteBanner } from './components/Banner';
 import { LanguageToggle } from './components/LanguageToggle';
 import { OutageHistory } from './components/OutageHistory';
@@ -47,13 +49,14 @@ export interface InitialData {
   stats: Promise<StatsResponse>;
 }
 
-/** The disclaimer and the language switch are for the public page; the admin page is always in English. */
+/** The disclaimer, the bell and the language switch are for the public page; the admin page is always in English. */
 const Masthead: Component<{ isPublic: boolean }> = (props) => (
   <>
     <header class="gg-masthead">
       <p class="gg-eyebrow">{t().masthead.eyebrow}</p>
       <div class="gg-masthead-actions">
         <Show when={props.isPublic}>
+          <AlertsBell />
           <LanguageToggle />
         </Show>
         <ThemeToggle />
@@ -242,6 +245,9 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
           )}
         </Show>
       </section>
+
+      {/* Fixed over the page, so it shifts nothing. */}
+      <AlertsCard ready={data() !== undefined} />
     </>
   );
 };

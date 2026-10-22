@@ -118,6 +118,36 @@ export const en = {
       'The figures cover only outages recorded at the measuring point.',
     ],
   },
+  alerts: {
+    bell: {
+      label: 'Power alerts',
+      on: 'Turn off power alerts',
+      off: 'Turn on power alerts',
+      blocked: 'Power alerts are blocked in your browser',
+      install: 'How to get power alerts',
+    },
+    card: {
+      heading: 'Want a heads-up?',
+      body: 'Get a notification when the power goes off in Extension 16, and when it’s back.',
+      scope: 'It’s measured at one point in Extension 16, so some streets may differ.',
+      turnOn: 'Turn on alerts',
+      notNow: 'Not now',
+      noThanks: 'No thanks',
+      close: 'Close',
+      iosIntro: 'On an iPhone, add this site to your home screen first:',
+      iosSteps: [
+        'Tap the Share button in Safari.',
+        'Choose ‘Add to Home Screen’.',
+        'Open the site from your home screen and tap the bell.',
+      ],
+      blockedHelp:
+        'Notifications for this site are blocked in your browser. Allow them in the browser’s settings, then tap the bell again.',
+      unsupported: 'This browser can’t receive notifications from the site. Try another browser.',
+      failed: 'That didn’t work. Please try again in a moment.',
+      turnedOn: 'Alerts are on.',
+      turnedOff: 'Alerts are off.',
+    },
+  },
   push: {
     off: { title: 'Power is off', body: (time: string) => `No power in Garsfontein Ext. 16 since ${time}.` },
     planned: {

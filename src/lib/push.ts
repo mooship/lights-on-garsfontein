@@ -1,4 +1,4 @@
-import { DAY_MS } from '../../shared/api';
+import { DAY_MS, MINUTE_MS } from '../../shared/api';
 import { SERVICE_WORKER_PATH } from '../../shared/paths';
 import type { Locale } from '../../site.config';
 import { api } from './api';
@@ -9,6 +9,9 @@ export type AlertsState = 'on' | 'off' | 'blocked' | 'ios-install' | 'unsupporte
 
 /** How long "later" hides the alerts card. */
 export const ALERTS_SNOOZE_MS = 30 * DAY_MS;
+
+/** How long after the status first loads the card may offer itself, so it never interrupts the first look. */
+export const ALERTS_OFFER_DELAY_MS = MINUTE_MS / 20;
 
 /** The alerts card waits for a return visit, so it never greets someone on their first page load. */
 const MIN_VISITS = 2;

@@ -39,6 +39,7 @@ import { HEAD } from '../src/i18n/head';
 import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
 import { PAGE_SIZE } from '../src/lib/pages';
 import { STATS_POLL_MS } from '../src/lib/poll';
+import { ALERTS_OFFER_DELAY_MS } from '../src/lib/push';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
 import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
@@ -380,6 +381,21 @@ test.describe('public page', () => {
         await trackLayoutShift(page);
         await page.goto(localePath(locale));
         await expect(page.locator('html')).toHaveAttribute('lang', locale);
+        expect(await readLayoutShift(page)).toBe(0);
+      });
+
+      test(`has zero cumulative layout shift with the alerts card open (${locale})`, async ({ page }) => {
+        await page.clock.install();
+        // A return visit in a browser that allows notifications (the test browser denies them).
+        await page.addInitScript((key) => {
+          localStorage.setItem(key, '1');
+          Object.defineProperty(Notification, 'permission', { get: () => 'default' });
+        }, STORAGE_KEYS.visits);
+        await trackLayoutShift(page);
+        await page.goto(localePath(locale));
+        await expect(page.getByRole('status')).toBeVisible();
+        await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
+        await expect(page.getByRole('dialog', { name: DICTIONARIES[locale].alerts.card.heading })).toBeVisible();
         expect(await readLayoutShift(page)).toBe(0);
       });
     });

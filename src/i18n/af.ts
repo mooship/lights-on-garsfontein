@@ -131,6 +131,40 @@ export const af = {
       'Die syfers dek net onderbrekings wat by die meetpunt aangeteken is.',
     ],
   },
+  // The alerts bell (src/components/AlertsBell.tsx) and card (AlertsCard.tsx). The bell's name is
+  // `label`; the others describe its state. The card never claims more than the scope line says.
+  alerts: {
+    bell: {
+      label: 'Kragkennisgewings',
+      on: 'Skakel kragkennisgewings af',
+      off: 'Skakel kragkennisgewings aan',
+      blocked: 'Kragkennisgewings is in jou blaaier geblokkeer',
+      install: 'Hoe om kragkennisgewings te kry',
+    },
+    card: {
+      heading: 'Wil jy op hoogte bly?',
+      body: 'Kry ’n kennisgewing wanneer die krag in Uitbreiding 16 afgaan, en wanneer dit weer aan is.',
+      scope: 'Daar word by een punt in Uitbreiding 16 gemeet, so sommige strate kan verskil.',
+      turnOn: 'Skakel kennisgewings aan',
+      notNow: 'Nie nou nie',
+      noThanks: 'Nee dankie',
+      close: 'Maak toe',
+      // An iPhone offers notifications only to a site opened from the home screen. iOS has no
+      // Afrikaans, so the menu item keeps its English name.
+      iosIntro: 'Op ’n iPhone moet jy die webwerf eers by jou tuisskerm voeg:',
+      iosSteps: [
+        'Tik op die deelknoppie in Safari.',
+        'Kies “Add to Home Screen”.',
+        'Maak die webwerf van jou tuisskerm af oop en tik op die klokkie.',
+      ],
+      blockedHelp:
+        'Kennisgewings vir hierdie webwerf is in jou blaaier geblokkeer. Laat dit in die blaaier se instellings toe en tik dan weer op die klokkie.',
+      unsupported: 'Hierdie blaaier kan nie kennisgewings van die webwerf ontvang nie. Probeer ’n ander blaaier.',
+      failed: 'Dit het nie gewerk nie. Probeer asseblief oor ’n rukkie weer.',
+      turnedOn: 'Kennisgewings is aangeskakel.',
+      turnedOff: 'Kennisgewings is afgeskakel.',
+    },
+  },
   // Web push alerts. `on` takes the time it came back and how long it was off (formatted with `units`).
   push: {
     off: { title: 'Die krag is af', body: (time: string) => `Geen krag in Garsfontein Uitb. 16 sedert ${time} nie.` },
