@@ -46,11 +46,12 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  it('serves a /sw.js that clears and unregisters the removed service worker', () => {
+  it('serves a /sw.js that clears old caches, shows pushes and never answers requests', () => {
     const sw = read('sw.js');
-    expect(sw).toContain('registration.unregister()');
     expect(sw).toContain('caches.delete');
-    // No fetch handler: from the moment it installs, every request goes to the network.
+    expect(sw).toContain('showNotification');
+    expect(sw).not.toContain('unregister');
+    // No fetch handler: every request goes to the network, so a stale status is never served as live.
     expect(sw).not.toMatch(/addEventListener\(\s*['"]fetch/);
   });
 
@@ -70,7 +71,7 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  // sw.js is only the kill switch above; the app never registers a service worker.
+  // sw.js only receives pushes (above); the app never registers a service worker.
   it('never registers a service worker', () => {
     const scripts = readdirSync(resolve(DIST, 'assets')).filter((name) => name.endsWith('.js'));
     expect(scripts.length).toBeGreaterThan(0);

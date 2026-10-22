@@ -1,8 +1,8 @@
-// Kill switch. The site has no service worker, but browsers that visited on 17 or 18 October 2026
-// still run an offline one that can answer with a cached status when the server is unreachable.
-// They check this URL on every visit and install these bytes, which delete its caches, unregister
-// it and reload the pages it controlled. With no fetch handler, every request goes to the network.
-// Keep this file while such a browser might come back.
+// Shows power alerts pushed to this browser, and does nothing else.
+//
+// There is no fetch handler on purpose: every request goes to the network, so a stale status can never
+// be served as live. Activation still deletes every cache, because browsers that visited on 17 or 18
+// October 2026 run an earlier offline worker whose cached status this file replaces.
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -10,8 +10,34 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       for (const name of await caches.keys()) await caches.delete(name);
-      await self.registration.unregister();
-      for (const client of await self.clients.matchAll({ type: 'window' })) client.navigate(client.url);
+      await self.clients.claim();
+    })(),
+  );
+});
+
+// The payload is AlertPayload in worker/lib/alerts.ts; `tag` makes a newer alert replace an older one.
+self.addEventListener('push', (event) => {
+  const { title, body, tag, lang, url } = event.data.json();
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      lang,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url },
+    }),
+  );
+});
+
+// An open page is only focused, not navigated: it polls the status itself and the reader keeps their place.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      const [page] = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (page) await page.focus();
+      else await self.clients.openWindow(event.notification.data.url);
     })(),
   );
 });

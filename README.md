@@ -228,7 +228,7 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor, t
 | --- | --- |
 | `site.config.ts` | Deployment identity (see [Run it for your area](#run-it-for-your-area)) |
 | `src/` | SolidJS app: `components/`, `lib/`, `styles/` (colours in `palette.ts`), `banners.ts` |
-| `public/` | Static files copied as they are: icons, `_headers`, and `sw.js`, a kill switch for an earlier offline service worker (the file says why); the app registers none |
+| `public/` | Static files copied as they are: icons, `_headers`, and `sw.js`, the service worker that only shows power alerts pushed to the browser (it has no fetch handler, so it caches nothing) |
 | `src/i18n/` | Public copy: one dictionary per language (`af.ts` is the source) and `head.ts` for the `<head>` |
 | `src/admin/` | The `/admin` page; its copy is English-only, in `copy.ts`, outside the dictionaries |
 | `worker/` | Worker: `index.ts` (security headers, crons), `routes/` (handlers; the route table is in `routes/index.ts`), `lib/` (router, grid, stats, auth, Turnstile), `crons.ts`, `db/schema.ts` |

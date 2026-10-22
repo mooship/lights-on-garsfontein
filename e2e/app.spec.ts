@@ -1416,7 +1416,7 @@ test.describe('unexpected responses', () => {
     await expect(page.locator('#username')).toHaveAttribute('maxlength', String(CREDENTIAL_MAX_LENGTH.username));
   });
 
-  test('serves the service worker kill switch at /sw.js, never cached', async ({ request }) => {
+  test('serves the push service worker at /sw.js, never cached', async ({ request }) => {
     const response = await request.get('/sw.js');
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toMatch(/javascript/);
