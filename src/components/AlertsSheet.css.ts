@@ -2,15 +2,14 @@ import { style } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 import { floating } from './AlertsCard.css';
 
-// The max-width and max-height keep the card inside a small screen; it scrolls rather than overflow.
+// The surface is .gg-card's. The max-width and max-height keep the card inside a small screen; it
+// scrolls rather than overflow.
 export const card = style([
   floating,
   {
     maxWidth: '26rem',
     maxHeight: 'calc(100dvh - 1.5rem)',
     overflowY: 'auto',
-    padding: '1.25rem',
-    borderRadius: vars.radius.card,
     display: 'flex',
     flexDirection: 'column',
     gap: '0.75rem',

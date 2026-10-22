@@ -28,7 +28,7 @@ const AlertsSheet: Component = () => {
   }
 
   return (
-    <section id={CARD_ID} class={css.card} role="dialog" aria-labelledby="alerts-heading">
+    <section id={CARD_ID} class={`gg-card ${css.card}`} role="dialog" aria-labelledby="alerts-heading">
       <div class={css.header}>
         <span class={css.icon}>
           <BellRing size={22} aria-hidden="true" />

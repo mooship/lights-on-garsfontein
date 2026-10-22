@@ -12,19 +12,20 @@ export const floating = style({
   insetInline: 'max(0.75rem, env(safe-area-inset-left))',
   bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
   marginInline: 'auto',
-  background: vars.color.card,
   color: vars.color.text,
-  border: `1px solid ${vars.color.border}`,
-  boxShadow: vars.color.shadow,
   '@media': {
     '(prefers-reduced-motion: no-preference)': { animation: `${slideUp} 360ms ${SETTLE} backwards` },
   },
 });
 
-// The confirmation after the bell or the card changes the alerts: a small pill that fades away.
+// The confirmation after the bell or the card changes the alerts: a small pill that fades away. It
+// has a card's surface (the card itself takes .gg-card) in a pill's shape.
 export const notice = style([
   floating,
   {
+    background: vars.color.card,
+    border: `1px solid ${vars.color.border}`,
+    boxShadow: vars.color.shadow,
     width: 'fit-content',
     padding: '0.625rem 1rem',
     borderRadius: vars.radius.pill,
