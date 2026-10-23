@@ -29,20 +29,20 @@ function withSecurityHeaders(routed: Response): Response {
   return response;
 }
 
-async function route(request: Request, env: Env): Promise<Response> {
+async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
   // HEAD runs the GET route; the runtime drops the body.
   const method = request.method === 'HEAD' ? 'GET' : request.method;
   const match = routes[`${method} ${url.pathname}`];
-  if (match) return dispatch(match, request, env);
+  if (match) return dispatch(match, request, env, ctx);
   if (url.pathname.startsWith(API_PREFIX)) return errors.notFound();
   return env.ASSETS.fetch(request);
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
-      return withSecurityHeaders(await route(request, env));
+      return withSecurityHeaders(await route(request, env, ctx));
     } catch (error) {
       console.error('Unhandled error', error);
       return withSecurityHeaders(errors.internal());

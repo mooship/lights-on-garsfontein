@@ -1,4 +1,4 @@
-import { createScheduledController, env } from 'cloudflare:test';
+import { createExecutionContext, createScheduledController, env, waitOnExecutionContext } from 'cloudflare:test';
 import { expect, vi } from 'vitest';
 import {
   MINUTE_MS,
@@ -51,7 +51,10 @@ interface CallOptions {
   env?: Env;
 }
 
-/** Sends a request through the Worker's fetch handler, from a fresh uniqueIp() unless `ip` is given. */
+/**
+ * Sends a request through the Worker's fetch handler, from a fresh uniqueIp() unless `ip` is given,
+ * and waits for the work it left running (an edge-cache store), as the next request could rely on it.
+ */
 export async function call(path: string, options: CallOptions = {}): Promise<Response> {
   const headers = new Headers(options.headers);
   headers.set(CLIENT_IP_HEADER, options.ip ?? uniqueIp());
@@ -59,7 +62,14 @@ export async function call(path: string, options: CallOptions = {}): Promise<Res
   const body = options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body));
   if (body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const request = new Request(`${ORIGIN}${path}`, { method: options.method ?? 'GET', headers, body });
-  return worker.fetch(request as Request<unknown, IncomingRequestCfProperties>, options.env ?? env);
+  const ctx = createExecutionContext();
+  const response = await worker.fetch(
+    request as Request<unknown, IncomingRequestCfProperties>,
+    options.env ?? env,
+    ctx,
+  );
+  await waitOnExecutionContext(ctx);
+  return response;
 }
 
 /**
