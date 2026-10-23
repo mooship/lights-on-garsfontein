@@ -16,14 +16,17 @@ const TITLE: Record<AlertsState, 'on' | 'off' | 'blocked' | 'install'> = {
   unsupported: 'install',
 };
 
-/** Its name stays the same; `title` says what a press does, and `aria-pressed` whether alerts are on. */
+/**
+ * Its name stays the same; `title` says what a press does. It is a toggle, with `aria-pressed`, only
+ * while a press can turn alerts on or off; otherwise a press opens the card that explains why not.
+ */
 export const AlertsBell: Component = () => (
   <button
     type="button"
     class={`gg-icon-button ${css.bell}`}
     aria-label={t().alerts.bell.label}
     title={t().alerts.bell[TITLE[state() ?? 'off']]}
-    aria-pressed={state() === 'on'}
+    aria-pressed={state() === 'on' || state() === 'off' ? state() === 'on' : undefined}
     aria-disabled={busy()}
     onClick={pressBell}
   >

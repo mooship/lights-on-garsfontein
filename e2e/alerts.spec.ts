@@ -4,7 +4,7 @@ import { LOCALES, localePath, nextLocale } from '../shared/locale';
 import { ADMIN_PAGE_PATH, PUSH_SUBSCRIPTION_PATH, SERVICE_WORKER_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
 import { DICTIONARIES } from '../src/i18n';
-import { ALERTS_OFFER_DELAY_MS, ALERTS_SNOOZE_MS } from '../src/lib/push';
+import { ALERTS_NOTICE_MS, ALERTS_OFFER_DELAY_MS, ALERTS_SNOOZE_MS } from '../src/lib/push';
 import { STORAGE_KEYS } from '../src/lib/storage';
 import { RFC8291_RECEIVER_KEYS } from '../test/push-keys';
 import { expect, returningVisitor, scrollsSideways, storeBeforeLoad, test } from './fixtures';
@@ -120,6 +120,13 @@ for (const locale of LOCALES) {
       await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
       await expect(card(page)).toBeVisible();
       await expect(bell(page)).toBeFocused();
+      // Without focus, screen readers hear it arrive by name, and only once: the card is outside the live region.
+      await expect(page.locator('[aria-live]').getByText(m.card.heading, { exact: true })).toHaveCount(1);
+      await expect(page.locator('[aria-live] [role="dialog"]')).toHaveCount(0);
+      // Gone once announced, so reading the page meets the card's name only in the card.
+      await page.clock.runFor(ALERTS_NOTICE_MS);
+      await expect(page.getByText(m.card.heading, { exact: true })).toHaveCount(1);
+      await expect(card(page)).toBeVisible();
       await expect(card(page)).toContainText(m.card.body);
       await expect(card(page)).toContainText(m.card.scope);
       // Same page and language as the footer's privacy link.
@@ -154,8 +161,15 @@ for (const locale of LOCALES) {
       await fakePush(page);
       await returningVisitor(page);
       await load(page);
+      // While open, the page scrolls focus clear of the card, which covers the bottom of the screen.
+      const scrollPadding = () =>
+        page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom) || 0);
+      await expect(card(page)).toBeVisible();
+      const height = (await card(page).boundingBox())?.height ?? Number.POSITIVE_INFINITY;
+      await expect.poll(scrollPadding).toBeGreaterThan(height);
       await card(page).getByRole('button', { name: m.card.notNow }).click();
       await expect(card(page)).not.toBeVisible();
+      await expect.poll(scrollPadding).toBe(0);
 
       await load(page);
       await expect(card(page)).not.toBeVisible();
@@ -181,8 +195,9 @@ for (const locale of LOCALES) {
       await expect(card(page)).not.toBeVisible();
       await bell(page).click();
       await expect(card(page)).toBeVisible();
-      // Opened on purpose, the card takes focus.
+      // Opened on purpose, the card takes focus, which reads it, so nothing else announces it.
       await expect(card(page).getByRole('heading', { name: m.card.heading })).toBeFocused();
+      await expect(page.locator('[aria-live]').getByText(m.card.heading, { exact: true })).toHaveCount(0);
       await expect(card(page).getByRole('button', { name: m.card.turnOn })).toBeVisible();
       // The bell closes it again.
       await bell(page).click();
@@ -245,6 +260,7 @@ for (const locale of LOCALES) {
       await fakePush(page, { permission: 'denied' });
       await load(page);
       await expect(bell(page)).toHaveAttribute('title', m.bell.blocked);
+      await expect(bell(page)).not.toHaveAttribute('aria-pressed');
       await bell(page).click();
       await expect(card(page)).toContainText(m.card.blockedHelp);
       await expect(card(page).getByRole('button', { name: m.card.turnOn })).toHaveCount(0);
@@ -255,7 +271,8 @@ for (const locale of LOCALES) {
     test('a permission revoked in the browser settings shows as blocked', async ({ page }) => {
       await fakePush(page, { subscribed: true, permission: 'denied' });
       await load(page);
-      await expect(bell(page)).toHaveAttribute('aria-pressed', 'false');
+      // Not a toggle while it cannot turn alerts on.
+      await expect(bell(page)).not.toHaveAttribute('aria-pressed');
       await expect(bell(page)).toHaveAttribute('title', m.bell.blocked);
     });
 
@@ -271,10 +288,13 @@ for (const locale of LOCALES) {
         await load(page);
         await expect(card(page)).toBeVisible();
         await expect(card(page).getByRole('listitem')).toHaveText(m.card.iosSteps);
+        // iOS names the menu item in English, so screen readers should read it as English.
+        await expect(card(page).locator('[lang="en"]')).toHaveText(m.card.iosMenuItem);
         await expect(card(page).getByRole('button', { name: m.card.turnOn })).toHaveCount(0);
         await card(page).getByRole('button', { name: m.card.notNow }).click();
         await expect(card(page)).not.toBeVisible();
         await expect(bell(page)).toHaveAttribute('title', m.bell.install);
+        await expect(bell(page)).not.toHaveAttribute('aria-pressed');
         await bell(page).click();
         await expect(card(page).getByRole('listitem')).toHaveText(m.card.iosSteps);
       });

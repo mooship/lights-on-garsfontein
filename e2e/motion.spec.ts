@@ -47,6 +47,7 @@ test.describe('motion', () => {
   });
 
   test('marks a change of status, but not the first status shown', async ({ page }) => {
+    await page.clock.install();
     const changed = '[data-status] > [aria-hidden="true"], [data-status] [role="status"] > *';
     let status: 'ON' | 'OFF' = 'ON';
     await withStatus(page, () => status);
@@ -62,6 +63,7 @@ test.describe('motion', () => {
   });
 
   test('brings in an outage a poll adds, but not the ones already listed', async ({ page, request }) => {
+    await page.clock.install();
     const rows = page.locator('section:has(#history-heading) li');
     await logOutage(request, 2);
     await recordAnimations(page);

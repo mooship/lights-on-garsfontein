@@ -73,6 +73,10 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 const AT = '@@:@@';
 /** Matches exactly `text`, with each AT any HH:MM. */
 const withTime = (text: string) => new RegExp(`^${escapeRegExp(text).replaceAll(AT, '\\d\\d:\\d\\d')}$`);
+/** The status badge's headline, apart from any other status line on the page. */
+const badge = (page: Page) => page.locator('[data-status]').getByRole('status');
+/** The warning that the status shown may be out of date: a status line, as it does not need to interrupt. */
+const staleWarning = (page: Page) => page.getByRole('status').filter({ hasText: withTime(en.status.stale(AT)) });
 /** The tab title during an outage: "OFF 5m · <brand>". */
 const outageTitle = (state: string) => new RegExp(`^${state} \\d+${en.units.m} · ${escapeRegExp(BRAND)}$`);
 
@@ -450,13 +454,15 @@ test.describe('public page', () => {
   });
 
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
+    await page.clock.install();
     await page.goto('/');
-    await expect(page.getByRole('status')).toContainText(en.status.NONE);
+    await expect(badge(page)).toContainText(en.status.NONE);
     await expect(page.getByRole('alert')).toHaveCount(0);
     await page.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
     await pollNow(page);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
-    await expect(page.getByRole('status')).toContainText(en.status.NONE);
+    await expect(staleWarning(page)).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(badge(page)).toContainText(en.status.NONE);
   });
 
   test('stops claiming the power is on once the last reading is older than the heartbeat threshold', async ({
@@ -468,19 +474,19 @@ test.describe('public page', () => {
       return { ...body, status: 'ON', monitored: true, since };
     });
     await page.goto('/en/');
-    await expect(page.getByRole('status')).toHaveText(en.status.ON);
+    await expect(badge(page)).toHaveText(en.status.ON);
     // The power going off often takes the reader's own connection with it.
     await page.unroute(`**${STATUS_PATH}`);
     await page.route(`**${STATUS_PATH}`, (route) => route.abort());
     await pollNow(page);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
-    await expect(page.getByRole('status')).toHaveText(en.status.ON);
+    await expect(staleWarning(page)).toBeVisible();
+    await expect(badge(page)).toHaveText(en.status.ON);
 
     await page.clock.fastForward(HEARTBEAT_THRESHOLD_MS + MINUTE_MS);
-    await expect(page.getByRole('status')).toHaveText(en.status.NONE);
+    await expect(badge(page)).toHaveText(en.status.NONE);
     await expect(page.getByTestId('badge-detail')).toHaveText(/^\s*$/);
     await expect(page).toHaveTitle(site.brand.full);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
+    await expect(staleWarning(page)).toBeVisible();
 
     // Out of touch, nothing new arrives, so neither the page nor the tab changes: not with the clock's
     // ticks, the failed status polls, nor a statistics refresh that brings the same figures.
@@ -498,11 +504,11 @@ test.describe('public page', () => {
   test('gives up on a status request that hangs, and says so', async ({ page }) => {
     await page.clock.install();
     await page.goto('/en/');
-    await expect(page.getByRole('status')).toContainText(en.status.NONE);
+    await expect(badge(page)).toContainText(en.status.NONE);
     await page.route(`**${STATUS_PATH}`, () => {}); // never answers
     await pollNow(page);
     await page.clock.fastForward(REQUEST_TIMEOUT_MS);
-    await expect(page.getByRole('alert')).toHaveText(withTime(en.status.stale(AT)));
+    await expect(staleWarning(page)).toBeVisible();
   });
 
   // Gentle on readers' phones: the status changes at most once a minute (heartbeats and the cron).
@@ -519,12 +525,18 @@ test.describe('public page', () => {
     await expect.poll(() => statusRequests).toBe(before + 1);
   });
 
-  test('refreshes statistics that went stale while the tab was hidden, but not fresh ones', async ({ page }) => {
+  test('refreshes the status and statistics that went stale while the tab was hidden, but not fresh ones', async ({
+    page,
+  }) => {
     await page.clock.install();
     let statsRequests = 0;
+    let statusRequests = 0;
     page.on('request', (r) => r.url().endsWith(STATS_PATH) && statsRequests++);
+    page.on('request', (r) => r.url().endsWith(STATUS_PATH) && statusRequests++);
     await page.goto('/en/');
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
+    await expect(badge(page)).toBeVisible();
+    const loaded = statusRequests;
     const setVisibility = (state: 'hidden' | 'visible') =>
       page.evaluate((s) => {
         Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s });
@@ -534,12 +546,15 @@ test.describe('public page', () => {
     await setVisibility('hidden');
     await setVisibility('visible');
     await expect.poll(() => statsRequests).toBe(1); // still fresh: only the first load
+    expect(statusRequests).toBe(loaded);
 
     await setVisibility('hidden');
     await page.clock.fastForward(STATS_POLL_MS + MINUTE_MS); // hidden tabs do not poll
     expect(statsRequests).toBe(1);
+    expect(statusRequests).toBe(loaded);
     await setVisibility('visible');
     await expect.poll(() => statsRequests).toBe(2);
+    await expect.poll(() => statusRequests).toBe(loaded + 1);
   });
 
   test('lets browsers keep the icons for a day instead of checking them on every visit', async ({ request }) => {
@@ -639,6 +654,10 @@ test.describe('admin', () => {
 
   test('logs a past outage', async ({ page }) => {
     await login(page);
+    // Neither end of a logged outage can be in the future.
+    const now = await page.getByLabel(admin.started).getAttribute('max');
+    expect(now).toBeTruthy();
+    await expect(page.getByLabel(admin.ended)).toHaveAttribute('max', now ?? '');
     await page.getByLabel(admin.started).fill('2026-10-01T18:00');
     await page.getByLabel(admin.ended).fill('2026-10-01T20:30');
     await page.getByRole('button', { name: admin.log }).click();
@@ -1015,6 +1034,33 @@ test.describe('outages by time of day', () => {
     await expect(next.and(page.locator('[aria-live]'))).toHaveCount(1);
   });
 
+  for (const locale of LOCALES) {
+    test.describe(`${locale} figures`, () => {
+      test.use({ appLocale: locale });
+
+      // The chart's readout needs the keyboard; the table gives every hour at once.
+      test(`gives the time off by hour as a table too (${locale})`, async ({ page }) => {
+        const m = DICTIONARIES[locale];
+        const u = m.units;
+        await withOutages(page);
+        await page.goto(localePath(locale));
+        await page.getByText(m.trends.tableLabel, { exact: true }).click();
+        await expect(page.getByRole('table', { name: m.trends.chartTitle })).toBeVisible();
+        const table = page.getByRole('table', { name: byHourTitle(locale) });
+        await expect(table.getByRole('columnheader')).toHaveText([m.trends.hourCol, m.trends.withoutPower]);
+        await expect(table.getByRole('row')).toHaveCount(25);
+        const cells = (hour: string) =>
+          table
+            .getByRole('row')
+            .filter({ has: page.getByRole('cell', { name: hour }) })
+            .getByRole('cell');
+        await expect(cells('18:00–19:00')).toHaveText(['18:00–19:00', `1 ${u.h} 30 ${u.min}`]);
+        await expect(cells('19:00–20:00')).toHaveText(['19:00–20:00', `30 ${u.min}`]);
+        await expect(cells('00:00–01:00')).toHaveText(['00:00–01:00', `0 ${u.min}`]);
+      });
+    });
+  }
+
   test.describe('af', () => {
     test.use({ appLocale: 'af' });
 
@@ -1183,6 +1229,7 @@ test.describe('all outages', () => {
     page,
     request,
   }) => {
+    await page.clock.install();
     const [newest] = await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1213,6 +1260,7 @@ test.describe('all outages', () => {
   });
 
   test('says so when a reload of the open list fails, and not once it is closed', async ({ page, request }) => {
+    await page.clock.install();
     const [newest] = await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1253,6 +1301,7 @@ test.describe('all outages', () => {
   });
 
   test('reloads the full list when the recent outages change', async ({ page, request }) => {
+    await page.clock.install();
     const [newest] = await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1268,6 +1317,7 @@ test.describe('all outages', () => {
   });
 
   test('keeps the full list while the recent outages stay the same', async ({ page, request }) => {
+    await page.clock.install();
     await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1343,6 +1393,7 @@ test.describe('admin sensor', () => {
   });
 
   test('keeps the last reading when a refresh fails, and says so', async ({ page }) => {
+    await page.clock.install();
     const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
     await login(page);
     later.next = (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } });
@@ -1352,6 +1403,7 @@ test.describe('admin sensor', () => {
   });
 
   test('a refresh after the session has ended shows the sign-in form', async ({ page }) => {
+    await page.clock.install();
     const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
     await login(page);
     later.next = (route) => route.fulfill({ status: 401, json: { error: ERROR.unauthorized } });
@@ -1396,6 +1448,7 @@ test.describe('unexpected responses', () => {
   // the server, never a reading; the next good answer recovers the page.
   for (const body of ['<html>Sign in to the Wi-Fi</html>', '{}', '{"status":"BROWNOUT","recent":[]}']) {
     test(`treats a status of ${body.slice(0, 20)}… as unreachable, then recovers`, async ({ page }) => {
+      await page.clock.install();
       await page.route(`**${STATUS_PATH}`, (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body }),
       );

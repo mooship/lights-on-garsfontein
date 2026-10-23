@@ -3,6 +3,8 @@
 
 // The status page's NONE, which the correction alert repeats: it claims no more than the page shows.
 const NO_OUTAGE_REPORTED = 'Geen onderbreking aangemeld nie';
+// The iPhone share menu's item, for alerts.card.iosMenuItem and the step that names it.
+const IOS_MENU_ITEM = 'Add to Home Screen';
 
 export const af = {
   // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
@@ -88,7 +90,7 @@ export const af = {
   },
   trends: {
     title: 'Statistiek',
-    tableLabel: 'Wys die weeklikse syfers',
+    tableLabel: 'Wys die syfers',
     refreshFailed: (time: string) => `Kon nie die statistiek bywerk nie. Dit is die syfers soos dit om ${time} was.`,
     // Retried every STATS_POLL_MS (src/lib/poll.ts).
     loadFailed: 'Kon nie die statistiek laai nie. Ons probeer oor ’n paar minute weer.',
@@ -122,6 +124,7 @@ export const af = {
     partial: (day: string) => ` (vanaf ${day})`,
     thisWeek: 'Hierdie week',
     weekCol: 'Week van',
+    hourCol: 'Uur',
     hoursCol: 'Ure sonder krag',
     outagesCol: 'Onderbrekings',
     download: 'Laai alle onderbrekings af (CSV)',
@@ -154,11 +157,13 @@ export const af = {
       noThanks: 'Nee dankie',
       close: 'Maak toe',
       // An iPhone offers notifications only to a site opened from the home screen. iOS has no
-      // Afrikaans, so the menu item keeps its English name.
+      // Afrikaans, so the menu item keeps its English name, which the card marks as English wherever
+      // a step names it.
       iosIntro: 'Op ’n iPhone moet jy die webwerf eers by jou tuisskerm voeg:',
+      iosMenuItem: IOS_MENU_ITEM,
       iosSteps: [
         'Tik op die deelknoppie in Safari.',
-        'Kies “Add to Home Screen”.',
+        `Kies “${IOS_MENU_ITEM}”.`,
         'Maak die webwerf van jou tuisskerm af oop en tik op die klokkie.',
       ],
       blockedHelp:
@@ -171,7 +176,10 @@ export const af = {
   },
   // Web push alerts. `on` takes the time it came back and how long it was off (formatted with `units`).
   push: {
-    off: { title: 'Die krag is af', body: (time: string) => `Geen krag in Garsfontein Uitb. 16 sedert ${time} nie.` },
+    off: {
+      title: 'Die krag is af',
+      body: (time: string) => `Geen krag by die meetpunt in Garsfontein Uitb. 16 sedert ${time} nie.`,
+    },
     planned: {
       title: 'Beplande onderbreking',
       body: (time: string) => `Dit het om ${time} begin en is vooraf aangekondig.`,

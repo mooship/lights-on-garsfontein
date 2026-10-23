@@ -2,9 +2,9 @@
 // shows what the card turned on.
 
 import { createEffect, createSignal, on, onCleanup } from 'solid-js';
-import { MINUTE_MS } from '../../shared/api';
 import { locale } from './i18n';
 import {
+  ALERTS_NOTICE_MS,
   ALERTS_OFFER_DELAY_MS,
   ALERTS_SNOOZE_MS,
   type AlertsState,
@@ -23,20 +23,26 @@ const [open, setOpen] = createSignal(false);
 type Notice = 'turnedOn' | 'turnedOff' | 'failed';
 // A key, so the message follows a language switch.
 const [notice, setNotice] = createSignal<Notice | null>(null);
+// Whether the live region names a card that just offered itself (src/components/AlertsCard.tsx).
+const [announcing, setAnnouncing] = createSignal(false);
 
-export { busy, notice, open, state };
+export { announcing, busy, notice, open, state };
 
 /** The open card's id, so closing it can tell whether it held focus. */
 export const CARD_ID = 'alerts-card';
-
-/** How long a confirmation stays. */
-const NOTICE_MS = MINUTE_MS / 15;
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 function say(key: Notice) {
   clearTimeout(noticeTimer);
   setNotice(key);
-  noticeTimer = setTimeout(() => setNotice(null), NOTICE_MS);
+  noticeTimer = setTimeout(() => setNotice(null), ALERTS_NOTICE_MS);
+}
+
+let announceTimer: ReturnType<typeof setTimeout> | undefined;
+function announce(on: boolean) {
+  clearTimeout(announceTimer);
+  setAnnouncing(on);
+  if (on) announceTimer = setTimeout(() => setAnnouncing(false), ALERTS_NOTICE_MS);
 }
 
 export async function refreshAlerts(): Promise<AlertsState> {
@@ -60,6 +66,7 @@ function openCard(byVisitor: boolean) {
   returnFocus = active instanceof HTMLElement && active !== document.body ? active : null;
   focusOnOpen = byVisitor;
   setOpen(true);
+  announce(!byVisitor);
 }
 
 /** Whether the card offers alerts, rather than only explaining why they cannot be turned on. */
@@ -72,6 +79,7 @@ export function closeCard(choice: Choice) {
   if (choice === 'noThanks') writeStored(STORAGE_KEYS.alertsDeclined, '1');
   const hadFocus = document.getElementById(CARD_ID)?.contains(document.activeElement);
   setOpen(false);
+  announce(false);
   if (!hadFocus) return;
   // Opened by itself while nothing had focus: the main content takes it rather than <body>.
   const target = returnFocus?.isConnected ? returnFocus : document.querySelector<HTMLElement>('.gg-main');

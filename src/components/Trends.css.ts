@@ -122,6 +122,9 @@ export const table = style({
   marginTop: '0.5rem',
 });
 
+// The figures hold a table for each chart, named after it.
+export const caption = style({ textAlign: 'left', fontWeight: 600, paddingTop: '0.75rem' });
+
 export const th = style({
   textAlign: 'left',
   fontWeight: 600,

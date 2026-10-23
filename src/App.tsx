@@ -120,10 +120,10 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
   onMount(() => {
     const timer = setInterval(whenVisible(status.refetch), POLL_MS);
     const statsTimer = setInterval(whenVisible(stats.refetch), STATS_POLL_MS);
-    // A tab back from the background asks for the status at once, and for the statistics only if
-    // they are older than a poll would let them get.
+    // A tab back from the background asks again only for what is older than a poll would let it get;
+    // the status from half a poll, so a quick look at another tab does not ask twice.
     const onVisible = whenVisible(() => {
-      status.refetch();
+      if (Date.now() - status.updatedAt() > POLL_MS / 2) status.refetch();
       if (Date.now() - stats.updatedAt() > STATS_POLL_MS) stats.refetch();
     });
     document.addEventListener('visibilitychange', onVisible);
@@ -173,7 +173,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                   {/* Only when something is wrong; the loading shell has no line for it. */}
                   <Show when={warning()}>
                     {(text) => (
-                      <p class={`gg-status-warning ${css.warning}`} role="alert">
+                      <p class={`gg-status-warning ${css.warning}`} role="status">
                         {text()}
                       </p>
                     )}
@@ -203,7 +203,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
               <>
                 <Trends stats={s()} now={minute()} />
                 <Show when={stats.error() !== undefined}>
-                  <p class={css.trendsWarning} role="alert">
+                  <p class={css.trendsWarning} role="status">
                     {t().trends.refreshFailed(formatTime(stats.updatedAt()))}
                   </p>
                 </Show>

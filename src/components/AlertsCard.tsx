@@ -1,5 +1,5 @@
 import { type Component, onCleanup, onMount, Show } from 'solid-js';
-import { followLanguage, notice, offerWhenReady, open, refreshAlerts, state } from '../lib/alerts-store';
+import { announcing, followLanguage, notice, offerWhenReady, open, refreshAlerts, state } from '../lib/alerts-store';
 import { t } from '../lib/i18n';
 import * as css from './AlertsCard.css';
 import { AlertsSheet } from './AlertsSheet';
@@ -23,13 +23,19 @@ export const AlertsCard: Component<{ ready: boolean }> = (props) => {
   followLanguage();
 
   return (
-    // Always present, so screen readers announce what goes into it: a card that offers itself does not
-    // take focus, so this is how they hear it arrive.
-    <div aria-live="polite">
+    <>
+      {/* Outside the live region: a card the visitor opens takes focus, which reads it already. */}
       <Show when={open()}>
         <AlertsSheet />
       </Show>
-      <Show when={notice()}>{(key) => <p class={css.notice}>{t().alerts.card[key()]}</p>}</Show>
-    </div>
+      {/* Always present, so screen readers announce what goes into it: a card that offers itself does
+          not take focus, so its name here, for a moment, is how they hear it arrive. */}
+      <div aria-live="polite">
+        <Show when={announcing()}>
+          <p class="gg-sr-only">{t().alerts.card.heading}</p>
+        </Show>
+        <Show when={notice()}>{(key) => <p class={css.notice}>{t().alerts.card[key()]}</p>}</Show>
+      </div>
+    </>
   );
 };

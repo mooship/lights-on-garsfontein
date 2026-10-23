@@ -14,6 +14,9 @@ export const ALERTS_SNOOZE_MS = 30 * DAY_MS;
 /** How long after the status first loads the card may offer itself, so it never interrupts the first look. */
 export const ALERTS_OFFER_DELAY_MS = MINUTE_MS / 20;
 
+/** How long a confirmation stays, and the name of a card that offered itself in the live region. */
+export const ALERTS_NOTICE_MS = MINUTE_MS / 15;
+
 /** The alerts card waits for a return visit, so it never greets someone on their first page load. */
 const MIN_VISITS = 2;
 

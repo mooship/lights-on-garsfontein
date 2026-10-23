@@ -2,6 +2,7 @@ import { type APIRequestContext, test as base, expect, type Page } from '@playwr
 import { type AdminOutagesResponse, DAY_MS, MINUTE_MS, OUTAGE_ACTION } from '../shared/api';
 import { ADMIN_OUTAGES_PATH } from '../shared/paths';
 import type { Locale } from '../site.config';
+import { POLL_MS } from '../src/lib/poll';
 import { STORAGE_KEYS } from '../src/lib/storage';
 import { exampleVar } from './dev-vars';
 
@@ -29,8 +30,8 @@ async function deleteOutages(request: APIRequestContext): Promise<void> {
   }
 }
 
-/** A tab coming back into view asks for the status at once. */
-export const pollNow = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+/** Lets a poll's interval pass, so the page asks again; the test installs the clock before loading the page. */
+export const pollNow = (page: Page) => page.clock.fastForward(POLL_MS);
 
 /** Serves the real response from `path`, changed by `change`. */
 export const patchJson = <T>(page: Page, path: string, change: (body: T) => T) =>
@@ -116,7 +117,8 @@ export const trackLayoutShift = (page: Page) =>
 /** The layout shift so far, once the status and statistics have rendered and the fonts have painted. */
 export async function readLayoutShift(page: Page): Promise<number> {
   await expect(page.getByRole('status')).toBeVisible();
-  await expect(page.locator('.gg-trends-details table')).toBeAttached(); // the skeleton has no table
+  // The skeleton has no table; the loaded card has one or two.
+  await expect(page.locator('.gg-trends-details table').first()).toBeAttached();
   return page.evaluate(async () => {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
