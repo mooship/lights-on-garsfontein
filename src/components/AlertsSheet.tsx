@@ -10,6 +10,7 @@ export const AlertsSheet: Component = () => {
   const [failed, setFailed] = createSignal(false);
   const m = () => t().alerts.card;
   let heading!: HTMLHeadingElement;
+  let card!: HTMLElement;
 
   // Escape puts off a card that offered something, and otherwise just closes it.
   const onKey = (event: KeyboardEvent) => {
@@ -18,6 +19,18 @@ export const AlertsSheet: Component = () => {
   onMount(() => {
     if (takesFocus()) heading.focus({ preventScroll: true });
     document.addEventListener('keydown', onKey);
+    // The card floats over the page without holding focus, so tabbing past it can reach a link
+    // beneath it. Padding the scroll by its height scrolls whatever takes focus clear of it, and moves
+    // nothing on the page.
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => {
+      root.style.scrollPaddingBottom = `${card.offsetHeight + Number.parseFloat(getComputedStyle(card).bottom)}px`;
+    });
+    observer.observe(card);
+    onCleanup(() => {
+      observer.disconnect();
+      root.style.removeProperty('scroll-padding-bottom');
+    });
   });
   onCleanup(() => document.removeEventListener('keydown', onKey));
 
@@ -28,7 +41,7 @@ export const AlertsSheet: Component = () => {
   }
 
   return (
-    <section id={CARD_ID} class={`gg-card ${css.card}`} role="dialog" aria-labelledby="alerts-heading">
+    <section id={CARD_ID} ref={card} class={`gg-card ${css.card}`} role="dialog" aria-labelledby="alerts-heading">
       <div class={css.header}>
         <span class={css.icon}>
           <BellRing size={22} aria-hidden="true" />

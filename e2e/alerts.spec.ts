@@ -157,8 +157,15 @@ for (const locale of LOCALES) {
       await fakePush(page);
       await returningVisitor(page);
       await load(page);
+      // While open, the page scrolls focus clear of the card, which covers the bottom of the screen.
+      const scrollPadding = () =>
+        page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom) || 0);
+      await expect(card(page)).toBeVisible();
+      const height = (await card(page).boundingBox())?.height ?? Number.POSITIVE_INFINITY;
+      await expect.poll(scrollPadding).toBeGreaterThan(height);
       await card(page).getByRole('button', { name: m.card.notNow }).click();
       await expect(card(page)).not.toBeVisible();
+      await expect.poll(scrollPadding).toBe(0);
 
       await load(page);
       await expect(card(page)).not.toBeVisible();
