@@ -40,7 +40,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
 - "Shared 60/min" is one limit per connection across those five endpoints and `GET /api/push/key`, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` and the push subscription writes each have their own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
-- A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt.
+- A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt. A JSON body larger than 16 KB (`MAX_BODY_BYTES` in `worker/lib/http.ts`) gets `413` with `payload_too_large`, bearer or not.
 - Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.
 - Only the admin API exposes an outage's `source`.

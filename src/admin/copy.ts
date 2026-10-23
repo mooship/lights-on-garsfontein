@@ -12,6 +12,7 @@ import { site } from '../../site.config.ts';
 type Unexplained =
   | typeof ERROR.forbidden
   | typeof ERROR.unsupportedMediaType
+  | typeof ERROR.payloadTooLarge
   | typeof ERROR.notConfigured
   | typeof ERROR.internal;
 

@@ -15,6 +15,7 @@ export const ERROR = {
   noOpenOutage: 'no_open_outage',
   alertSent: 'alert_sent',
   unsupportedMediaType: 'unsupported_media_type',
+  payloadTooLarge: 'payload_too_large',
   rateLimited: 'rate_limited',
   internal: 'internal_error',
 } as const;
