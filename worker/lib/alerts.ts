@@ -137,7 +137,7 @@ export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
 }
 
 /** Clears a claim, if it is still the one made at `claimedAt`, so the next run claims the alert again. */
-export async function releaseClaim(db: Db, { kind, outageId }: AlertClaim, claimedAt: string): Promise<void> {
+async function releaseClaim(db: Db, { kind, outageId }: AlertClaim, claimedAt: string): Promise<void> {
   const field = kind === 'off' ? 'offAlertAt' : 'onAlertAt';
   await db
     .update(outages)
