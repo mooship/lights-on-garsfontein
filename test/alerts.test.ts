@@ -32,8 +32,10 @@ describe('alertMessage', () => {
     expect(body).toBe(en.push.off.body('14:02'));
     expect(body).toContain('14:02');
     // One literal smoke string per language.
-    expect(body).toBe('No power in Garsfontein Ext. 16 since 14:02.');
-    expect(alertMessage('off', off, 'af').body).toBe('Geen krag in Garsfontein Uitb. 16 sedert 14:02 nie.');
+    expect(body).toBe('No power at the measuring point in Garsfontein Ext. 16 since 14:02.');
+    expect(alertMessage('off', off, 'af').body).toBe(
+      'Geen krag by die meetpunt in Garsfontein Uitb. 16 sedert 14:02 nie.',
+    );
   });
 
   it('uses the planned wording for planned outages', () => {
