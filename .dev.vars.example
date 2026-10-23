@@ -13,3 +13,4 @@ CONTACT_EMAIL="contact@example.invalid"
 VAPID_PRIVATE_KEY='{"key_ops":["sign"],"ext":true,"kty":"EC","x":"-3Hp4KVoMjPEi9JbtKlFpP-QnlseRduXTOFZdyXyA20","y":"eDeNwmF2tJG0I2WpQfhHy5ydPHz6zyO7bzffyHoNzjQ","crv":"P-256","d":"9dxzmBrrYXeQGoMXkFCuPw3hGBggRaDrc4ffWOBJyrE"}'
 TELEGRAM_BOT_TOKEN=""
 TELEGRAM_CHAT_ID=""
+TELEGRAM_WEBHOOK_SECRET=""
