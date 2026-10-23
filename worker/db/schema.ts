@@ -39,6 +39,8 @@ export const outages = sqliteTable(
     index('outages_start_time_idx').on(table.startTime),
     // Open outages (end_time IS NULL) and the stats range scan on end_time.
     index('outages_end_start_idx').on(table.endTime, table.startTime),
+    // The minute cron's follow-up claims (claimAlerts); partial, so it holds only the few rows still waiting.
+    index('outages_alert_pending_idx').on(table.offAlertAt).where(sql`${table.onAlertAt} is null`),
   ],
 );
 

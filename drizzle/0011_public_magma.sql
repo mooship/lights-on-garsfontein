@@ -1,0 +1,1 @@
+CREATE INDEX `outages_alert_pending_idx` ON `outages` (`off_alert_at`) WHERE "outages"."on_alert_at" is null;
