@@ -4,8 +4,7 @@ import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, MINUTE_MS, TIMER_ACTION } from '../sha
 import { ERROR } from '../shared/errors';
 import { HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { createDb } from '../worker/db/client';
-import { getGridState } from '../worker/lib/grid';
-import { MAX_PAUSE_MS } from '../worker/routes/status';
+import { getGridState, MAX_PAUSE_MS } from '../worker/lib/grid';
 import {
   asAdmin,
   call,

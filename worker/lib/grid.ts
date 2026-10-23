@@ -1,5 +1,6 @@
 import { and, desc, eq, gt, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
 import {
+  DAY_MS,
   HEARTBEAT_THRESHOLD_MS,
   isPaused,
   isStale,
@@ -86,8 +87,11 @@ function powerState(
   return { status: 'ON', since: null };
 }
 
-/** The D1-backed part of StatusResponse, read in one batch. */
-export async function getGridState(db: Db, now: Date) {
+/**
+ * The D1-backed part of StatusResponse, read in one batch, as `grid`, with the heartbeat and the
+ * open outage behind it for the owner's views. Only `grid` is public: the rows say how an outage was recorded.
+ */
+export async function readGridState(db: Db, now: Date) {
   const [[heartbeat], [open], recentRows] = await db.batch([
     heartbeatQuery(db),
     openOutageQuery(db),
@@ -104,7 +108,7 @@ export async function getGridState(db: Db, now: Date) {
     (max, o) => (o.endTime && (!max || o.endTime > max) ? o.endTime : max),
     null,
   );
-  return {
+  const grid = {
     status: state.status,
     since: state.since ?? lastEnd,
     outage: open ? summarise(open) : null,
@@ -115,7 +119,10 @@ export async function getGridState(db: Db, now: Date) {
       !isStale(heartbeat.lastSeen, now.getTime()) &&
       !isPaused(heartbeat.pausedUntil, now.getTime()),
   };
+  return { grid, heartbeat, open };
 }
+
+export const getGridState = async (db: Db, now: Date) => (await readGridState(db, now)).grid;
 
 /**
  * Opens a sensor outage when the heartbeat has gone stale and nothing is open yet. Returns whether
@@ -190,6 +197,9 @@ export async function recordHeartbeat(
   const count = closed.length + gaps.length;
   return { closed: count, changed: count > 0 || missed.meta.changes > 0 };
 }
+
+/** The longest pause, so a forgotten one cannot leave the sensor ignored for good. */
+export const MAX_PAUSE_MS = 30 * DAY_MS;
 
 /**
  * Pauses outage detection until `until`, or with null ends a running pause now, so the silence
