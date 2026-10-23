@@ -75,11 +75,10 @@ export const isoTime = () => z.iso.datetime({ offset: true }).transform((v) => n
 /** The largest request body read; the largest real one, a push subscription, is a few kilobytes. */
 export const MAX_BODY_BYTES = 16 * 1024;
 
-/**
- * The body as text, or null once it passes MAX_BODY_BYTES: refused up front by its Content-Length,
- * and, for a chunked body without one, while it is read, so neither is ever held whole.
- */
-async function readCappedText(request: Request): Promise<string | null> {
+/** The body as text, or null when it is over MAX_BODY_BYTES. */
+// Refused up front by its Content-Length, and a chunked body as soon as it passes the limit, so an
+// oversized body is never held whole.
+export async function readCappedText(request: Request): Promise<string | null> {
   if (!request.body) return '';
   if (Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES) return null;
   const decoder = new TextDecoder();

@@ -1,7 +1,9 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import { ERROR } from '../shared/errors';
 import { STATUS_PATH, TELEGRAM_WEBHOOK_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
+import { MAX_BODY_BYTES } from '../worker/lib/http';
 import { TELEGRAM_SECRET_HEADER } from '../worker/routes/telegram';
 import { call, getStatus, setHeartbeat } from './helpers';
 
@@ -43,6 +45,12 @@ describe('the Telegram webhook', () => {
     expect(await pausedUntil()).toBeNull();
   });
 
+  it('refuses a body over MAX_BODY_BYTES', async () => {
+    const res = await send(update(`/help ${'x'.repeat(MAX_BODY_BYTES)}`));
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: ERROR.payloadTooLarge });
+  });
   it("answers the owner's command in the response, as a sendMessage", async () => {
     const res = await send(update('/help'));
 

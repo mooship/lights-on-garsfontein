@@ -1,7 +1,7 @@
 import { STATUS_PATH, TELEGRAM_WEBHOOK_PATH } from '../../shared/paths';
 import { refuseBadToken } from '../lib/auth';
 import { safeEqual } from '../lib/crypto';
-import { json } from '../lib/http';
+import { errors, json, readCappedText } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 import { runCommand } from '../lib/telegram-commands';
 
@@ -23,7 +23,14 @@ const nothing = () => new Response(null, { headers: { 'Cache-Control': 'no-store
  * needed. Everyone else, and anything but a text message, gets nothing, so the bot gives nothing away.
  */
 async function postUpdate({ request, env, db }: RouteContext): Promise<Response> {
-  const update = await request.json<{ message?: { chat?: { id?: unknown }; text?: unknown } }>().catch(() => null);
+  const raw = await readCappedText(request);
+  if (raw === null) return errors.payloadTooLarge();
+  let update: { message?: { chat?: { id?: unknown }; text?: unknown } } | null = null;
+  try {
+    update = JSON.parse(raw);
+  } catch {
+    // Not JSON, so not an update: it gets nothing, like any other message the bot does not answer.
+  }
   const message = update?.message;
   if (!message || String(message.chat?.id) !== env.TELEGRAM_CHAT_ID || typeof message.text !== 'string') {
     return nothing();
