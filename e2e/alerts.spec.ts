@@ -245,6 +245,7 @@ for (const locale of LOCALES) {
       await fakePush(page, { permission: 'denied' });
       await load(page);
       await expect(bell(page)).toHaveAttribute('title', m.bell.blocked);
+      await expect(bell(page)).not.toHaveAttribute('aria-pressed');
       await bell(page).click();
       await expect(card(page)).toContainText(m.card.blockedHelp);
       await expect(card(page).getByRole('button', { name: m.card.turnOn })).toHaveCount(0);
@@ -255,7 +256,8 @@ for (const locale of LOCALES) {
     test('a permission revoked in the browser settings shows as blocked', async ({ page }) => {
       await fakePush(page, { subscribed: true, permission: 'denied' });
       await load(page);
-      await expect(bell(page)).toHaveAttribute('aria-pressed', 'false');
+      // Not a toggle while it cannot turn alerts on.
+      await expect(bell(page)).not.toHaveAttribute('aria-pressed');
       await expect(bell(page)).toHaveAttribute('title', m.bell.blocked);
     });
 
@@ -275,6 +277,7 @@ for (const locale of LOCALES) {
         await card(page).getByRole('button', { name: m.card.notNow }).click();
         await expect(card(page)).not.toBeVisible();
         await expect(bell(page)).toHaveAttribute('title', m.bell.install);
+        await expect(bell(page)).not.toHaveAttribute('aria-pressed');
         await bell(page).click();
         await expect(card(page).getByRole('listitem')).toHaveText(m.card.iosSteps);
       });
