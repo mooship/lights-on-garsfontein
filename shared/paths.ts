@@ -11,6 +11,7 @@ export const HEARTBEAT_PAUSE_PATH = '/api/heartbeat/pause';
 export const CONTACT_PATH = '/api/contact';
 export const PUSH_SUBSCRIPTION_PATH = '/api/push/subscription';
 export const PUSH_KEY_PATH = '/api/push/key';
+export const TELEGRAM_WEBHOOK_PATH = '/api/telegram';
 
 export const ADMIN_API_PREFIX = '/api/admin/';
 export const LOGIN_PATH = '/api/admin/login';

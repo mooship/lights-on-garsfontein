@@ -93,5 +93,18 @@ export const admin = {
         `False alarm: the power stayed on. The sensor was offline from ${from} to ${to}.`,
       plain: 'False alarm: the power stayed on.',
     },
+    // The owner's commands (worker/lib/telegram-commands.ts).
+    help: [
+      'Commands:',
+      '/status: the power and the sensor now',
+      '/pause 3h: pause the sensor (30m, 3h, 2d)',
+      '/resume: end a pause',
+    ].join('\n'),
+    // "30 days" is MAX_PAUSE_MS (worker/routes/status.ts); change them together.
+    usage: 'Use /pause with a duration such as 30m, 3h or 2d, up to 30 days.',
+    paused: (until: string) => `Sensor paused until ${until}.`,
+    resumed: 'Pause ended.',
+    notPaused: 'Nothing is paused.',
+    outage: (since: string, source: string) => `Outage open since ${since} (${source}).`,
   },
 };

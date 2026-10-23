@@ -14,7 +14,7 @@ import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
  */
 export const STATUS_EDGE_TTL_SECONDS = 12;
 
-/** The longest pause, so a forgotten one cannot leave the sensor ignored for good. */
+/** The longest pause, so a forgotten one cannot leave the sensor ignored for good. Its days are in admin.telegram.usage (src/admin/copy.ts). */
 export const MAX_PAUSE_MS = 30 * DAY_MS;
 
 const pauseSchema = z.object({

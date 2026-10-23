@@ -35,6 +35,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `POST`/`DELETE /api/push/subscription` | Saves or removes a browser's power alert subscription; `{ "ok": true }` | `no-store` | 5/min |
 | `POST /api/heartbeat` | Sensor check-in, with an optional `{ "poweredFor" }` ([Sensor](#sensor)) | `no-store` | `HEARTBEAT_TOKEN` |
 | `POST /api/heartbeat/pause` | Pauses outage detection | `no-store` | `HEARTBEAT_TOKEN` |
+| `POST /api/telegram` | Telegram's webhook for the owner's bot commands ([Owner alerts on Telegram](#owner-alerts-on-telegram)) | `no-store` | `TELEGRAM_WEBHOOK_SECRET` in `X-Telegram-Bot-Api-Secret-Token` |
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
@@ -215,6 +216,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor |
    | `VAPID_PRIVATE_KEY` | Optional: the key that signs power alerts, an ECDSA P-256 private key as a one-line JWK: `npm run --silent vapid-keys | npx wrangler secret put VAPID_PRIVATE_KEY`. The public key is derived from it and served at `GET /api/push/key`; until it is set, that answers `404` and browsers cannot subscribe |
    | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the owner's private Telegram alerts (see [Owner alerts on Telegram](#owner-alerts-on-telegram)). Until both are set, none are sent |
+   | `TELEGRAM_WEBHOOK_SECRET` | Optional: the secret Telegram sends with each command to the bot. Until it is set, `POST /api/telegram` answers `401` |
    | `CONTACT_EMAIL` | Optional: address for privacy requests, revealed on the privacy page only after a Turnstile check. Until it is set, requests go to public GitHub issues |
 
    For random values, use for example `openssl rand -base64 32`.
@@ -239,6 +241,7 @@ The owner can get the same alerts privately, in a chat with their own Telegram b
 
 - **Setup.** Create a bot with [@BotFather](https://t.me/BotFather) and keep its token. Send the bot `/start`, then open `https://api.telegram.org/bot<token>/getUpdates` and read `message.chat.id`. Set both secrets: `npx wrangler secret put TELEGRAM_BOT_TOKEN` and `npx wrangler secret put TELEGRAM_CHAT_ID`.
 - **When.** Exactly when the power alerts above are due, from the same claims, so the two never disagree. Each claim also puts one Telegram message on `PUSH_QUEUE`, even with no subscribers.
+- **Commands.** `/status` gives the status, the sensor's state and any open outage with how it was recorded; `/pause 3h` pauses outage detection (`30m`, `3h`, `2d`, up to `MAX_PAUSE_MS`), like [`lights-on pause`](#sensor); `/resume` ends a pause. Telegram posts each message to `POST /api/telegram`, which checks `TELEGRAM_WEBHOOK_SECRET`, answers only `TELEGRAM_CHAT_ID`, and replies in the response (`worker/lib/telegram-commands.ts`). To connect it once, generate a value (`openssl rand -hex 32`), set it with `npx wrangler secret put TELEGRAM_WEBHOOK_SECRET`, then call the Bot API's `setWebhook` with `url` set to `<site>/api/telegram`, `secret_token` set to the same value and `allowed_updates` set to `["message"]`, and `setMyCommands` with `status`, `pause` and `resume` so they show in Telegram's menu.
 - **Delivery.** `worker/lib/telegram.ts` sends it with the Bot API's `sendMessage`, retrying a 429, a 5xx or a network error up to `PUSH_MAX_ATTEMPTS`. Any other error (a wrong token or chat ID) is dropped and logged with Telegram's description; logs never contain the token.
 
 ## Extending

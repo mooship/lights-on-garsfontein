@@ -6,6 +6,7 @@ import { historyRoutes } from './history';
 import { pushRoutes } from './push';
 import { seoRoutes } from './seo';
 import { statusRoutes } from './status';
+import { telegramRoutes } from './telegram';
 
 /** Every Worker endpoint. To add one, see README, "Adding an endpoint". */
 export const routes: Routes = {
@@ -16,4 +17,5 @@ export const routes: Routes = {
   ...seoRoutes,
   ...contactRoutes,
   ...pushRoutes,
+  ...telegramRoutes,
 };
