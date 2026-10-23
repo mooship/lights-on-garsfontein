@@ -61,10 +61,9 @@ export default {
     }
   },
 
-  /**
-   * One page of an alert, or one Telegram alert, per message; see worker/lib/deliver.ts and telegram.ts.
-   * The queue has `max_retries = 0`, so a job that throws is re-queued here, or it would be lost.
-   */
+  /** One page of an alert, or one Telegram alert, per message; see worker/lib/deliver.ts and telegram.ts. */
+  // The queue has `max_retries = 0`, so a job that throws is re-queued here, or it would be lost.
+  // Delivery throws only before anything is sent, so a retry never repeats an alert.
   async queue(batch, env) {
     for (const message of batch.messages) {
       const job = message.body;

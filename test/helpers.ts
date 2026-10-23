@@ -51,10 +51,8 @@ interface CallOptions {
   env?: Env;
 }
 
-/**
- * Sends a request through the Worker's fetch handler, from a fresh uniqueIp() unless `ip` is given,
- * and waits for the work it left running (an edge-cache store), as the next request could rely on it.
- */
+/** Sends a request through the Worker's fetch handler, from a fresh uniqueIp() unless `ip` is given. */
+// Waits for the work the request left running (an edge-cache store), as the next request may rely on it.
 export async function call(path: string, options: CallOptions = {}): Promise<Response> {
   const headers = new Headers(options.headers);
   headers.set(CLIENT_IP_HEADER, options.ip ?? uniqueIp());
@@ -72,10 +70,8 @@ export async function call(path: string, options: CallOptions = {}): Promise<Res
   return response;
 }
 
-/**
- * Stubs fetch for `hostname`, which `answer`s with the request's URL; other fetches go through.
- * Like a real fetch, it rejects once its signal has aborted. Returns the spy.
- */
+/** Stubs fetch for `hostname`, which `answer`s with the request's URL; other fetches go through. Returns the spy. */
+// Like a real fetch, it rejects once its signal has aborted.
 export function stubFetchHost(hostname: string, answer: (url: string) => Response | Promise<Response>) {
   const realFetch = globalThis.fetch;
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

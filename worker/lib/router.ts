@@ -95,11 +95,9 @@ async function storeInEdgeCache(request: Request, response: Response, ttl: true 
 const needsSameSite = (route: Route, request: Request) =>
   request.method !== 'GET' && request.method !== 'HEAD' && !(route.authorize && bearerToken(request) !== null);
 
-/**
- * Runs a matched route: its guards, the handler (or edge cache), purges, then CORS and `ctx.headers`.
- * A miss is stored in the edge cache after the response is sent (`execution.waitUntil`); a purge is
- * awaited, so the next read after a write never gets the old copy.
- */
+/** Runs a matched route: its guards, the handler (or edge cache), purges, then CORS and `ctx.headers`. */
+// A miss is stored after the response is sent (`execution.waitUntil`); a purge is awaited, so the
+// next read after a write never gets the old copy.
 export async function dispatch(
   route: Route,
   request: Request,

@@ -55,10 +55,8 @@ export async function getOpenOutage(db: Db): Promise<Outage | undefined> {
   return open;
 }
 
-/**
- * No open outage other than `id`, for a statement that opens or reopens one: checked inside that
- * statement, so two concurrent requests cannot both pass it.
- */
+/** SQL: no open outage other than `id`. */
+// Part of the statement that opens or reopens one, so two concurrent requests cannot both pass it.
 export const noOtherOpen = (id: number) =>
   sql`not exists (select 1 from ${outages} where ${and(isOpen, ne(outages.id, id))})`;
 

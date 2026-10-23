@@ -80,15 +80,14 @@ export interface TelegramAlert extends AlertClaim {
 /** What goes on PUSH_QUEUE; only a Telegram alert has a `channel`. */
 export type AlertJob = AlertPage | TelegramAlert;
 
-/**
- * Puts `job` back on the queue for another attempt, waiting longer each time, unless it has had
- * PUSH_MAX_ATTEMPTS. Returns whether it was re-queued.
- */
+/** Re-queues `job` for its next attempt, unless it has had PUSH_MAX_ATTEMPTS; returns whether it did. */
 export async function retryAlert(queue: Queue<AlertJob>, job: AlertJob): Promise<boolean> {
   if (job.attempt >= PUSH_MAX_ATTEMPTS) return false;
+  // A longer wait after each attempt.
   await queue.send({ ...job, attempt: job.attempt + 1 }, { delaySeconds: ALERT_RETRY_DELAY_SECONDS * job.attempt });
   return true;
 }
+
 /**
  * Marks the alerts that are due as sent and returns them: off, then on, then dismissed. Each kind
  * is one conditional UPDATE, so two concurrent runs cannot claim the same alert; the three go in
