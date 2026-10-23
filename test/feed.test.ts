@@ -64,6 +64,13 @@ describe('GET /feed.xml', () => {
     );
   });
 
+  it('drops part minutes as the page and alerts do', async () => {
+    await insertOutage({ startTime: '2026-10-17T12:05:00.000Z', endTime: '2026-10-17T14:18:40.000Z' });
+    expect(field(entries(await (await call(FEED_PATH)).text())[0], 'title')).toBe(
+      'Outage 17 Oct 2026 14:05 (2 h 13 min)',
+    );
+  });
+
   it('excludes false positives and keeps the latest 20', async () => {
     await insertOutage({
       startTime: '2026-10-19T00:00:00.000Z',

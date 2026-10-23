@@ -8,8 +8,10 @@ import {
   type StatsResponse,
   TRACKING_SINCE,
 } from '../../shared/api';
+import { formatDurationIn } from '../../shared/format';
 import { CSV_PATH, FEED_PATH, OUTAGES_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
+import { DICTIONARIES } from '../../src/i18n/index';
 import { outages } from '../db/schema';
 import { SUMMARY_COLUMNS, summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
@@ -122,17 +124,12 @@ function feedDate(iso: string): string {
   return `${part.day} ${part.month} ${part.year} ${part.hour}:${part.minute}`;
 }
 
-/** "2 h 10 min", "3 h" or "45 min". */
-function feedDuration(ms: number): string {
-  const minutes = Math.max(0, Math.round(ms / MINUTE_MS));
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return [h ? `${h} h` : '', m || !h ? `${m} min` : ''].filter(Boolean).join(' ');
-}
+/** Worded as the page and alerts word durations, in English like the rest of the feed. */
+const feedDuration = (ms: number) => formatDurationIn(ms, DICTIONARIES.en.units, { days: false, seconds: false });
 
 /**
  * Atom feed of the latest outages (false positives excluded), newest first. English only, as feeds
- * are read by software, so it skips the site's dictionaries.
+ * are read by software, so its copy skips the site's dictionaries.
  */
 async function getFeed({ env, db }: RouteContext): Promise<Response> {
   const rows = await db
