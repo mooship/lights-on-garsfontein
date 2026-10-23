@@ -1,4 +1,5 @@
 import { inArray } from 'drizzle-orm';
+import { SECOND_MS } from '../../shared/api';
 import type { Locale } from '../../site.config';
 import { createDb } from '../db/client';
 import { type PushSubscriptionRow, pushSubscriptions } from '../db/schema';
@@ -15,7 +16,7 @@ const errorName = (reason: unknown) => (reason instanceof Error ? reason.name : 
  * transient failures go back on the queue, with a longer wait each time, until PUSH_MAX_ATTEMPTS.
  */
 export async function deliverAlertPage(page: AlertPage, env: Env, now: Date): Promise<void> {
-  if (now.getTime() - Date.parse(page.queuedAt) > PUSH_TTL_SECONDS * 1000) return;
+  if (now.getTime() - Date.parse(page.queuedAt) > PUSH_TTL_SECONDS * SECOND_MS) return;
   const db = createDb(env.DB);
   const [outage, subscriptions] = await Promise.all([
     loadDueOutage(db, page),

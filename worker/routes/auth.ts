@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { CREDENTIAL_MAX_LENGTH, DAY_MS, TURNSTILE_ACTION } from '../../shared/api';
+import { CREDENTIAL_MAX_LENGTH, DAY_MS, SECOND_MS, TURNSTILE_ACTION } from '../../shared/api';
 import { LOGIN_PATH, LOGOUT_PATH } from '../../shared/paths';
 import { sessions } from '../db/schema';
 import { SESSION_COOKIE } from '../lib/cookies';
@@ -77,7 +77,7 @@ export async function checkSession({ request, env, db, headers }: RouteContext):
       .update(sessions)
       .set({ expiresAt: new Date(renewed).toISOString() })
       .where(eq(sessions.id, id));
-    headers.append('Set-Cookie', sessionCookie(token, Math.floor((renewed - now) / 1000)));
+    headers.append('Set-Cookie', sessionCookie(token, Math.floor((renewed - now) / SECOND_MS)));
   }
   return true;
 }
@@ -110,7 +110,7 @@ async function login(ctx: RouteContext): Promise<Response> {
     createdAt: new Date(now).toISOString(),
     passwordFingerprint: await passwordFingerprint(env),
   });
-  return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_MS / 1000) });
+  return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_MS / SECOND_MS) });
 }
 
 async function logout({ request, db }: RouteContext): Promise<Response> {

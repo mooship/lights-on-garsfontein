@@ -1,4 +1,5 @@
 import { render } from 'solid-js/web';
+import { SECOND_MS } from '../shared/api';
 import { ADMIN_PAGE_PATH } from '../shared/paths';
 import { App, type InitialData } from './App';
 import { api } from './lib/api';
@@ -34,7 +35,7 @@ if (!leaving) start();
 // A page left open across a deploy asks for lazy chunks of its own build, which the server no longer
 // has: a reload brings the page onto the current build. At most one reload per CHUNK_RELOAD_GAP_MS, so a
 // chunk that is truly missing cannot loop, while a later deploy in the same tab can still recover.
-const CHUNK_RELOAD_GAP_MS = 10_000;
+const CHUNK_RELOAD_GAP_MS = 10 * SECOND_MS;
 addEventListener('vite:preloadError', () => {
   try {
     const last = Number(sessionStorage.getItem(STORAGE_KEYS.chunkReload));

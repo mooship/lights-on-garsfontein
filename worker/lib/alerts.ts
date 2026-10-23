@@ -1,5 +1,5 @@
 import { and, asc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
-import { MINUTE_MS } from '../../shared/api';
+import { MINUTE_MS, SECOND_MS } from '../../shared/api';
 import { formatDurationIn, formatTimeOfDay } from '../../shared/format';
 import { localePath } from '../../shared/locale';
 import { type Locale, site } from '../../site.config';
@@ -54,7 +54,7 @@ export const PUSH_PAGE_SIZE = 40;
 /** How many times one page, or one Telegram message, is tried before it is dropped. */
 export const PUSH_MAX_ATTEMPTS = 3;
 /** The wait before a retry, multiplied by the attempts so far. */
-export const ALERT_RETRY_DELAY_SECONDS = 60;
+export const ALERT_RETRY_DELAY_SECONDS = MINUTE_MS / SECOND_MS;
 /** The most messages Queues accepts in one `sendBatch`. */
 const QUEUE_BATCH_LIMIT = 100;
 

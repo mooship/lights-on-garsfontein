@@ -8,6 +8,7 @@ import {
   type OutageSummary,
   type PowerStatus,
   RECENT_LIMIT,
+  SECOND_MS,
 } from '../../shared/api';
 import type { Db } from '../db/client';
 import { heartbeats, type Outage, outages, sessions } from '../db/schema';
@@ -171,7 +172,7 @@ export async function recordHeartbeat(
 ): Promise<{ closed: number; changed: boolean }> {
   const iso = now.toISOString();
   const staleBefore = new Date(now.getTime() - HEARTBEAT_THRESHOLD_MS).toISOString();
-  const poweredSince = new Date(Math.max(0, now.getTime() - poweredFor * 1000)).toISOString();
+  const poweredSince = new Date(Math.max(0, now.getTime() - poweredFor * SECOND_MS)).toISOString();
   const anyOpen = isNull(outages.endTime);
   // Insert-select (raw `db.run` cannot be batched): it needs every column, in table order.
   const missedOutage = db

@@ -1,4 +1,4 @@
-import { DAY_MS, UTC_OFFSET_MS } from '../../shared/api';
+import { DAY_MS, SECOND_MS, UTC_OFFSET_MS } from '../../shared/api';
 import { formatDurationIn, formatTimeOfDay, splitDuration } from '../../shared/format';
 import { site } from '../../site.config';
 import { intlLocale, t } from './i18n';
@@ -73,7 +73,7 @@ export function formatCompactDuration(ms: number): string {
 
 /** "01:02:03" stopwatch format. */
 export function formatClock(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const totalSeconds = Math.max(0, Math.floor(ms / SECOND_MS));
   return `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
 }
 

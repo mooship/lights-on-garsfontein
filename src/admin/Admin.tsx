@@ -18,6 +18,7 @@ import {
   type AdminOutagesResponse,
   CREDENTIAL_MAX_LENGTH,
   outageDurationMs,
+  SECOND_MS,
   type SensorReading,
   TIMER_ACTION,
   type TimerAction,
@@ -312,7 +313,7 @@ const Dashboard: Component<{
 }> = (props) => {
   let heading!: HTMLHeadingElement;
   onMount(() => props.focus && heading.focus());
-  const now = useNow(1000);
+  const now = useNow(SECOND_MS);
   const minute = useMinute(now);
   // Starts from the list the session check already fetched; changes refresh it.
   const [outages, setOutages] = createSignal(props.initial);

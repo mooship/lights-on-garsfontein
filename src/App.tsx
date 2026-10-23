@@ -13,6 +13,7 @@ import {
 import {
   HEARTBEAT_THRESHOLD_MS,
   outageDurationMs,
+  SECOND_MS,
   type StatsResponse,
   type StatusResponse,
   TRACKING_SINCE,
@@ -112,7 +113,7 @@ function statusDetail(s: StatusResponse, now: number): string {
 }
 
 const PublicView: Component<{ initial: InitialData }> = (props) => {
-  const now = useNow(1000);
+  const now = useNow(SECOND_MS);
   const minute = useMinute(now);
   const status = createPoll(props.initial.status, api.status);
   const stats = createPoll(props.initial.stats, api.stats);

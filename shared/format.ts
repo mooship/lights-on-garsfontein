@@ -2,7 +2,7 @@
 // durations alike; src/lib/format.ts wraps these with the active language.
 
 import { site } from '../site.config';
-import { DAY_MS, HOUR_MS, MINUTE_MS } from './api';
+import { DAY_MS, HOUR_MS, MINUTE_MS, SECOND_MS } from './api';
 
 /** Unit labels, as a dictionary's `units` gives them. */
 export interface DurationUnits {
@@ -37,7 +37,7 @@ export function splitDuration(ms: number) {
     days: Math.floor(clamped / DAY_MS),
     hours: Math.floor((clamped % DAY_MS) / HOUR_MS),
     minutes: Math.floor((clamped % HOUR_MS) / MINUTE_MS),
-    seconds: Math.floor(clamped / 1000),
+    seconds: Math.floor(clamped / SECOND_MS),
   };
 }
 
