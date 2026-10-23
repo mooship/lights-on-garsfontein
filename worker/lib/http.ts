@@ -1,7 +1,12 @@
 import { z } from 'zod';
-import { MINUTE_MS } from '../../shared/api';
+import { MINUTE_MS, SECOND_MS } from '../../shared/api';
 import { ERROR, type ErrorCode } from '../../shared/errors';
 
+/**
+ * How long a call to another service (push, Telegram, Turnstile) may take, as an `AbortSignal.timeout`,
+ * so one that hangs cannot hold a request or a queue job open.
+ */
+export const FETCH_TIMEOUT_MS = 10 * SECOND_MS;
 /** A JSON response, `no-store` unless `headers` sets its own Cache-Control. */
 export function json(data: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), {

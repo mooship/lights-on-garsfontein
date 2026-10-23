@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TURNSTILE_ACTION } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { CONTACT_PATH } from '../shared/paths';
-import { call, mockSiteverify, mockTurnstile, ORIGIN, uniqueIp } from './helpers';
+import { call, expireTimeouts, mockSiteverify, mockTurnstile, ORIGIN, uniqueIp } from './helpers';
 
 // checkTurnstile (worker/lib/turnstile.ts), through /api/contact with CONTACT_EMAIL set, so a
 // passing check answers 200 and a failing one 403.
@@ -46,6 +46,11 @@ describe('Turnstile check', () => {
     }
   });
 
+  it('fails closed when siteverify does not answer in time', async () => {
+    mockTurnstile(true, TURNSTILE_ACTION.contact);
+    expireTimeouts();
+    expect((await reveal()).status).toBe(403);
+  });
   it('treats a malformed siteverify answer as a failure', async () => {
     mockSiteverify(() => Response.json({ success: 'yes', action: TURNSTILE_ACTION.contact, hostname: HOSTNAME }));
     expect((await reveal()).status).toBe(403);

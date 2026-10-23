@@ -14,7 +14,7 @@ import {
   type TelegramAlert,
 } from '../worker/lib/alerts';
 import { deliverTelegramAlert, TELEGRAM_HOST, telegramConfigured, telegramText } from '../worker/lib/telegram';
-import { insertOutage, insertSubscription, runCron, stubFetchHost } from './helpers';
+import { expireTimeouts, insertOutage, insertSubscription, runCron, stubFetchHost } from './helpers';
 
 const NOW = new Date('2026-10-22T12:00:00.000Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
@@ -208,6 +208,17 @@ describe('deliverTelegramAlert', () => {
     expect(options?.delaySeconds).toBeGreaterThan(60);
   });
 
+  it('retries when Telegram does not answer in time', async () => {
+    const outage = await insertOutage({ startTime: ago(DUE_MS) });
+    stubTelegram(200);
+    expireTimeouts();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { send, queue } = retryQueue();
+
+    await deliverTelegramAlert(alertFor(outage), telegramEnv(queue), NOW);
+
+    expect(send).toHaveBeenCalledOnce();
+  });
   it('gives up after PUSH_MAX_ATTEMPTS', async () => {
     const outage = await insertOutage({ startTime: ago(DUE_MS) });
     stubTelegram(503);

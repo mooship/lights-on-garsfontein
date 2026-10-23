@@ -18,7 +18,7 @@ import {
 } from '../worker/lib/alerts';
 import { deliverAlertPage } from '../worker/lib/deliver';
 import { PUSH_TTL_SECONDS } from '../worker/lib/webpush';
-import { insertOutage, insertSubscription, mockPushService, PUSH_TEST_HOST, runCron } from './helpers';
+import { expireTimeouts, insertOutage, insertSubscription, mockPushService, PUSH_TEST_HOST, runCron } from './helpers';
 
 const { af, en } = DICTIONARIES;
 
@@ -466,6 +466,18 @@ describe('deliverAlertPage', () => {
     expect(send.mock.calls[0]?.[0].ids).toEqual([id]);
   });
 
+  it('retries a push service that does not answer in time', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    mockPushService(() => 201);
+    expireTimeouts();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [id]), testEnv, NOW);
+
+    expect(send).toHaveBeenCalledOnce();
+  });
   it('logs a rejected send with the push host and the error name, but never the endpoint path', async () => {
     const outage = await openOutage();
     const id = await insertSubscription('secret-path');

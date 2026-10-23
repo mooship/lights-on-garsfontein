@@ -62,17 +62,28 @@ export async function call(path: string, options: CallOptions = {}): Promise<Res
   return worker.fetch(request as Request<unknown, IncomingRequestCfProperties>, options.env ?? env);
 }
 
-/** Stubs fetch for `hostname`, which `answer`s with the request's URL; other fetches go through. Returns the spy. */
+/**
+ * Stubs fetch for `hostname`, which `answer`s with the request's URL; other fetches go through.
+ * Like a real fetch, it rejects once its signal has aborted. Returns the spy.
+ */
 export function stubFetchHost(hostname: string, answer: (url: string) => Response | Promise<Response>) {
   const realFetch = globalThis.fetch;
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
-    return new URL(url).hostname === hostname ? answer(url) : realFetch(input, init);
+    if (new URL(url).hostname !== hostname) return realFetch(input, init);
+    (init?.signal ?? (input instanceof Request ? input.signal : null))?.throwIfAborted();
+    return answer(url);
   });
   vi.stubGlobal('fetch', spy);
   return spy;
 }
 
+/** Makes every `AbortSignal.timeout` fire at once, so a fetch stubbed with stubFetchHost fails as a timed-out one does. */
+export function expireTimeouts() {
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation(() =>
+    AbortSignal.abort(new DOMException('The operation timed out', 'TimeoutError')),
+  );
+}
 /** Stubs the Turnstile siteverify call with `answer`; other fetches go through. */
 export const mockSiteverify = (answer: () => Response | Promise<Response>) =>
   stubFetchHost('challenges.cloudflare.com', answer);

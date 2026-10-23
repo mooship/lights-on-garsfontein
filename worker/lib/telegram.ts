@@ -8,6 +8,7 @@ import { DICTIONARIES } from '../../src/i18n/index';
 import { createDb } from '../db/client';
 import type { Outage } from '../db/schema';
 import { type AlertKind, loadDueOutage, retryAlert, type TelegramAlert } from './alerts';
+import { FETCH_TIMEOUT_MS } from './http';
 
 export const TELEGRAM_HOST = 'api.telegram.org';
 
@@ -62,6 +63,7 @@ export async function deliverTelegramAlert(alert: TelegramAlert, env: Env, now: 
     const response = await fetch(`https://${TELEGRAM_HOST}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       body: JSON.stringify({
         chat_id: env.TELEGRAM_CHAT_ID,
         text: telegramText(alert.kind, outage, now),
