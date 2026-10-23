@@ -5,6 +5,7 @@ import { formatDurationIn } from '../shared/format';
 import { admin } from '../src/admin/copy';
 import { DICTIONARIES } from '../src/i18n/index';
 import { createDb } from '../worker/db/client';
+import { HEARTBEAT_ROW_ID } from '../worker/db/schema';
 import { MAX_PAUSE_MS } from '../worker/lib/grid';
 import { formatAt } from '../worker/lib/telegram';
 import { parsePause, runCommand } from '../worker/lib/telegram-commands';
@@ -15,10 +16,13 @@ const { telegram, sensor } = admin;
 
 const run = (text: string, now = new Date()) => runCommand(text, createDb(env.DB), now);
 const pausedUntil = async () =>
-  (await env.DB.prepare('SELECT paused_until FROM heartbeats WHERE id = 1').first<{ paused_until: string | null }>())
-    ?.paused_until ?? null;
+  (
+    await env.DB.prepare(`SELECT paused_until FROM heartbeats WHERE id = ${HEARTBEAT_ROW_ID}`).first<{
+      paused_until: string | null;
+    }>()
+  )?.paused_until ?? null;
 const setPause = (until: string) =>
-  env.DB.prepare('UPDATE heartbeats SET paused_until = ? WHERE id = 1').bind(until).run();
+  env.DB.prepare(`UPDATE heartbeats SET paused_until = ? WHERE id = ${HEARTBEAT_ROW_ID}`).bind(until).run();
 
 describe('parsePause', () => {
   it('reads minutes, hours and days, up to MAX_PAUSE_MS', () => {

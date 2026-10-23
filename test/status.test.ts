@@ -4,6 +4,7 @@ import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, MINUTE_MS, TIMER_ACTION } from '../sha
 import { ERROR } from '../shared/errors';
 import { HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { createDb } from '../worker/db/client';
+import { HEARTBEAT_ROW_ID } from '../worker/db/schema';
 import { getGridState, MAX_PAUSE_MS } from '../worker/lib/grid';
 import {
   asAdmin,
@@ -188,7 +189,9 @@ describe('POST /api/heartbeat', () => {
   it('records the heartbeat', async () => {
     const res = await heartbeat();
     expect(res.status).toBe(200);
-    const row = await env.DB.prepare('SELECT last_seen FROM heartbeats WHERE id = 1').first<{ last_seen: string }>();
+    const row = await env.DB.prepare(`SELECT last_seen FROM heartbeats WHERE id = ${HEARTBEAT_ROW_ID}`).first<{
+      last_seen: string;
+    }>();
     expect(Date.now() - Date.parse(row?.last_seen ?? '')).toBeLessThan(5_000);
   });
 
@@ -333,8 +336,11 @@ describe('POST /api/heartbeat with poweredFor', () => {
 describe('POST /api/heartbeat/pause', () => {
   const fromNow = (ms: number) => new Date(Date.now() + ms).toISOString();
   const pausedUntil = async () =>
-    (await env.DB.prepare('SELECT paused_until FROM heartbeats WHERE id = 1').first<{ paused_until: string | null }>())
-      ?.paused_until;
+    (
+      await env.DB.prepare(`SELECT paused_until FROM heartbeats WHERE id = ${HEARTBEAT_ROW_ID}`).first<{
+        paused_until: string | null;
+      }>()
+    )?.paused_until;
   const outageStarts = async () =>
     (await env.DB.prepare('SELECT start_time FROM outages').all<{ start_time: string }>()).results.map(
       (r) => r.start_time,
