@@ -34,7 +34,8 @@ export const item = style({
 
 export const itemMeta = style({ fontSize: '0.875rem', color: vars.color.muted });
 
-export const flagged = style({ opacity: 0.55, textDecoration: 'line-through' });
+// Struck through but at full strength: fading the row would take its text below 4.5:1 contrast.
+export const flagged = style({ textDecoration: 'line-through' });
 
 export const actions = style({ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' });
 
