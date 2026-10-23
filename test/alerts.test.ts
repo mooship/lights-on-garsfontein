@@ -241,6 +241,17 @@ describe('claimAlerts', () => {
       { kind: 'dismissed', outageId: dismissed },
     ]);
   });
+
+  it('finds the outages awaiting a follow-up without scanning the table', async () => {
+    // The follow-up claims' shared filter; the minute cron runs it, so a scan grows with the history.
+    const { results } = await env.DB.prepare(
+      'EXPLAIN QUERY PLAN UPDATE outages SET on_alert_at = ? WHERE off_alert_at IS NOT NULL AND on_alert_at IS NULL',
+    )
+      .bind(NOW.toISOString())
+      .all<{ detail: string }>();
+
+    expect(results.map(({ detail }) => detail)).not.toContainEqual(expect.stringMatching(/^SCAN outages/));
+  });
 });
 
 describe('enqueueAlerts', () => {
