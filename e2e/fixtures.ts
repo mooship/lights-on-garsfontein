@@ -116,7 +116,8 @@ export const trackLayoutShift = (page: Page) =>
 /** The layout shift so far, once the status and statistics have rendered and the fonts have painted. */
 export async function readLayoutShift(page: Page): Promise<number> {
   await expect(page.getByRole('status')).toBeVisible();
-  await expect(page.locator('.gg-trends-details table')).toBeAttached(); // the skeleton has no table
+  // The skeleton has no table; the loaded card has one or two.
+  await expect(page.locator('.gg-trends-details table').first()).toBeAttached();
   return page.evaluate(async () => {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
