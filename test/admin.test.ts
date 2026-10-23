@@ -298,6 +298,25 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(n).toBe(0);
   });
 
+  // Its follow-up is sent only while the row exists, so deleting it would leave subscribers with the off alert.
+  it('refuses to delete an outage whose off alert went out with no follow-up yet', async () => {
+    const alerted = '2026-10-12T10:10:00.000Z';
+    const pending = await insertOutage({ startTime: '2026-10-12T10:00:00Z', offAlertAt: alerted });
+    const res = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id: pending });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: ERROR.alertSent });
+
+    const followedUp = await insertOutage({
+      startTime: '2026-10-01T10:00:00Z',
+      endTime: '2026-10-01T11:00:00Z',
+      offAlertAt: alerted,
+      onAlertAt: alerted,
+    });
+    expect((await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id: followedUp })).status).toBe(200);
+    const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
+    expect(n).toBe(1);
+  });
+
   it('marks outages as planned and shows it publicly', async () => {
     const created = await post(ADMIN_OUTAGES_PATH, {
       action: OUTAGE_ACTION.create,

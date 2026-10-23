@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { type AdminOutagesResponse, MINUTE_MS, OUTAGE_ACTION, TIMER_ACTION } from '../../shared/api';
 import { ERROR } from '../../shared/errors';
@@ -109,7 +109,14 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   if (!existing) return errors.notFound();
 
   if (input.action === OUTAGE_ACTION.delete) {
-    await db.delete(outages).where(eq(outages.id, input.id));
+    // While an off alert awaits its follow-up, the outage stays: the follow-up is sent only while
+    // the row exists (loadDueOutage), so subscribers would be left believing the power is off.
+    // Marking it a false positive sends the correction instead.
+    const [deleted] = await db
+      .delete(outages)
+      .where(and(eq(outages.id, input.id), or(isNull(outages.offAlertAt), isNotNull(outages.onAlertAt))))
+      .returning({ id: outages.id });
+    if (!deleted) return errors.conflict(ERROR.alertSent);
     return json({ ok: true });
   }
 
