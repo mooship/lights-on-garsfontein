@@ -49,7 +49,20 @@ export const AlertsSheet: Component = () => {
           <Show when={state() === 'ios-install'}>
             <p class={css.text}>{m().iosIntro}</p>
             <ol class={css.steps}>
-              <For each={m().iosSteps}>{(step) => <li>{step}</li>}</For>
+              <For each={m().iosSteps}>
+                {(step) => (
+                  <li>
+                    <For each={step.split(m().iosMenuItem)}>
+                      {(part, i) => (
+                        <>
+                          {i() > 0 && <span lang="en">{m().iosMenuItem}</span>}
+                          {part}
+                        </>
+                      )}
+                    </For>
+                  </li>
+                )}
+              </For>
             </ol>
           </Show>
         </Match>

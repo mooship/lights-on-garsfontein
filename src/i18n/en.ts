@@ -2,6 +2,7 @@ import type { Messages } from './af.ts';
 
 // The status page's NONE, which the correction alert repeats: it claims no more than the page shows.
 const NO_OUTAGE_REPORTED = 'No outage reported';
+const IOS_MENU_ITEM = 'Add to Home Screen';
 
 export const en = {
   lang: { switchTo: 'Skakel oor na Afrikaans', next: 'Afrikaans' },
@@ -139,9 +140,10 @@ export const en = {
       noThanks: 'No thanks',
       close: 'Close',
       iosIntro: 'On an iPhone, add this site to your home screen first:',
+      iosMenuItem: IOS_MENU_ITEM,
       iosSteps: [
         'Tap the Share button in Safari.',
-        'Choose ‘Add to Home Screen’.',
+        `Choose ‘${IOS_MENU_ITEM}’.`,
         'Open the site from your home screen and tap the bell.',
       ],
       blockedHelp:

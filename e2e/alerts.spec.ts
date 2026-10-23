@@ -273,6 +273,8 @@ for (const locale of LOCALES) {
         await load(page);
         await expect(card(page)).toBeVisible();
         await expect(card(page).getByRole('listitem')).toHaveText(m.card.iosSteps);
+        // iOS names the menu item in English, so screen readers should read it as English.
+        await expect(card(page).locator('[lang="en"]')).toHaveText(m.card.iosMenuItem);
         await expect(card(page).getByRole('button', { name: m.card.turnOn })).toHaveCount(0);
         await card(page).getByRole('button', { name: m.card.notNow }).click();
         await expect(card(page)).not.toBeVisible();

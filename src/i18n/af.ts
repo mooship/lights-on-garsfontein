@@ -3,6 +3,8 @@
 
 // The status page's NONE, which the correction alert repeats: it claims no more than the page shows.
 const NO_OUTAGE_REPORTED = 'Geen onderbreking aangemeld nie';
+// The iPhone share menu's item, for alerts.card.iosMenuItem and the step that names it.
+const IOS_MENU_ITEM = 'Add to Home Screen';
 
 export const af = {
   // `switchTo` labels the language switch and `next` is its text, both written in the next locale.
@@ -154,11 +156,13 @@ export const af = {
       noThanks: 'Nee dankie',
       close: 'Maak toe',
       // An iPhone offers notifications only to a site opened from the home screen. iOS has no
-      // Afrikaans, so the menu item keeps its English name.
+      // Afrikaans, so the menu item keeps its English name, which the card marks as English wherever
+      // a step names it.
       iosIntro: 'Op ’n iPhone moet jy die webwerf eers by jou tuisskerm voeg:',
+      iosMenuItem: IOS_MENU_ITEM,
       iosSteps: [
         'Tik op die deelknoppie in Safari.',
-        'Kies “Add to Home Screen”.',
+        `Kies “${IOS_MENU_ITEM}”.`,
         'Maak die webwerf van jou tuisskerm af oop en tik op die klokkie.',
       ],
       blockedHelp:
