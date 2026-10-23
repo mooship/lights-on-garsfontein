@@ -1,6 +1,6 @@
 import {
-  DAY_MS as DAY,
-  HOUR_MS as HOUR,
+  DAY_MS,
+  HOUR_MS,
   localDate,
   MINUTE_MS,
   UTC_OFFSET_MS,
@@ -8,7 +8,7 @@ import {
   type WindowStats,
 } from '../../shared/api';
 
-const WEEK = 7 * DAY;
+const WEEK_MS = 7 * DAY_MS;
 /** The most weeks StatsResponse.weeks holds. */
 const WEEKS_SHOWN = 26;
 
@@ -71,18 +71,18 @@ export function windowStats(
   let daysTracked = 0;
   let daysWithOutage = 0;
   let next = 0;
-  for (let day = dayStartOf(start); day < to; day += DAY) {
+  for (let day = dayStartOf(start); day < to; day += DAY_MS) {
     daysTracked += 1;
     const dayFrom = Math.max(day, start);
-    const dayTo = Math.min(day + DAY, to);
+    const dayTo = Math.min(day + DAY_MS, to);
     while ((intervals[next]?.end ?? Number.POSITIVE_INFINITY) <= dayFrom) next += 1;
     const current = intervals[next];
     if (current && overlap(current, dayFrom, dayTo) > 0) daysWithOutage += 1;
   }
 
   return {
-    trackedHours: round1(tracked / HOUR),
-    hoursOff: round1(offMs / HOUR),
+    trackedHours: round1(tracked / HOUR_MS),
+    hoursOff: round1(offMs / HOUR_MS),
     minutesOff: Math.round(offMs / MINUTE_MS),
     outages,
     availability: tracked > 0 ? Math.round((1 - offMs / tracked) * 10_000) / 10_000 : null,
@@ -105,8 +105,8 @@ export function hourlyMinutes(intervals: Interval[], from: number, to: number, t
     const end = Math.min(i.end, to);
     for (let at = Math.max(i.start, start); at < end; ) {
       // The next local hour boundary; UTC_OFFSET_MS is fixed, so hours never shift.
-      const next = Math.min(end, (Math.floor((at + UTC_OFFSET_MS) / HOUR) + 1) * HOUR - UTC_OFFSET_MS);
-      const hour = Math.floor((at + UTC_OFFSET_MS) / HOUR) % 24;
+      const next = Math.min(end, (Math.floor((at + UTC_OFFSET_MS) / HOUR_MS) + 1) * HOUR_MS - UTC_OFFSET_MS);
+      const hour = Math.floor((at + UTC_OFFSET_MS) / HOUR_MS) % 24;
       ms[hour] = (ms[hour] ?? 0) + next - at;
       at = next;
     }
@@ -116,23 +116,28 @@ export function hourlyMinutes(intervals: Interval[], from: number, to: number, t
 
 /** Start (UTC ms) of the calendar day containing `ts`, in the configured zone. */
 function dayStartOf(ts: number): number {
-  return Math.floor((ts + UTC_OFFSET_MS) / DAY) * DAY - UTC_OFFSET_MS;
+  return Math.floor((ts + UTC_OFFSET_MS) / DAY_MS) * DAY_MS - UTC_OFFSET_MS;
 }
 
 /** Start (UTC ms) of the Monday-to-Sunday week containing `ts`, in the configured zone. */
 export function weekStartOf(ts: number): number {
-  const day = Math.floor((ts + UTC_OFFSET_MS) / DAY);
+  const day = Math.floor((ts + UTC_OFFSET_MS) / DAY_MS);
   const dayOfWeek = (day + 3) % 7; // 1970-01-01 was a Thursday; Monday = 0.
-  return (day - dayOfWeek) * DAY - UTC_OFFSET_MS;
+  return (day - dayOfWeek) * DAY_MS - UTC_OFFSET_MS;
 }
 
 /** Weekly hours off from the tracking start's week to the current week (at most WEEKS_SHOWN). */
 export function weeklyStats(intervals: Interval[], now: number, trackingSince: number): WeekStats[] {
   if (now < trackingSince) return [];
-  const first = Math.max(weekStartOf(trackingSince), weekStartOf(now) - (WEEKS_SHOWN - 1) * WEEK);
+  const first = Math.max(weekStartOf(trackingSince), weekStartOf(now) - (WEEKS_SHOWN - 1) * WEEK_MS);
   const weeks: WeekStats[] = [];
-  for (let start = first; start <= now; start += WEEK) {
-    const { hoursOff, minutesOff, outages } = windowStats(intervals, start, Math.min(start + WEEK, now), trackingSince);
+  for (let start = first; start <= now; start += WEEK_MS) {
+    const { hoursOff, minutesOff, outages } = windowStats(
+      intervals,
+      start,
+      Math.min(start + WEEK_MS, now),
+      trackingSince,
+    );
     weeks.push({ weekStart: localDate(start), hoursOff, minutesOff, outages });
   }
   return weeks;
