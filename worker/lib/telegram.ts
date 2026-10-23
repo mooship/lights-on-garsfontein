@@ -26,7 +26,7 @@ const dayFormat = new Intl.DateTimeFormat(INTL_LOCALE, { timeZone: site.timeZone
 export const telegramConfigured = (env: Env): boolean => Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID);
 
 /** "14:05", or "22 Oct 14:05" when that is not the day of `now`: a retried message can arrive a day late. */
-function formatAt(iso: string, now: Date): string {
+export function formatAt(iso: string, now: Date): string {
   const time = formatTimeOfDay(iso, INTL_LOCALE);
   const day = dayFormat.format(new Date(iso));
   return day === dayFormat.format(now) ? time : `${day} ${time}`;
