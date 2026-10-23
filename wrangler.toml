@@ -97,7 +97,7 @@ enabled = true
 
 # Secrets (set with `wrangler secret put <NAME>`, see README):
 # ADMIN_USERNAME, ADMIN_PASSWORD_HASH, ADMIN_API_TOKEN, HEARTBEAT_TOKEN, TURNSTILE_SECRET_KEY, CONTACT_EMAIL,
-# VAPID_PRIVATE_KEY (npm run vapid-keys)
+# VAPID_PRIVATE_KEY (npm run vapid-keys), TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (owner alerts)
 
 # The Playwright suite only (`wrangler dev --env e2e`, playwright.config.ts); never deployed. The
 # suite loads the page far more often than a reader, so the status limit is out of its way.

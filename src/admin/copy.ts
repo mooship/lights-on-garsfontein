@@ -79,4 +79,19 @@ export const admin = {
     silent: (duration: string, since: string) => `Sensor silent for ${duration}, since ${since}.`,
     stale: (time: string) => `Unable to refresh. Showing the sensor as at ${time}.`,
   },
+  // The owner's private Telegram alerts (worker/lib/telegram.ts). A silent sensor can mean a power
+  // cut or a lost connection, so its off message claims no more than that.
+  telegram: {
+    off: {
+      sensor: (since: string) => `No reading from home since ${since}. The power may be off.`,
+      manual: (since: string) => `Power off at home since ${since}.`,
+    },
+    planned: 'Planned outage. ',
+    on: (at: string, lasted: string) => `Power is back on at home since ${at}, after ${lasted}.`,
+    dismissed: {
+      sensor: (from: string, to: string) =>
+        `False alarm: the power stayed on. The sensor was offline from ${from} to ${to}.`,
+      plain: 'False alarm: the power stayed on.',
+    },
+  },
 };
