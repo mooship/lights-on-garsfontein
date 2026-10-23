@@ -49,6 +49,7 @@ async function request<T>(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
   });
+  // A body that is not JSON, such as a proxy's error page, still leaves the status to report.
   const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined;
   if (!res.ok) throw new ApiError(res.status, body?.error ?? `http_${res.status}`);
   if (body === undefined || !valid(body)) throw new ApiError(res.status, INVALID_RESPONSE);
