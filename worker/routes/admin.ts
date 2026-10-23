@@ -5,7 +5,7 @@ import { ERROR } from '../../shared/errors';
 import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, TIMER_PATH } from '../../shared/paths';
 import { heartbeats, outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
-import { getOpenOutage, openOutage, summarise } from '../lib/grid';
+import { getOpenOutage, noOtherOpen, openOutage, summarise } from '../lib/grid';
 import { errors, isoTime, json, parseBody } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { checkSession } from './auth';
@@ -88,12 +88,16 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
     if (input.endTime && input.endTime < input.startTime) return errors.badRequest(ERROR.endBeforeStart);
     // One open outage at a time: punch in and heartbeats close "the" open one, so a second would
     // keep the status OFF after the power came back.
-    if (!input.endTime && (await getOpenOutage(db))) return errors.conflict(ERROR.outageAlreadyOpen);
+    if (!input.endTime) {
+      const opened = await openOutage(db, input.startTime, 'manual', { isPlanned: input.isPlanned });
+      if (!opened) return errors.conflict(ERROR.outageAlreadyOpen);
+      return json({ outage: await getOpenOutage(db) }, 201);
+    }
     const [outage] = await db
       .insert(outages)
       .values({
         startTime: input.startTime,
-        endTime: input.endTime ?? null,
+        endTime: input.endTime,
         source: 'manual',
         isPlanned: input.isPlanned ?? false,
       })
@@ -124,13 +128,15 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
     changes.endTime = endTime;
   }
   if (endTime && endTime < existing.startTime) return errors.badRequest(ERROR.endBeforeStart);
-  if (endTime === null && !falsePositive) {
-    const open = await getOpenOutage(db);
-    if (open && open.id !== existing.id) return errors.conflict(ERROR.outageAlreadyOpen);
-  }
   if (Object.keys(changes).length === 0) return json({ outage: existing });
 
-  const [outage] = await db.update(outages).set(changes).where(eq(outages.id, input.id)).returning();
+  const staysOpen = endTime === null && !falsePositive;
+  const [outage] = await db
+    .update(outages)
+    .set(changes)
+    .where(staysOpen ? and(eq(outages.id, input.id), noOtherOpen(input.id)) : eq(outages.id, input.id))
+    .returning();
+  if (!outage) return staysOpen ? errors.conflict(ERROR.outageAlreadyOpen) : errors.notFound();
   return json({ outage });
 }
 
