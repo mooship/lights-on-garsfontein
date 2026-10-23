@@ -8,9 +8,10 @@ import {
   type OutageSummary,
   type PowerStatus,
   RECENT_LIMIT,
+  SECOND_MS,
 } from '../../shared/api';
 import type { Db } from '../db/client';
-import { heartbeats, type Outage, outages, sessions } from '../db/schema';
+import { HEARTBEAT_ROW_ID, heartbeats, type Outage, outages, sessions } from '../db/schema';
 
 /** Open and not flagged as a false positive. */
 const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, false));
@@ -38,7 +39,7 @@ function heartbeatQuery(db: Db) {
         ),
     })
     .from(heartbeats)
-    .where(eq(heartbeats.id, 1))
+    .where(eq(heartbeats.id, HEARTBEAT_ROW_ID))
     .limit(1);
 }
 
@@ -171,7 +172,7 @@ export async function recordHeartbeat(
 ): Promise<{ closed: number; changed: boolean }> {
   const iso = now.toISOString();
   const staleBefore = new Date(now.getTime() - HEARTBEAT_THRESHOLD_MS).toISOString();
-  const poweredSince = new Date(Math.max(0, now.getTime() - poweredFor * 1000)).toISOString();
+  const poweredSince = new Date(Math.max(0, now.getTime() - poweredFor * SECOND_MS)).toISOString();
   const anyOpen = isNull(outages.endTime);
   // Insert-select (raw `db.run` cannot be batched): it needs every column, in table order.
   const missedOutage = db
@@ -189,7 +190,7 @@ export async function recordHeartbeat(
     .from(heartbeats)
     .where(
       and(
-        eq(heartbeats.id, 1),
+        eq(heartbeats.id, HEARTBEAT_ROW_ID),
         lt(silentSinceSql(), staleBefore),
         lt(silentSinceSql(), poweredSince),
         sql`not exists (select 1 from ${outages} where ${outages.startTime} >= ${silentSinceSql()} or ${anyOpen})`,
@@ -207,7 +208,7 @@ export async function recordHeartbeat(
     db.insert(outages).select(missedOutage),
     db
       .insert(heartbeats)
-      .values({ id: 1, lastSeen: iso })
+      .values({ id: HEARTBEAT_ROW_ID, lastSeen: iso })
       .onConflictDoUpdate({ target: heartbeats.id, set: { lastSeen: iso } }),
     dismissed,
     db.update(outages).set({ endTime }).where(anyOpen).returning({ id: outages.id }),
@@ -228,7 +229,11 @@ export async function pauseSensor(db: Db, until: string | null, now: Date): Prom
   const [row] = await db
     .update(heartbeats)
     .set({ pausedUntil: until ?? iso })
-    .where(until ? eq(heartbeats.id, 1) : and(eq(heartbeats.id, 1), gt(heartbeats.pausedUntil, iso)))
+    .where(
+      until
+        ? eq(heartbeats.id, HEARTBEAT_ROW_ID)
+        : and(eq(heartbeats.id, HEARTBEAT_ROW_ID), gt(heartbeats.pausedUntil, iso)),
+    )
     .returning({ pausedUntil: heartbeats.pausedUntil });
   return row?.pausedUntil ?? null;
 }

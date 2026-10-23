@@ -8,8 +8,10 @@ import {
   type StatsResponse,
   TRACKING_SINCE,
 } from '../../shared/api';
+import { formatDurationIn } from '../../shared/format';
 import { CSV_PATH, FEED_PATH, OUTAGES_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
+import { DICTIONARIES } from '../../src/i18n/index';
 import { outages } from '../db/schema';
 import { SUMMARY_COLUMNS, summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
@@ -54,14 +56,7 @@ function csvField(value: string | number | null): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/**
- * Open data: every outage (false positives excluded) as CSV, oldest first.
- *
- * The columns are a stable public contract that other people's scripts read, so don't rename,
- * reorder or reformat them; add new columns only at the end, and note any change with a version
- * in the README. `start_time_utc` and `end_time_utc` are ISO 8601 UTC; `end_time_utc` and
- * `duration_minutes` (whole minutes) are empty while the outage is open; `planned` is yes or no.
- */
+/** Open data, every outage but false positives, oldest first; a public contract (README, CSV contract). */
 async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   const rows = await db
     .select(SUMMARY_COLUMNS)
@@ -122,17 +117,12 @@ function feedDate(iso: string): string {
   return `${part.day} ${part.month} ${part.year} ${part.hour}:${part.minute}`;
 }
 
-/** "2 h 10 min", "3 h" or "45 min". */
-function feedDuration(ms: number): string {
-  const minutes = Math.max(0, Math.round(ms / MINUTE_MS));
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return [h ? `${h} h` : '', m || !h ? `${m} min` : ''].filter(Boolean).join(' ');
-}
+/** Worded as the page and alerts word durations, in English like the rest of the feed. */
+const feedDuration = (ms: number) => formatDurationIn(ms, DICTIONARIES.en.units, { days: false, seconds: false });
 
 /**
  * Atom feed of the latest outages (false positives excluded), newest first. English only, as feeds
- * are read by software, so it skips the site's dictionaries.
+ * are read by software, so its copy skips the site's dictionaries.
  */
 async function getFeed({ env, db }: RouteContext): Promise<Response> {
   const rows = await db

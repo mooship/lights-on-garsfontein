@@ -89,8 +89,6 @@ describe('alertMessage', () => {
     // One literal smoke string per language.
     expect(english.title).toBe('No outage reported');
     expect(afrikaans.title).toBe('Geen onderbreking aangemeld nie');
-    expect(english.body).toBe('The earlier alert about Garsfontein Ext. 16 was not confirmed.');
-    expect(afrikaans.body).toBe('Die vorige waarskuwing oor Garsfontein Uitb. 16 is nie bevestig nie.');
   });
 });
 

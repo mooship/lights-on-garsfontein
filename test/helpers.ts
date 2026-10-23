@@ -9,6 +9,7 @@ import {
 } from '../shared/api';
 import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, LOGIN_PATH, STATUS_PATH } from '../shared/paths';
 import { MINUTE_CRON } from '../worker/crons';
+import { HEARTBEAT_ROW_ID } from '../worker/db/schema';
 import worker from '../worker/index';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { randomToken, sha256Hex } from '../worker/lib/crypto';
@@ -141,7 +142,7 @@ export async function getStatus(): Promise<StatusResponse> {
 export async function setHeartbeat(secondsAgo: number): Promise<string> {
   const lastSeen = new Date(Date.now() - secondsAgo * 1000).toISOString();
   await env.DB.prepare(
-    'INSERT INTO heartbeats (id, last_seen) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET last_seen = excluded.last_seen',
+    `INSERT INTO heartbeats (id, last_seen) VALUES (${HEARTBEAT_ROW_ID}, ?) ON CONFLICT (id) DO UPDATE SET last_seen = excluded.last_seen`,
   )
     .bind(lastSeen)
     .run();
@@ -241,7 +242,7 @@ export function requestPause(until: string | null, token = env.HEARTBEAT_TOKEN):
 
 /** Sets the pause straight in D1, so it can lie in the past. */
 export async function setPausedUntil(until: string | null): Promise<void> {
-  await env.DB.prepare('UPDATE heartbeats SET paused_until = ? WHERE id = 1').bind(until).run();
+  await env.DB.prepare(`UPDATE heartbeats SET paused_until = ? WHERE id = ${HEARTBEAT_ROW_ID}`).bind(until).run();
 }
 
 /** An admin API write with ADMIN_API_TOKEN, as a script or agent sends it. */

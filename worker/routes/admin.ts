@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { type AdminOutagesResponse, MINUTE_MS, OUTAGE_ACTION, TIMER_ACTION } from '../../shared/api';
 import { ERROR } from '../../shared/errors';
 import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, TIMER_PATH } from '../../shared/paths';
-import { heartbeats, outages } from '../db/schema';
+import { HEARTBEAT_ROW_ID, heartbeats, outages } from '../db/schema';
 import { checkBearer, refuseBadToken } from '../lib/auth';
 import { getOpenOutage, noOtherOpen, openOutage, summarise } from '../lib/grid';
 import { errors, isoTime, json, parseBody } from '../lib/http';
@@ -42,7 +42,7 @@ async function listOutages({ db }: RouteContext): Promise<Response> {
     db
       .select({ lastSeen: heartbeats.lastSeen, pausedUntil: heartbeats.pausedUntil })
       .from(heartbeats)
-      .where(eq(heartbeats.id, 1)),
+      .where(eq(heartbeats.id, HEARTBEAT_ROW_ID)),
   ]);
   const body: AdminOutagesResponse = {
     sensor: sensor ?? null,

@@ -15,14 +15,14 @@ import { vapidPublicKey } from '../lib/webpush';
  * endpoint off this list is refused: it would make the Worker send requests to any address.
  * An entry starting with a dot matches every subdomain; the others match one host.
  */
-export const PUSH_HOSTS: readonly string[] = [
+const PUSH_HOSTS: readonly string[] = [
   'fcm.googleapis.com',
   'updates.push.services.mozilla.com',
   '.push.apple.com',
   '.notify.windows.com',
 ];
 
-export function isPushEndpoint(value: string): boolean {
+function isPushEndpoint(value: string): boolean {
   const url = URL.parse(value);
   if (url?.protocol !== 'https:' || url.port !== '' || url.username || url.password) return false;
   return PUSH_HOSTS.some((host) => (host.startsWith('.') ? url.hostname.endsWith(host) : url.hostname === host));

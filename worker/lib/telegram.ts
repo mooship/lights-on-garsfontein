@@ -73,6 +73,7 @@ export async function deliverTelegramAlert(alert: TelegramAlert, env: Env, now: 
     status = response.status;
     if (response.ok) return;
     if (status !== 429 && status < 500) {
+      // A body that is not JSON still leaves the status to log.
       const { description } = await response.json<{ description?: string }>().catch(() => ({ description: '' }));
       console.warn(`Dropped a Telegram alert: Telegram answered ${status} (${description})`);
       return;

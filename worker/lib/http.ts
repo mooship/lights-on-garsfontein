@@ -18,7 +18,7 @@ export function json(data: unknown, status = 200, headers: HeadersInit = {}): Re
 }
 
 /** Cache-Control for a public response that any cache may keep for `ms`. */
-export const publicCache = (ms: number) => `public, max-age=${ms / 1000}`;
+export const publicCache = (ms: number) => `public, max-age=${ms / SECOND_MS}`;
 
 /** Every API error response: `{ error }` with an ErrorCode, plus the zod issues as `details` on a bad request. */
 export const errors = {
@@ -29,7 +29,7 @@ export const errors = {
   conflict: (error: ErrorCode) => json({ error }, 409),
   unsupportedMediaType: () => json({ error: ERROR.unsupportedMediaType }, 415),
   payloadTooLarge: () => json({ error: ERROR.payloadTooLarge }, 413),
-  rateLimited: () => json({ error: ERROR.rateLimited }, 429, { 'Retry-After': String(MINUTE_MS / 1000) }),
+  rateLimited: () => json({ error: ERROR.rateLimited }, 429, { 'Retry-After': String(MINUTE_MS / SECOND_MS) }),
   internal: () => json({ error: ERROR.internal }, 500),
 };
 

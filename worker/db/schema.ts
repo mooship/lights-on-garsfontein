@@ -3,9 +3,12 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { DISMISSED_BY, OUTAGE_SOURCES } from '../../shared/api';
 import { site } from '../../site.config';
 
+/** The id of the only `heartbeats` row. */
+export const HEARTBEAT_ROW_ID = 1;
+
 /**
- * The sensor's last report. One row (id 1), so one sensor per instance: a second sensor needs its
- * own rows here, a sensor id on the heartbeat route and on sensor outages, and its own detection.
+ * The sensor's last report. One row (`HEARTBEAT_ROW_ID`), so one sensor per instance: a second sensor
+ * needs its own rows here, a sensor id on the heartbeat route and on sensor outages, and its own detection.
  */
 export const heartbeats = sqliteTable('heartbeats', {
   id: integer('id').primaryKey(),

@@ -1,4 +1,4 @@
-import { HOUR_MS, type PushSubscriptionBody } from '../../shared/api';
+import { HOUR_MS, type PushSubscriptionBody, SECOND_MS } from '../../shared/api';
 import { fromBase64Url, toBase64Url } from '../../shared/base64url';
 import { site } from '../../site.config';
 import { FETCH_TIMEOUT_MS } from './http';
@@ -7,7 +7,7 @@ import { FETCH_TIMEOUT_MS } from './http';
 export type PushTarget = Pick<PushSubscriptionBody, 'endpoint'> & PushSubscriptionBody['keys'];
 
 /** How long a push service may hold a message for an offline device; a stale outage alert misleads. */
-export const PUSH_TTL_SECONDS = 3600;
+export const PUSH_TTL_SECONDS = HOUR_MS / SECOND_MS;
 
 const encoder = new TextEncoder();
 
@@ -111,7 +111,7 @@ export async function vapidSigner(privateJwk: JsonWebKey): Promise<VapidSigner> 
   return async (audience, now) => {
     const signingInput = `${part({ typ: 'JWT', alg: 'ES256' })}.${part({
       aud: new URL(audience).origin,
-      exp: Math.floor((now + VAPID_EXP_MS) / 1000),
+      exp: Math.floor((now + VAPID_EXP_MS) / SECOND_MS),
       sub: site.url,
     })}`;
     // WebCrypto returns the raw r || s pair, which is the JWS form of ES256.

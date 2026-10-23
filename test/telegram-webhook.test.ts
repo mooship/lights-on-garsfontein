@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ERROR } from '../shared/errors';
 import { STATUS_PATH, TELEGRAM_WEBHOOK_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
+import { HEARTBEAT_ROW_ID } from '../worker/db/schema';
 import { MAX_BODY_BYTES } from '../worker/lib/http';
 import { TELEGRAM_SECRET_HEADER } from '../worker/routes/telegram';
 import { call, getStatus, setHeartbeat } from './helpers';
@@ -28,8 +29,11 @@ const send = (body: unknown, { secret = SECRET as string | null, env: testEnv = 
     env: testEnv,
   });
 const pausedUntil = async () =>
-  (await env.DB.prepare('SELECT paused_until FROM heartbeats WHERE id = 1').first<{ paused_until: string | null }>())
-    ?.paused_until ?? null;
+  (
+    await env.DB.prepare(`SELECT paused_until FROM heartbeats WHERE id = ${HEARTBEAT_ROW_ID}`).first<{
+      paused_until: string | null;
+    }>()
+  )?.paused_until ?? null;
 
 describe('the Telegram webhook', () => {
   it('refuses a missing or wrong secret, and every request while the secret is unset', async () => {
