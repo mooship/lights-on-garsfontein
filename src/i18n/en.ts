@@ -153,7 +153,10 @@ export const en = {
     },
   },
   push: {
-    off: { title: 'Power is off', body: (time: string) => `No power in Garsfontein Ext. 16 since ${time}.` },
+    off: {
+      title: 'Power is off',
+      body: (time: string) => `No power at the measuring point in Garsfontein Ext. 16 since ${time}.`,
+    },
     planned: {
       title: 'Planned outage',
       body: (time: string) => `Started at ${time}, announced in advance.`,

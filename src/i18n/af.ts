@@ -171,7 +171,10 @@ export const af = {
   },
   // Web push alerts. `on` takes the time it came back and how long it was off (formatted with `units`).
   push: {
-    off: { title: 'Die krag is af', body: (time: string) => `Geen krag in Garsfontein Uitb. 16 sedert ${time} nie.` },
+    off: {
+      title: 'Die krag is af',
+      body: (time: string) => `Geen krag by die meetpunt in Garsfontein Uitb. 16 sedert ${time} nie.`,
+    },
     planned: {
       title: 'Beplande onderbreking',
       body: (time: string) => `Dit het om ${time} begin en is vooraf aangekondig.`,
