@@ -71,11 +71,20 @@ export async function deliverAlertPage(page: AlertPage, env: Env, now: Date): Pr
     else if (status >= 300) console.warn(`Push service ${host} answered ${status}`);
   });
 
-  if (gone.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, gone));
+  // The pushes have gone out, so nothing after them may throw: the queue handler would re-queue the
+  // whole page, and everyone who got the alert would get it again.
+  try {
+    if (gone.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, gone));
+  } catch (error) {
+    console.warn(`Could not delete ${gone.length} gone push subscriptions: ${errorName(error)}`);
+  }
   if (retry.length === 0) return;
-  if (!(await retryAlert(env.PUSH_QUEUE, { ...page, ids: retry }))) {
+  try {
+    if (await retryAlert(env.PUSH_QUEUE, { ...page, ids: retry })) return;
     console.warn(
       `Gave up on ${retry.length} push sends after ${page.attempt} attempts to ${[...retryHosts].join(', ')}`,
     );
+  } catch (error) {
+    console.warn(`Could not re-queue ${retry.length} push sends: ${errorName(error)}`);
   }
 }

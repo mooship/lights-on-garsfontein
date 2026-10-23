@@ -710,6 +710,47 @@ describe('the queue handler', () => {
     expect(message.ack).toHaveBeenCalledOnce();
   });
 
+  it('never re-queues a page once its pushes went out, even if tidying up after them fails', async () => {
+    const outage = await insertOutage({ startTime: ago(DUE_MS) });
+    const gone = await insertSubscription('gone');
+    const fine = await insertSubscription('fine');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const send = vi.fn(async (_body: AlertPage, _options?: QueueSendOptions) => {});
+    // D1 fails only the delete of the gone subscription.
+    const DB = new Proxy(env.DB, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (query: string) => {
+            if (/^delete/i.test(query)) throw new Error('D1 is down');
+            return target.prepare(query);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const body: AlertPage = {
+      kind: 'off',
+      outageId: outage,
+      ids: [gone, fine],
+      attempt: 1,
+      queuedAt: new Date().toISOString(),
+    };
+    const message = { body, ack: vi.fn() };
+    const pushes = mockPushService((endpoint) => (endpoint.endsWith('/gone') ? 410 : 201));
+
+    await worker.queue({ messages: [message] } as unknown as MessageBatch<AlertPage>, {
+      ...env,
+      DB,
+      PUSH_QUEUE: { send } as unknown as Queue<AlertPage>,
+    });
+
+    expect(pushes).toHaveBeenCalledTimes(2);
+    expect(send).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(warn.mock.calls.flat().join(' ')).not.toContain('D1 is down');
+  });
+
   // The queue never retries on its own (max_retries = 0), so a thrown job would be lost.
   it('re-queues a job that throws, up to PUSH_MAX_ATTEMPTS, logging only the error name', async () => {
     vi.spyOn(alerts, 'loadDueOutage').mockRejectedValue(new Error('D1 said something private'));
