@@ -120,6 +120,9 @@ for (const locale of LOCALES) {
       await page.clock.runFor(ALERTS_OFFER_DELAY_MS);
       await expect(card(page)).toBeVisible();
       await expect(bell(page)).toBeFocused();
+      // Without focus, screen readers hear it arrive by name, and only once: the card is outside the live region.
+      await expect(page.locator('[aria-live]').getByText(m.card.heading, { exact: true })).toHaveCount(1);
+      await expect(page.locator('[aria-live] [role="dialog"]')).toHaveCount(0);
       await expect(card(page)).toContainText(m.card.body);
       await expect(card(page)).toContainText(m.card.scope);
       // Same page and language as the footer's privacy link.
@@ -181,8 +184,9 @@ for (const locale of LOCALES) {
       await expect(card(page)).not.toBeVisible();
       await bell(page).click();
       await expect(card(page)).toBeVisible();
-      // Opened on purpose, the card takes focus.
+      // Opened on purpose, the card takes focus, which reads it, so nothing else announces it.
       await expect(card(page).getByRole('heading', { name: m.card.heading })).toBeFocused();
+      await expect(page.locator('[aria-live]').getByText(m.card.heading, { exact: true })).toHaveCount(0);
       await expect(card(page).getByRole('button', { name: m.card.turnOn })).toBeVisible();
       // The bell closes it again.
       await bell(page).click();
