@@ -644,6 +644,10 @@ test.describe('admin', () => {
 
   test('logs a past outage', async ({ page }) => {
     await login(page);
+    // Neither end of a logged outage can be in the future.
+    const now = await page.getByLabel(admin.started).getAttribute('max');
+    expect(now).toBeTruthy();
+    await expect(page.getByLabel(admin.ended)).toHaveAttribute('max', now ?? '');
     await page.getByLabel(admin.started).fill('2026-10-01T18:00');
     await page.getByLabel(admin.ended).fill('2026-10-01T20:30');
     await page.getByRole('button', { name: admin.log }).click();

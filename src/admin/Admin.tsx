@@ -231,6 +231,8 @@ const OutageRow: Component<{
 const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError }> = (props) => {
   const [saved, setSaved] = createSignal(false);
   const { busy, error, run } = createAction({ onError: props.onError });
+  // Read once, so both ends share one limit.
+  const latest = toLocalInput(Date.now());
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -255,11 +257,11 @@ const LogOutageForm: Component<{ onLogged: () => Promise<void>; onError: OnError
         <div class={css.formRow}>
           <label class={label}>
             {admin.started}
-            <input class={input} type="datetime-local" name="start" required max={toLocalInput(Date.now())} />
+            <input class={input} type="datetime-local" name="start" required max={latest} />
           </label>
           <label class={label}>
             {admin.ended}
-            <input class={input} type="datetime-local" name="end" />
+            <input class={input} type="datetime-local" name="end" max={latest} />
           </label>
         </div>
         <label class={css.checkbox}>
