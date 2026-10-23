@@ -1,16 +1,13 @@
 // The owner's Telegram commands. Only the owner's chat reaches these (worker/routes/telegram.ts),
 // so the replies may say how an outage was recorded.
 
-import { eq } from 'drizzle-orm';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { formatDurationIn } from '../../shared/format';
 import { admin } from '../../src/admin/copy';
 import { sensorState } from '../../src/admin/sensor';
 import { DICTIONARIES } from '../../src/i18n/index';
 import type { Db } from '../db/client';
-import { heartbeats } from '../db/schema';
-import { MAX_PAUSE_MS } from '../routes/status';
-import { getGridState, getOpenOutage, pauseSensor } from './grid';
+import { MAX_PAUSE_MS, pauseSensor, readGridState } from './grid';
 import { formatAt } from './telegram';
 
 const { telegram, sensor: sensorCopy, source: sourceCopy } = admin;
@@ -36,7 +33,7 @@ export async function runCommand(text: string, db: Db, now: Date): Promise<{ tex
   if (command === '/status') return reply(await statusText(db, now));
   if (command === '/pause') {
     const ms = rest.length === 0 ? parsePause(arg) : null;
-    if (ms === null) return reply(telegram.usage);
+    if (ms === null) return reply(telegram.usage(MAX_PAUSE_MS / DAY_MS));
     const until = await pauseSensor(db, new Date(now.getTime() + ms).toISOString(), now);
     return until ? reply(telegram.paused(formatAt(until, now)), true) : reply(sensorCopy.never);
   }
@@ -47,18 +44,11 @@ export async function runCommand(text: string, db: Db, now: Date): Promise<{ tex
 }
 
 async function statusText(db: Db, now: Date): Promise<string> {
-  const [grid, open, [reading]] = await Promise.all([
-    getGridState(db, now),
-    getOpenOutage(db),
-    db
-      .select({ lastSeen: heartbeats.lastSeen, pausedUntil: heartbeats.pausedUntil })
-      .from(heartbeats)
-      .where(eq(heartbeats.id, 1)),
-  ]);
+  const { grid, heartbeat, open } = await readGridState(db, now);
   // Unless the sensor vouches for it, ON claims only that no outage has been reported.
   const lines = [grid.status === 'OFF' ? statusCopy.OFF : grid.monitored ? statusCopy.ON : statusCopy.NONE];
 
-  const state = sensorState(reading ?? null, now.getTime());
+  const state = sensorState(heartbeat ?? null, now.getTime());
   if (state.kind === 'never') lines.push(sensorCopy.never);
   else if (state.kind === 'paused') lines.push(sensorCopy.paused(formatAt(state.until, now)));
   else if (state.kind === 'reporting') lines.push(sensorCopy.reporting(formatAt(state.lastSeen, now)));

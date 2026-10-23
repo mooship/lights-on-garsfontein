@@ -5,9 +5,9 @@ import { formatDurationIn } from '../shared/format';
 import { admin } from '../src/admin/copy';
 import { DICTIONARIES } from '../src/i18n/index';
 import { createDb } from '../worker/db/client';
+import { MAX_PAUSE_MS } from '../worker/lib/grid';
 import { formatAt } from '../worker/lib/telegram';
 import { parsePause, runCommand } from '../worker/lib/telegram-commands';
-import { MAX_PAUSE_MS } from '../worker/routes/status';
 import { insertOutage, setHeartbeat } from './helpers';
 
 const { status, units } = DICTIONARIES.en;
@@ -97,7 +97,7 @@ describe('/pause', () => {
   it('answers with the usage and changes nothing for a missing, malformed or too long duration', async () => {
     await setHeartbeat(30);
     for (const text of ['/pause', '/pause 31d', '/pause 3H', '/pause 3 h']) {
-      expect(await run(text)).toEqual({ text: telegram.usage, statusChanged: false });
+      expect(await run(text)).toEqual({ text: telegram.usage(MAX_PAUSE_MS / DAY_MS), statusChanged: false });
     }
     expect(await pausedUntil()).toBeNull();
   });

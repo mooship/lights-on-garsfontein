@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { DAY_MS, type StatusResponse } from '../../shared/api';
+import type { StatusResponse } from '../../shared/api';
 import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
 import { requireBearer } from '../lib/auth';
-import { getGridState, pauseSensor, recordHeartbeat } from '../lib/grid';
+import { getGridState, MAX_PAUSE_MS, pauseSensor, recordHeartbeat } from '../lib/grid';
 import { isJson, isoTime, json, parseBody } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
 
@@ -13,9 +13,6 @@ import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
  * uses it too, as the page reloads that list when the status changes.
  */
 export const STATUS_EDGE_TTL_SECONDS = 12;
-
-/** The longest pause, so a forgotten one cannot leave the sensor ignored for good. Its days are in admin.telegram.usage (src/admin/copy.ts). */
-export const MAX_PAUSE_MS = 30 * DAY_MS;
 
 const pauseSchema = z.object({
   until: isoTime()
