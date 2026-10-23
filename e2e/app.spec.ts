@@ -454,6 +454,7 @@ test.describe('public page', () => {
   });
 
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
+    await page.clock.install();
     await page.goto('/');
     await expect(badge(page)).toContainText(en.status.NONE);
     await expect(page.getByRole('alert')).toHaveCount(0);
@@ -1228,6 +1229,7 @@ test.describe('all outages', () => {
     page,
     request,
   }) => {
+    await page.clock.install();
     const [newest] = await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1258,6 +1260,7 @@ test.describe('all outages', () => {
   });
 
   test('says so when a reload of the open list fails, and not once it is closed', async ({ page, request }) => {
+    await page.clock.install();
     const [newest] = await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1298,6 +1301,7 @@ test.describe('all outages', () => {
   });
 
   test('reloads the full list when the recent outages change', async ({ page, request }) => {
+    await page.clock.install();
     const [newest] = await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1313,6 +1317,7 @@ test.describe('all outages', () => {
   });
 
   test('keeps the full list while the recent outages stay the same', async ({ page, request }) => {
+    await page.clock.install();
     await logOutages(request, RECENT_LIMIT);
     await page.goto('/');
     await page.getByRole('button', { name: en.history.showAll }).click();
@@ -1388,6 +1393,7 @@ test.describe('admin sensor', () => {
   });
 
   test('keeps the last reading when a refresh fails, and says so', async ({ page }) => {
+    await page.clock.install();
     const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
     await login(page);
     later.next = (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } });
@@ -1397,6 +1403,7 @@ test.describe('admin sensor', () => {
   });
 
   test('a refresh after the session has ended shows the sign-in form', async ({ page }) => {
+    await page.clock.install();
     const later = await mockSensor(page, { lastSeen: ago(30_000), pausedUntil: null });
     await login(page);
     later.next = (route) => route.fulfill({ status: 401, json: { error: ERROR.unauthorized } });
@@ -1441,6 +1448,7 @@ test.describe('unexpected responses', () => {
   // the server, never a reading; the next good answer recovers the page.
   for (const body of ['<html>Sign in to the Wi-Fi</html>', '{}', '{"status":"BROWNOUT","recent":[]}']) {
     test(`treats a status of ${body.slice(0, 20)}… as unreachable, then recovers`, async ({ page }) => {
+      await page.clock.install();
       await page.route(`**${STATUS_PATH}`, (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body }),
       );
