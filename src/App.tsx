@@ -173,7 +173,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                   {/* Only when something is wrong; the loading shell has no line for it. */}
                   <Show when={warning()}>
                     {(text) => (
-                      <p class={`gg-status-warning ${css.warning}`} role="alert">
+                      <p class={`gg-status-warning ${css.warning}`} role="status">
                         {text()}
                       </p>
                     )}
@@ -203,7 +203,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
               <>
                 <Trends stats={s()} now={minute()} />
                 <Show when={stats.error() !== undefined}>
-                  <p class={css.trendsWarning} role="alert">
+                  <p class={css.trendsWarning} role="status">
                     {t().trends.refreshFailed(formatTime(stats.updatedAt()))}
                   </p>
                 </Show>
