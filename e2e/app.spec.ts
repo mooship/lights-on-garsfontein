@@ -524,12 +524,18 @@ test.describe('public page', () => {
     await expect.poll(() => statusRequests).toBe(before + 1);
   });
 
-  test('refreshes statistics that went stale while the tab was hidden, but not fresh ones', async ({ page }) => {
+  test('refreshes the status and statistics that went stale while the tab was hidden, but not fresh ones', async ({
+    page,
+  }) => {
     await page.clock.install();
     let statsRequests = 0;
+    let statusRequests = 0;
     page.on('request', (r) => r.url().endsWith(STATS_PATH) && statsRequests++);
+    page.on('request', (r) => r.url().endsWith(STATUS_PATH) && statusRequests++);
     await page.goto('/en/');
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
+    await expect(badge(page)).toBeVisible();
+    const loaded = statusRequests;
     const setVisibility = (state: 'hidden' | 'visible') =>
       page.evaluate((s) => {
         Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s });
@@ -539,12 +545,15 @@ test.describe('public page', () => {
     await setVisibility('hidden');
     await setVisibility('visible');
     await expect.poll(() => statsRequests).toBe(1); // still fresh: only the first load
+    expect(statusRequests).toBe(loaded);
 
     await setVisibility('hidden');
     await page.clock.fastForward(STATS_POLL_MS + MINUTE_MS); // hidden tabs do not poll
     expect(statsRequests).toBe(1);
+    expect(statusRequests).toBe(loaded);
     await setVisibility('visible');
     await expect.poll(() => statsRequests).toBe(2);
+    await expect.poll(() => statusRequests).toBe(loaded + 1);
   });
 
   test('lets browsers keep the icons for a day instead of checking them on every visit', async ({ request }) => {
