@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNull, lt, ne, or, type SQL, sql } from 'drizzle-orm';
 import {
   DAY_MS,
   HEARTBEAT_THRESHOLD_MS,
@@ -55,20 +55,38 @@ export async function getOpenOutage(db: Db): Promise<Outage | undefined> {
   return open;
 }
 
+/** SQL: no open outage other than `id`. */
+// Part of the statement that opens or reopens one, so two concurrent requests cannot both pass it.
+export const noOtherOpen = (id: number) =>
+  sql`not exists (select 1 from ${outages} where ${and(isOpen, ne(outages.id, id))})`;
+
 /**
  * Opens an outage unless one is already open (or `unless` matches any outage), as a single
  * statement so two concurrent callers cannot both open one. Returns whether a row was inserted.
  */
-export async function openOutage(db: Db, startTime: string, source: OutageSource, unless?: SQL): Promise<boolean> {
+export async function openOutage(
+  db: Db,
+  startTime: string,
+  source: OutageSource,
+  { unless, isPlanned = false }: { unless?: SQL; isPlanned?: boolean } = {},
+): Promise<boolean> {
   const blocked = unless ? or(isOpen, unless) : isOpen;
   const { meta } = await db.run(
-    sql`insert into ${outages} (start_time, source) select ${startTime}, ${source} where not exists (select 1 from ${outages} where ${blocked})`,
+    sql`insert into ${outages} (start_time, source, is_planned) select ${startTime}, ${source}, ${isPlanned ? 1 : 0} where not exists (select 1 from ${outages} where ${blocked})`,
   );
   return meta.changes > 0;
 }
 
+/** The columns summarise reads, to select instead of whole rows. */
+export const SUMMARY_COLUMNS = {
+  id: outages.id,
+  startTime: outages.startTime,
+  endTime: outages.endTime,
+  isPlanned: outages.isPlanned,
+};
+
 /** The public shape of an outage row. */
-export function summarise(outage: Pick<Outage, 'id' | 'startTime' | 'endTime' | 'isPlanned'>): OutageSummary {
+export function summarise(outage: Pick<Outage, keyof typeof SUMMARY_COLUMNS>): OutageSummary {
   const { id, startTime, endTime, isPlanned } = outage;
   return { id, startTime, endTime, planned: isPlanned };
 }
@@ -132,7 +150,7 @@ export async function detectOutage(db: Db, now: Date): Promise<boolean> {
   const [[heartbeat], [open]] = await db.batch([heartbeatQuery(db), openOutageQuery(db)]);
   if (open || !heartbeat || heartbeat.onRecord || !isStale(heartbeat.silentSince, now.getTime())) return false;
   // The insert re-checks both conditions, in case another request got there first.
-  return openOutage(db, heartbeat.silentSince, 'sensor', gte(outages.startTime, heartbeat.silentSince));
+  return openOutage(db, heartbeat.silentSince, 'sensor', { unless: gte(outages.startTime, heartbeat.silentSince) });
 }
 
 /**

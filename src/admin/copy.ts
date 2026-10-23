@@ -12,6 +12,7 @@ import { site } from '../../site.config.ts';
 type Unexplained =
   | typeof ERROR.forbidden
   | typeof ERROR.unsupportedMediaType
+  | typeof ERROR.payloadTooLarge
   | typeof ERROR.notConfigured
   | typeof ERROR.internal;
 
@@ -28,6 +29,8 @@ export const admin = {
     turnstile_failed: 'The security check failed. Please try again.',
     outage_already_open: 'An outage is already open.',
     no_open_outage: 'There is no open outage to close.',
+    alert_sent:
+      'Subscribers were alerted to this outage and have not yet had the follow-up. Mark it a false positive instead.',
     end_before_start: 'The end must be after the start.',
     invalid_json: 'The request could not be read. Reload the page and try again.',
     bad_request: 'Check the times and try again. Times cannot be in the future.',

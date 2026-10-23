@@ -18,7 +18,7 @@ import {
 } from '../worker/lib/alerts';
 import { deliverAlertPage } from '../worker/lib/deliver';
 import { PUSH_TTL_SECONDS } from '../worker/lib/webpush';
-import { insertOutage, insertSubscription, mockPushService, PUSH_TEST_HOST, runCron } from './helpers';
+import { expireTimeouts, insertOutage, insertSubscription, mockPushService, PUSH_TEST_HOST, runCron } from './helpers';
 
 const { af, en } = DICTIONARIES;
 
@@ -466,6 +466,18 @@ describe('deliverAlertPage', () => {
     expect(send.mock.calls[0]?.[0].ids).toEqual([id]);
   });
 
+  it('retries a push service that does not answer in time', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    mockPushService(() => 201);
+    expireTimeouts();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [id]), testEnv, NOW);
+
+    expect(send).toHaveBeenCalledOnce();
+  });
   it('logs a rejected send with the push host and the error name, but never the endpoint path', async () => {
     const outage = await openOutage();
     const id = await insertSubscription('secret-path');
@@ -696,5 +708,70 @@ describe('the queue handler', () => {
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(message.ack).toHaveBeenCalledOnce();
+  });
+
+  it('never re-queues a page once its pushes went out, even if tidying up after them fails', async () => {
+    const outage = await insertOutage({ startTime: ago(DUE_MS) });
+    const gone = await insertSubscription('gone');
+    const fine = await insertSubscription('fine');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const send = vi.fn(async (_body: AlertPage, _options?: QueueSendOptions) => {});
+    // D1 fails only the delete of the gone subscription.
+    const DB = new Proxy(env.DB, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (query: string) => {
+            if (/^delete/i.test(query)) throw new Error('D1 is down');
+            return target.prepare(query);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const body: AlertPage = {
+      kind: 'off',
+      outageId: outage,
+      ids: [gone, fine],
+      attempt: 1,
+      queuedAt: new Date().toISOString(),
+    };
+    const message = { body, ack: vi.fn() };
+    const pushes = mockPushService((endpoint) => (endpoint.endsWith('/gone') ? 410 : 201));
+
+    await worker.queue({ messages: [message] } as unknown as MessageBatch<AlertPage>, {
+      ...env,
+      DB,
+      PUSH_QUEUE: { send } as unknown as Queue<AlertPage>,
+    });
+
+    expect(pushes).toHaveBeenCalledTimes(2);
+    expect(send).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(warn.mock.calls.flat().join(' ')).not.toContain('D1 is down');
+  });
+
+  // The queue never retries on its own (max_retries = 0), so a thrown job would be lost.
+  it('re-queues a job that throws, up to PUSH_MAX_ATTEMPTS, logging only the error name', async () => {
+    vi.spyOn(alerts, 'loadDueOutage').mockRejectedValue(new Error('D1 said something private'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const send = vi.fn(async (_body: AlertPage, _options?: QueueSendOptions) => {});
+    const queuedAt = new Date().toISOString();
+    const page = (attempt: number): AlertPage => ({ kind: 'off', outageId: 1, ids: [1], attempt, queuedAt });
+    const messages = [page(1), page(PUSH_MAX_ATTEMPTS)].map((body) => ({ body, ack: vi.fn() }));
+
+    await worker.queue({ messages } as unknown as MessageBatch<AlertPage>, {
+      ...env,
+      PUSH_QUEUE: { send } as unknown as Queue<AlertPage>,
+    });
+
+    expect(send).toHaveBeenCalledOnce();
+    const [body, options] = send.mock.calls[0] ?? [];
+    expect(body).toEqual(page(2));
+    expect(options?.delaySeconds).toBeGreaterThan(0);
+    for (const message of messages) expect(message.ack).toHaveBeenCalledOnce();
+    const logged = warn.mock.calls.flat().join(' ');
+    expect(logged).toContain('Error');
+    expect(logged).not.toContain('private');
   });
 });

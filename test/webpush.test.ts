@@ -104,4 +104,10 @@ describe('web push', () => {
     expect(request.headers.get('Authorization')).toBe(authorization);
     expect((await request.arrayBuffer()).byteLength).toBeGreaterThan(86);
   });
+
+  it('never follows a redirect', async () => {
+    const target: PushTarget = { endpoint: 'https://push.example/abc', ...RFC8291_RECEIVER_KEYS };
+    const request = await buildPushRequest(target, { title: 'Power is off' }, 'vapid t=x, k=y');
+    expect(request.redirect).toBe('manual');
+  });
 });

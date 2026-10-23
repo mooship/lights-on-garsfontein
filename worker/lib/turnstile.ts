@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { TurnstileAction } from '../../shared/api';
 import { ERROR } from '../../shared/errors';
-import { errors } from './http';
+import { errors, FETCH_TIMEOUT_MS } from './http';
 import type { RouteContext } from './router';
 
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -41,7 +41,7 @@ export async function checkTurnstile(
   body.append('response', token);
   body.append('remoteip', ip);
   try {
-    const res = await fetch(SITEVERIFY_URL, { method: 'POST', body });
+    const res = await fetch(SITEVERIFY_URL, { method: 'POST', body, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     const outcome = res.ok ? siteverifySchema.safeParse(await res.json()) : null;
     if (outcome?.success && outcome.data.success) {
       // Test secrets report a dummy hostname and no action, so only the real secret is held to them.
@@ -50,7 +50,7 @@ export async function checkTurnstile(
       if (solvedFor === action && hostname === new URL(env.SITE_URL).hostname) return null;
     }
   } catch {
-    // An unreachable siteverify fails closed.
+    // An unreachable or slow siteverify fails closed.
   }
   return errors.forbidden(ERROR.turnstileFailed);
 }

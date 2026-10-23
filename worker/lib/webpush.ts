@@ -1,6 +1,7 @@
 import { HOUR_MS, type PushSubscriptionBody } from '../../shared/api';
 import { fromBase64Url, toBase64Url } from '../../shared/base64url';
 import { site } from '../../site.config';
+import { FETCH_TIMEOUT_MS } from './http';
 
 /** Where a push goes and the keys it is encrypted to, as a subscription row stores them. */
 export type PushTarget = Pick<PushSubscriptionBody, 'endpoint'> & PushSubscriptionBody['keys'];
@@ -135,5 +136,8 @@ export async function buildPushRequest(target: PushTarget, payload: object, auth
       Authorization: authorization,
     },
     body,
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    // A redirect would carry the VAPID token to a host PUSH_HOSTS (worker/routes/push.ts) never allowed.
+    redirect: 'manual',
   });
 }

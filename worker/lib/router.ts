@@ -96,7 +96,14 @@ const needsSameSite = (route: Route, request: Request) =>
   request.method !== 'GET' && request.method !== 'HEAD' && !(route.authorize && bearerToken(request) !== null);
 
 /** Runs a matched route: its guards, the handler (or edge cache), purges, then CORS and `ctx.headers`. */
-export async function dispatch(route: Route, request: Request, env: Env): Promise<Response> {
+// A miss is stored after the response is sent (`execution.waitUntil`); a purge is awaited, so the
+// next read after a write never gets the old copy.
+export async function dispatch(
+  route: Route,
+  request: Request,
+  env: Env,
+  execution: ExecutionContext,
+): Promise<Response> {
   const ip = clientIp(request);
   const ctx: RouteContext = {
     request,
@@ -119,7 +126,7 @@ export async function dispatch(route: Route, request: Request, env: Env): Promis
   if (!response && route.authorize) response = await route.authorize(ctx);
   if (!response) {
     response = await route.handler(ctx);
-    if (cacheable !== null) await storeInEdgeCache(request, response, cacheable);
+    if (cacheable !== null) execution.waitUntil(storeInEdgeCache(request, response, cacheable));
     if (purges && response.ok) await purgeEdgeCache(new URL(request.url).origin, purges);
   }
   if (route.cors) response.headers.set('Access-Control-Allow-Origin', '*');

@@ -1,7 +1,10 @@
 import { z } from 'zod';
-import { MINUTE_MS } from '../../shared/api';
+import { MINUTE_MS, SECOND_MS } from '../../shared/api';
 import { ERROR, type ErrorCode } from '../../shared/errors';
 
+/** How long a call to another service (push, Telegram, Turnstile) may take. */
+// Passed as AbortSignal.timeout, so a service that hangs cannot hold a request or a queue job open.
+export const FETCH_TIMEOUT_MS = 10 * SECOND_MS;
 /** A JSON response, `no-store` unless `headers` sets its own Cache-Control. */
 export function json(data: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), {
@@ -25,6 +28,7 @@ export const errors = {
   notFound: (error: ErrorCode = ERROR.notFound) => json({ error }, 404),
   conflict: (error: ErrorCode) => json({ error }, 409),
   unsupportedMediaType: () => json({ error: ERROR.unsupportedMediaType }, 415),
+  payloadTooLarge: () => json({ error: ERROR.payloadTooLarge }, 413),
   rateLimited: () => json({ error: ERROR.rateLimited }, 429, { 'Retry-After': String(MINUTE_MS / 1000) }),
   internal: () => json({ error: ERROR.internal }, 500),
 };
@@ -66,14 +70,36 @@ export async function isRateLimited(limiter: RateLimit, key: string): Promise<bo
 /** An ISO 8601 time with an offset, normalised to UTC. */
 export const isoTime = () => z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
 
-/** Parses a JSON body against a schema; on failure returns the 400 to send instead. */
+/** The largest request body read; the largest real one, a push subscription, is a few kilobytes. */
+export const MAX_BODY_BYTES = 16 * 1024;
+
+/** The body as text, or null when it is over MAX_BODY_BYTES. */
+// Refused up front by its Content-Length, and a chunked body as soon as it passes the limit, so an
+// oversized body is never held whole.
+export async function readCappedText(request: Request): Promise<string | null> {
+  if (!request.body) return '';
+  if (Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES) return null;
+  const decoder = new TextDecoder();
+  let text = '';
+  let size = 0;
+  for await (const chunk of request.body) {
+    size += chunk.byteLength;
+    if (size > MAX_BODY_BYTES) return null;
+    text += decoder.decode(chunk, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+/** Parses a JSON body against a schema; on failure returns the 400 (or 413) to send instead. */
 export async function parseBody<T extends z.ZodType>(
   request: Request,
   schema: T,
 ): Promise<{ data: z.infer<T> } | { response: Response }> {
+  const text = await readCappedText(request);
+  if (text === null) return { response: errors.payloadTooLarge() };
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(text);
   } catch {
     return { response: errors.badRequest(ERROR.invalidJson) };
   }

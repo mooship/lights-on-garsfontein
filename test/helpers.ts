@@ -1,4 +1,4 @@
-import { createScheduledController, env } from 'cloudflare:test';
+import { createExecutionContext, createScheduledController, env, waitOnExecutionContext } from 'cloudflare:test';
 import { expect, vi } from 'vitest';
 import {
   MINUTE_MS,
@@ -52,6 +52,7 @@ interface CallOptions {
 }
 
 /** Sends a request through the Worker's fetch handler, from a fresh uniqueIp() unless `ip` is given. */
+// Waits for the work the request left running (an edge-cache store), as the next request may rely on it.
 export async function call(path: string, options: CallOptions = {}): Promise<Response> {
   const headers = new Headers(options.headers);
   headers.set(CLIENT_IP_HEADER, options.ip ?? uniqueIp());
@@ -59,20 +60,36 @@ export async function call(path: string, options: CallOptions = {}): Promise<Res
   const body = options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body));
   if (body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const request = new Request(`${ORIGIN}${path}`, { method: options.method ?? 'GET', headers, body });
-  return worker.fetch(request as Request<unknown, IncomingRequestCfProperties>, options.env ?? env);
+  const ctx = createExecutionContext();
+  const response = await worker.fetch(
+    request as Request<unknown, IncomingRequestCfProperties>,
+    options.env ?? env,
+    ctx,
+  );
+  await waitOnExecutionContext(ctx);
+  return response;
 }
 
 /** Stubs fetch for `hostname`, which `answer`s with the request's URL; other fetches go through. Returns the spy. */
+// Like a real fetch, it rejects once its signal has aborted.
 export function stubFetchHost(hostname: string, answer: (url: string) => Response | Promise<Response>) {
   const realFetch = globalThis.fetch;
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
-    return new URL(url).hostname === hostname ? answer(url) : realFetch(input, init);
+    if (new URL(url).hostname !== hostname) return realFetch(input, init);
+    (init?.signal ?? (input instanceof Request ? input.signal : null))?.throwIfAborted();
+    return answer(url);
   });
   vi.stubGlobal('fetch', spy);
   return spy;
 }
 
+/** Makes every `AbortSignal.timeout` fire at once, so a fetch stubbed with stubFetchHost fails as a timed-out one does. */
+export function expireTimeouts() {
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation(() =>
+    AbortSignal.abort(new DOMException('The operation timed out', 'TimeoutError')),
+  );
+}
 /** Stubs the Turnstile siteverify call with `answer`; other fetches go through. */
 export const mockSiteverify = (answer: () => Response | Promise<Response>) =>
   stubFetchHost('challenges.cloudflare.com', answer);

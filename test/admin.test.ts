@@ -132,6 +132,31 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(await openOutageCount()).toBe(1);
   });
 
+  it('opens only one outage when two are logged with no end at once', async () => {
+    const results = await Promise.all(
+      ['2026-10-12T10:00:00Z', '2026-10-12T11:00:00Z'].map((startTime) =>
+        post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.create, startTime, isPlanned: true }),
+      ),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    const created = (await results.find((r) => r.status === 201)?.json()) as { outage: unknown };
+    expect(created.outage).toMatchObject({ isPlanned: true, source: 'manual', endTime: null });
+    expect(await openOutageCount()).toBe(1);
+  });
+
+  it('reopens only one outage when two are reopened at once', async () => {
+    const ids = [
+      await insertOutage({ startTime: '2026-10-01T10:00:00Z', endTime: '2026-10-01T11:00:00Z' }),
+      await insertOutage({ startTime: '2026-10-02T10:00:00Z', endTime: '2026-10-02T11:00:00Z' }),
+    ];
+    const results = await Promise.all(
+      ids.map((id) => post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id, endTime: null })),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(await results.find((r) => r.status === 409)?.json()).toEqual({ error: ERROR.outageAlreadyOpen });
+    expect(await openOutageCount()).toBe(1);
+  });
+
   it('closes an open outage marked a false positive, even when asked to leave its end empty', async () => {
     const id = await insertOutage({ startTime: '2026-10-12T10:00:00Z' });
     const res = await post(ADMIN_OUTAGES_PATH, {
@@ -271,6 +296,25 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect((await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id })).status).toBe(200);
     const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
     expect(n).toBe(0);
+  });
+
+  // Its follow-up is sent only while the row exists, so deleting it would leave subscribers with the off alert.
+  it('refuses to delete an outage whose off alert went out with no follow-up yet', async () => {
+    const alerted = '2026-10-12T10:10:00.000Z';
+    const pending = await insertOutage({ startTime: '2026-10-12T10:00:00Z', offAlertAt: alerted });
+    const res = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id: pending });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: ERROR.alertSent });
+
+    const followedUp = await insertOutage({
+      startTime: '2026-10-01T10:00:00Z',
+      endTime: '2026-10-01T11:00:00Z',
+      offAlertAt: alerted,
+      onAlertAt: alerted,
+    });
+    expect((await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id: followedUp })).status).toBe(200);
+    const { n } = (await env.DB.prepare('SELECT COUNT(*) AS n FROM outages').first<{ n: number }>()) ?? {};
+    expect(n).toBe(1);
   });
 
   it('marks outages as planned and shows it publicly', async () => {
