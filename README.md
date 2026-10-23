@@ -214,6 +214,7 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `ADMIN_API_TOKEN` | Optional: bearer token for scripts |
    | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor |
    | `VAPID_PRIVATE_KEY` | Optional: the key that signs power alerts, an ECDSA P-256 private key as a one-line JWK: `npm run --silent vapid-keys | npx wrangler secret put VAPID_PRIVATE_KEY`. The public key is derived from it and served at `GET /api/push/key`; until it is set, that answers `404` and browsers cannot subscribe |
+   | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the owner's private Telegram alerts (see [Owner alerts on Telegram](#owner-alerts-on-telegram)). Until both are set, none are sent |
    | `CONTACT_EMAIL` | Optional: address for privacy requests, revealed on the privacy page only after a Turnstile check. Until it is set, requests go to public GitHub issues |
 
    For random values, use for example `openssl rand -base64 32`.
@@ -231,6 +232,14 @@ Visitors can ask their browser for a notification when the power goes off and wh
 - **Delivery.** The minute cron puts pages of subscriptions on the `PUSH_QUEUE` queue (`lights-on-push`), and the queue handler sends each page to the push service, retrying transient failures (429, 5xx, network errors) up to `PUSH_MAX_ATTEMPTS`. A message that is not delivered within `PUSH_TTL_SECONDS` (`worker/lib/webpush.ts`, one hour) is dropped by the push service, so nobody gets a stale alert hours later. A subscription the push service answers `404` or `410` for is deleted.
 - **Bindings.** `PUSH_QUEUE` and `PUSH_LIMITER` are in `wrangler.toml` (also under `[env.e2e]`) and `wrangler.example.toml`. `PUSH_LIMITER` is the 5/min limit on the subscription writes.
 - **Privacy.** [`privacy.html`](privacy.html) says what a subscription holds and when it is deleted; keep it accurate if that changes.
+
+### Owner alerts on Telegram
+
+The owner can get the same alerts privately, in a chat with their own Telegram bot. They are not for residents. The messages are English and, unlike the public alerts, say how an outage was recorded: a silent sensor reads "No reading from home since 14:05. The power may be off.", because it can also mean a lost connection. The copy is `admin.telegram` in `src/admin/copy.ts`.
+
+- **Setup.** Create a bot with [@BotFather](https://t.me/BotFather) and keep its token. Send the bot `/start`, then open `https://api.telegram.org/bot<token>/getUpdates` and read `message.chat.id`. Set both secrets: `npx wrangler secret put TELEGRAM_BOT_TOKEN` and `npx wrangler secret put TELEGRAM_CHAT_ID`.
+- **When.** Exactly when the power alerts above are due, from the same claims, so the two never disagree. Each claim also puts one Telegram message on `PUSH_QUEUE`, even with no subscribers.
+- **Delivery.** `worker/lib/telegram.ts` sends it with the Bot API's `sendMessage`, retrying a 429, a 5xx or a network error up to `PUSH_MAX_ATTEMPTS`. Any other error (a wrong token or chat ID) is dropped and logged with Telegram's description; logs never contain the token.
 
 ## Extending
 

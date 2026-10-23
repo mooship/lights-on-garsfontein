@@ -51,8 +51,10 @@ export function alertMessage(
 export const ALERT_DELAY_MS = 10 * MINUTE_MS;
 /** Subscriptions per queue message, so one delivery run stays inside a Worker invocation's limits. */
 export const PUSH_PAGE_SIZE = 40;
-/** How many times one page is tried before it is dropped. */
+/** How many times one page, or one Telegram message, is tried before it is dropped. */
 export const PUSH_MAX_ATTEMPTS = 3;
+/** The wait before a retry, multiplied by the attempts so far. */
+export const ALERT_RETRY_DELAY_SECONDS = 60;
 /** The most messages Queues accepts in one `sendBatch`. */
 const QUEUE_BATCH_LIMIT = 100;
 
@@ -67,6 +69,16 @@ export interface AlertPage extends AlertClaim {
   attempt: number;
   queuedAt: string;
 }
+
+/** The queue message body for the owner's Telegram alert about one outage (worker/lib/telegram.ts). */
+export interface TelegramAlert extends AlertClaim {
+  channel: 'telegram';
+  attempt: number;
+  queuedAt: string;
+}
+
+/** What goes on PUSH_QUEUE; only a Telegram alert has a `channel`. */
+export type AlertJob = AlertPage | TelegramAlert;
 
 /**
  * Marks the alerts that are due as sent and returns them: off, then on, then dismissed. Each kind
@@ -126,12 +138,35 @@ export async function releaseClaim(db: Db, { kind, outageId }: AlertClaim, claim
 }
 
 /**
- * Queues every subscription, in pages, for each claimed alert. If it fails before any page of a
- * claim is queued, that claim is released and the error rethrown, so the alert is retried rather
- * than lost, and an "on" alert never follows an "off" that nobody got. Once a page is queued the
- * claim stays: some subscribers hearing it beats all of them hearing it twice.
+ * The outage an alert is about, or `null` if it no longer warrants the alert, which would then mislead.
+ * A dismissed alert for an undone dismissal releases its claim, so the outage's real end can still send "back on".
  */
-export async function enqueueAlerts(db: Db, queue: Queue<AlertPage>, claims: AlertClaim[], now: Date): Promise<void> {
+export async function loadDueOutage(db: Db, alert: AlertClaim & { queuedAt: string }): Promise<Outage | null> {
+  const outage = await db.select().from(outages).where(eq(outages.id, alert.outageId)).get();
+  if (!outage) return null;
+  if (alert.kind === 'dismissed') {
+    if (outage.isFalsePositive) return outage;
+    await releaseClaim(db, alert, alert.queuedAt);
+    return null;
+  }
+  if (outage.isFalsePositive) return null;
+  return (outage.endTime !== null) === (alert.kind === 'on') ? outage : null;
+}
+
+/**
+ * Queues every subscription, in pages, for each claimed alert, and with `telegram` one message to
+ * the owner ahead of them. If it fails before any message of a claim is queued, that claim is
+ * released and the error rethrown, so the alert is retried rather than lost, and an "on" alert
+ * never follows an "off" that nobody got. Once a message is queued the claim stays: some
+ * subscribers hearing it beats all of them hearing it twice.
+ */
+export async function enqueueAlerts(
+  db: Db,
+  queue: Queue<AlertJob>,
+  claims: AlertClaim[],
+  now: Date,
+  { telegram = false } = {},
+): Promise<void> {
   if (claims.length === 0) return;
   const queuedAt = now.toISOString();
   const queued = new Set<AlertClaim>();
@@ -141,8 +176,11 @@ export async function enqueueAlerts(db: Db, queue: Queue<AlertPage>, claims: Ale
       .from(pushSubscriptions)
       .orderBy(asc(pushSubscriptions.id));
     const ids = rows.map(({ id }) => id);
-    const messages: { claim: AlertClaim; request: MessageSendRequest<AlertPage> }[] = [];
+    const messages: { claim: AlertClaim; request: MessageSendRequest<AlertJob> }[] = [];
     for (const claim of claims) {
+      if (telegram) {
+        messages.push({ claim, request: { body: { ...claim, channel: 'telegram', attempt: 1, queuedAt } } });
+      }
       for (let start = 0; start < ids.length; start += PUSH_PAGE_SIZE) {
         const body = { ...claim, ids: ids.slice(start, start + PUSH_PAGE_SIZE), attempt: 1, queuedAt };
         messages.push({ claim, request: { body } });

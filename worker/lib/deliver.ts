@@ -1,32 +1,21 @@
-import { eq, inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import type { Locale } from '../../site.config';
-import { createDb, type Db } from '../db/client';
-import { type Outage, outages, type PushSubscriptionRow, pushSubscriptions } from '../db/schema';
-import { type AlertPage, type AlertPayload, alertMessage, PUSH_MAX_ATTEMPTS, releaseClaim } from './alerts';
+import { createDb } from '../db/client';
+import { type PushSubscriptionRow, pushSubscriptions } from '../db/schema';
+import {
+  ALERT_RETRY_DELAY_SECONDS,
+  type AlertPage,
+  type AlertPayload,
+  alertMessage,
+  loadDueOutage,
+  PUSH_MAX_ATTEMPTS,
+} from './alerts';
 import { buildPushRequest, PUSH_TTL_SECONDS, vapidSigner } from './webpush';
-
-const RETRY_DELAY_SECONDS = 60;
 
 // Logs name only the push service's host and an error's name: an endpoint path identifies a
 // subscriber, and some error messages quote the URL they failed on.
 const hostOf = (endpoint: string) => URL.parse(endpoint)?.host ?? 'invalid endpoint';
 const errorName = (reason: unknown) => (reason instanceof Error ? reason.name : typeof reason);
-
-/**
- * The outage the page is about, or `null` if it no longer warrants the alert, which would then mislead.
- * A dismissed page for an undone dismissal releases its claim, so the outage's real end can still send "back on".
- */
-async function loadDueOutage(db: Db, page: AlertPage): Promise<Outage | null> {
-  const outage = await db.select().from(outages).where(eq(outages.id, page.outageId)).get();
-  if (!outage) return null;
-  if (page.kind === 'dismissed') {
-    if (outage.isFalsePositive) return outage;
-    await releaseClaim(db, page, page.queuedAt);
-    return null;
-  }
-  if (outage.isFalsePositive) return null;
-  return (outage.endTime !== null) === (page.kind === 'on') ? outage : null;
-}
 
 /**
  * Sends one page of an alert. Subscriptions the push service reports gone are deleted, and
@@ -94,7 +83,7 @@ export async function deliverAlertPage(page: AlertPage, env: Env, now: Date): Pr
   if (page.attempt < PUSH_MAX_ATTEMPTS) {
     await env.PUSH_QUEUE.send(
       { ...page, ids: retry, attempt: page.attempt + 1 },
-      { delaySeconds: RETRY_DELAY_SECONDS * page.attempt },
+      { delaySeconds: ALERT_RETRY_DELAY_SECONDS * page.attempt },
     );
   } else {
     console.warn(
