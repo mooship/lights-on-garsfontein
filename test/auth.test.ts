@@ -173,6 +173,10 @@ describe('admin auth', () => {
     expect((await asAdmin(TIMER_PATH, { action: TIMER_ACTION.punchOut })).status).toBe(201);
     const headers = { Authorization: `Bearer ${env.ADMIN_API_TOKEN}` };
     expect((await call(ADMIN_OUTAGES_PATH, { headers })).status).toBe(200);
+    // Checked before the sign-in limit, so it neither counts towards it nor is refused by it.
+    const limiter = stubLimiter();
+    expect((await call(ADMIN_OUTAGES_PATH, { headers, env: { ...env, LOGIN_LIMITER: limiter } })).status).toBe(200);
+    expect(limiter.limit).not.toHaveBeenCalled();
   });
 
   it('rejects a wrong API token without falling back to cookies, and rate limits guesses', async () => {

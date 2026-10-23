@@ -72,7 +72,7 @@ Outages come from a heartbeat sensor, the admin punch clock, or both.
 
 Sign in at `/admin`. The session cookie (`__Host-admin_session`, `HttpOnly`, `Secure`, `SameSite=Strict`) lasts 30 days after the last visit and never more than 90 days after sign-in. **Punch out** when the power goes off and **Punch in** when it returns; **Log a past outage** adds anything missed. Each outage can be marked **Planned** or **False positive**, closed or deleted. Outages before `trackingSince` can be added for the history and CSV, but statistics count only time from then. Under the punch clock, a line says whether the [sensor](#sensor) is reporting, paused or silent, and since when; the page refreshes it once a minute while it is visible, and when you return to it.
 
-Scripts can use `Authorization: Bearer <ADMIN_API_TOKEN>` instead of a session; wrong tokens count towards the per-connection sign-in limit. Times need an offset and may be at most five minutes in the future.
+Scripts can use `Authorization: Bearer <ADMIN_API_TOKEN>` instead of a session. Each wrong token counts towards the per-connection sign-in limit, and a connection over it gets `429` instead of `401`. The right token is checked first, so it is still accepted from that connection: the limit only slows guessing, and the token's length is what makes guessing it hopeless. Times need an offset and may be at most five minutes in the future.
 
 ```sh
 # The power went off ("punch_in" when it returns)
@@ -212,14 +212,13 @@ You need Node 24, a Cloudflare account and, optionally, a domain on Cloudflare.
    | `ADMIN_USERNAME` | Admin sign-in name (case-insensitive) |
    | `ADMIN_PASSWORD_HASH` | PBKDF2 hash of a password of at least 12 characters: `npm run --silent hash-password \| npx wrangler secret put ADMIN_PASSWORD_HASH`. Changing it signs out every session |
    | `TURNSTILE_SECRET_KEY` | The Turnstile widget's secret key |
-   | `ADMIN_API_TOKEN` | Optional: bearer token for scripts |
-   | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor |
+   | `ADMIN_API_TOKEN` | Optional: bearer token for scripts; generate it with `openssl rand -hex 32` |
+   | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor; generate it with `openssl rand -hex 32` |
    | `VAPID_PRIVATE_KEY` | Optional: the key that signs power alerts, an ECDSA P-256 private key as a one-line JWK: `npm run --silent vapid-keys | npx wrangler secret put VAPID_PRIVATE_KEY`. The public key is derived from it and served at `GET /api/push/key`; until it is set, that answers `404` and browsers cannot subscribe |
    | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the owner's private Telegram alerts (see [Owner alerts on Telegram](#owner-alerts-on-telegram)). Until both are set, none are sent |
    | `TELEGRAM_WEBHOOK_SECRET` | Optional: the secret Telegram sends with each command to the bot. Until it is set, `POST /api/telegram` answers `401` |
    | `CONTACT_EMAIL` | Optional: address for privacy requests, revealed on the privacy page only after a Turnstile check. Until it is set, requests go to public GitHub issues |
 
-   For random values, use for example `openssl rand -base64 32`.
 7. **Deploy.** `npm run deploy` builds, applies pending D1 migrations and deploys. With Cloudflare Workers Builds, use `npm run build` as the build command and `npm run deploy:ci` as the deploy command: migrations run first, so if one fails the previous version stays live.
 8. **Regenerate the images**: `npm run og` (social card) and `npm run icons` (both need `npx playwright install chromium` once). Edit the `<title>` in `public/favicon.svg` by hand. The colours come from `src/styles/palette.ts`; files that cannot import it keep copies to change with it: `src/styles/privacy.css`, the theme-color metas in `index.html`, `public/favicon*.svg`, and `background_color` and `theme_color` in `templates/site.webmanifest` (JSON, so it cannot carry a note).
 9. **Review `privacy.html`** for your jurisdiction. It holds the privacy notice and terms, is written for POPIA and describes this deployment's data handling; `FORKERS` comments mark what to check. Do not use utility or municipal logos, and keep the independence disclaimer.

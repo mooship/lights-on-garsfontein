@@ -2,7 +2,11 @@ import { safeEqual } from './crypto';
 import { bearerToken, errors, isRateLimited } from './http';
 import type { RouteContext } from './router';
 
-/** Wrong or missing tokens share the login rate limit, so they cannot be brute-forced. */
+/**
+ * Wrong or missing tokens count towards the login rate limit, which slows guessing. Callers check
+ * the token first, so the right one is never refused: refusing it would mean counting every good
+ * request too, and the sensor, on the owner's connection, would use up the owner's sign-ins.
+ */
 export async function refuseBadToken({ env, limitKey }: RouteContext): Promise<Response> {
   if (await isRateLimited(env.LOGIN_LIMITER, limitKey)) return errors.rateLimited();
   return errors.unauthorized();
