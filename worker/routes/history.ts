@@ -56,14 +56,7 @@ function csvField(value: string | number | null): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/**
- * Open data: every outage (false positives excluded) as CSV, oldest first.
- *
- * The columns are a stable public contract that other people's scripts read, so don't rename,
- * reorder or reformat them; add new columns only at the end, and note any change with a version
- * in the README. `start_time_utc` and `end_time_utc` are ISO 8601 UTC; `end_time_utc` and
- * `duration_minutes` (whole minutes) are empty while the outage is open; `planned` is yes or no.
- */
+/** Open data, every outage but false positives, oldest first; a public contract (README, CSV contract). */
 async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   const rows = await db
     .select(SUMMARY_COLUMNS)
