@@ -137,5 +137,7 @@ export async function buildPushRequest(target: PushTarget, payload: object, auth
     },
     body,
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    // A redirect would carry the VAPID token to a host PUSH_HOSTS (worker/routes/push.ts) never allowed.
+    redirect: 'manual',
   });
 }
