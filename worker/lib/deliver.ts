@@ -2,14 +2,7 @@ import { inArray } from 'drizzle-orm';
 import type { Locale } from '../../site.config';
 import { createDb } from '../db/client';
 import { type PushSubscriptionRow, pushSubscriptions } from '../db/schema';
-import {
-  ALERT_RETRY_DELAY_SECONDS,
-  type AlertPage,
-  type AlertPayload,
-  alertMessage,
-  loadDueOutage,
-  PUSH_MAX_ATTEMPTS,
-} from './alerts';
+import { type AlertPage, type AlertPayload, alertMessage, loadDueOutage, retryAlert } from './alerts';
 import { buildPushRequest, PUSH_TTL_SECONDS, vapidSigner } from './webpush';
 
 // Logs name only the push service's host and an error's name: an endpoint path identifies a
@@ -80,12 +73,7 @@ export async function deliverAlertPage(page: AlertPage, env: Env, now: Date): Pr
 
   if (gone.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, gone));
   if (retry.length === 0) return;
-  if (page.attempt < PUSH_MAX_ATTEMPTS) {
-    await env.PUSH_QUEUE.send(
-      { ...page, ids: retry, attempt: page.attempt + 1 },
-      { delaySeconds: ALERT_RETRY_DELAY_SECONDS * page.attempt },
-    );
-  } else {
+  if (!(await retryAlert(env.PUSH_QUEUE, { ...page, ids: retry }))) {
     console.warn(
       `Gave up on ${retry.length} push sends after ${page.attempt} attempts to ${[...retryHosts].join(', ')}`,
     );

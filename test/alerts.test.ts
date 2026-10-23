@@ -697,4 +697,28 @@ describe('the queue handler', () => {
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(message.ack).toHaveBeenCalledOnce();
   });
+
+  // The queue never retries on its own (max_retries = 0), so a thrown job would be lost.
+  it('re-queues a job that throws, up to PUSH_MAX_ATTEMPTS, logging only the error name', async () => {
+    vi.spyOn(alerts, 'loadDueOutage').mockRejectedValue(new Error('D1 said something private'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const send = vi.fn(async (_body: AlertPage, _options?: QueueSendOptions) => {});
+    const queuedAt = new Date().toISOString();
+    const page = (attempt: number): AlertPage => ({ kind: 'off', outageId: 1, ids: [1], attempt, queuedAt });
+    const messages = [page(1), page(PUSH_MAX_ATTEMPTS)].map((body) => ({ body, ack: vi.fn() }));
+
+    await worker.queue({ messages } as unknown as MessageBatch<AlertPage>, {
+      ...env,
+      PUSH_QUEUE: { send } as unknown as Queue<AlertPage>,
+    });
+
+    expect(send).toHaveBeenCalledOnce();
+    const [body, options] = send.mock.calls[0] ?? [];
+    expect(body).toEqual(page(2));
+    expect(options?.delaySeconds).toBeGreaterThan(0);
+    for (const message of messages) expect(message.ack).toHaveBeenCalledOnce();
+    const logged = warn.mock.calls.flat().join(' ');
+    expect(logged).toContain('Error');
+    expect(logged).not.toContain('private');
+  });
 });

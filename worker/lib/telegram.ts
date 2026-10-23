@@ -7,13 +7,7 @@ import { admin } from '../../src/admin/copy';
 import { DICTIONARIES } from '../../src/i18n/index';
 import { createDb } from '../db/client';
 import type { Outage } from '../db/schema';
-import {
-  ALERT_RETRY_DELAY_SECONDS,
-  type AlertKind,
-  loadDueOutage,
-  PUSH_MAX_ATTEMPTS,
-  type TelegramAlert,
-} from './alerts';
+import { type AlertKind, loadDueOutage, retryAlert, type TelegramAlert } from './alerts';
 
 export const TELEGRAM_HOST = 'api.telegram.org';
 
@@ -86,12 +80,7 @@ export async function deliverTelegramAlert(alert: TelegramAlert, env: Env, now: 
     console.warn(`Telegram send failed: ${error instanceof Error ? error.name : typeof error}`);
   }
 
-  if (alert.attempt < PUSH_MAX_ATTEMPTS) {
-    await env.PUSH_QUEUE.send(
-      { ...alert, attempt: alert.attempt + 1 },
-      { delaySeconds: ALERT_RETRY_DELAY_SECONDS * alert.attempt },
-    );
-  } else {
+  if (!(await retryAlert(env.PUSH_QUEUE, alert))) {
     console.warn(`Gave up on a Telegram alert after ${alert.attempt} attempts`);
   }
 }

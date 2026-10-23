@@ -1,7 +1,7 @@
 import { API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
 import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
-import { type AlertJob, claimAlerts, enqueueAlerts } from './lib/alerts';
+import { type AlertJob, claimAlerts, enqueueAlerts, retryAlert } from './lib/alerts';
 import { deliverAlertPage } from './lib/deliver';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
 import { errors } from './lib/http';
@@ -61,12 +61,24 @@ export default {
     }
   },
 
-  /** One page of an alert, or one Telegram alert, per message; see worker/lib/deliver.ts and telegram.ts. */
+  /**
+   * One page of an alert, or one Telegram alert, per message; see worker/lib/deliver.ts and telegram.ts.
+   * The queue has `max_retries = 0`, so a job that throws is re-queued here, or it would be lost.
+   */
   async queue(batch, env) {
     for (const message of batch.messages) {
       const job = message.body;
-      if ('channel' in job) await deliverTelegramAlert(job, env, new Date());
-      else await deliverAlertPage(job, env, new Date());
+      try {
+        if ('channel' in job) await deliverTelegramAlert(job, env, new Date());
+        else await deliverAlertPage(job, env, new Date());
+      } catch (error) {
+        // Only the name: a message can quote an endpoint or the Telegram token.
+        const name = error instanceof Error ? error.name : typeof error;
+        const retried = await retryAlert(env.PUSH_QUEUE, job);
+        console.warn(
+          `An alert job failed (${name}); ${retried ? 'retrying' : `gave up after ${job.attempt} attempts`}`,
+        );
+      }
       message.ack();
     }
   },
