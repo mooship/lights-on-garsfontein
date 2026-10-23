@@ -4,7 +4,7 @@ import { LOCALES, localePath, nextLocale } from '../shared/locale';
 import { ADMIN_PAGE_PATH, PUSH_SUBSCRIPTION_PATH, SERVICE_WORKER_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
 import { DICTIONARIES } from '../src/i18n';
-import { ALERTS_OFFER_DELAY_MS, ALERTS_SNOOZE_MS } from '../src/lib/push';
+import { ALERTS_NOTICE_MS, ALERTS_OFFER_DELAY_MS, ALERTS_SNOOZE_MS } from '../src/lib/push';
 import { STORAGE_KEYS } from '../src/lib/storage';
 import { RFC8291_RECEIVER_KEYS } from '../test/push-keys';
 import { expect, returningVisitor, scrollsSideways, storeBeforeLoad, test } from './fixtures';
@@ -123,6 +123,10 @@ for (const locale of LOCALES) {
       // Without focus, screen readers hear it arrive by name, and only once: the card is outside the live region.
       await expect(page.locator('[aria-live]').getByText(m.card.heading, { exact: true })).toHaveCount(1);
       await expect(page.locator('[aria-live] [role="dialog"]')).toHaveCount(0);
+      // Gone once announced, so reading the page meets the card's name only in the card.
+      await page.clock.runFor(ALERTS_NOTICE_MS);
+      await expect(page.getByText(m.card.heading, { exact: true })).toHaveCount(1);
+      await expect(card(page)).toBeVisible();
       await expect(card(page)).toContainText(m.card.body);
       await expect(card(page)).toContainText(m.card.scope);
       // Same page and language as the footer's privacy link.
