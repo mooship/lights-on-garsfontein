@@ -79,8 +79,16 @@ export async function openOutage(
   return meta.changes > 0;
 }
 
+/** The columns summarise reads, to select instead of whole rows. */
+export const SUMMARY_COLUMNS = {
+  id: outages.id,
+  startTime: outages.startTime,
+  endTime: outages.endTime,
+  isPlanned: outages.isPlanned,
+};
+
 /** The public shape of an outage row. */
-export function summarise(outage: Pick<Outage, 'id' | 'startTime' | 'endTime' | 'isPlanned'>): OutageSummary {
+export function summarise(outage: Pick<Outage, keyof typeof SUMMARY_COLUMNS>): OutageSummary {
   const { id, startTime, endTime, isPlanned } = outage;
   return { id, startTime, endTime, planned: isPlanned };
 }

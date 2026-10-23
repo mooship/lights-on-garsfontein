@@ -11,7 +11,7 @@ import {
 import { CSV_PATH, FEED_PATH, OUTAGES_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { outages } from '../db/schema';
-import { summarise } from '../lib/grid';
+import { SUMMARY_COLUMNS, summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { hourlyMinutes, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
@@ -64,7 +64,7 @@ function csvField(value: string | number | null): string {
  */
 async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
   const rows = await db
-    .select()
+    .select(SUMMARY_COLUMNS)
     .from(outages)
     .where(eq(outages.isFalsePositive, false))
     .orderBy(asc(outages.startTime));
@@ -93,7 +93,7 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
  */
 async function getOutages({ db }: RouteContext): Promise<Response> {
   const rows = await db
-    .select()
+    .select(SUMMARY_COLUMNS)
     .from(outages)
     .where(eq(outages.isFalsePositive, false))
     .orderBy(desc(outages.startTime));
@@ -136,7 +136,7 @@ function feedDuration(ms: number): string {
  */
 async function getFeed({ env, db }: RouteContext): Promise<Response> {
   const rows = await db
-    .select({ id: outages.id, startTime: outages.startTime, endTime: outages.endTime, isPlanned: outages.isPlanned })
+    .select(SUMMARY_COLUMNS)
     .from(outages)
     .where(eq(outages.isFalsePositive, false))
     .orderBy(desc(outages.startTime))
