@@ -318,6 +318,7 @@ export const Trends: Component<TrendsProps> = (props) => {
     })),
   );
   const fullWindow = () => s().trackedHours >= 30 * 24;
+  const byHourTitle = () => t().trends.byHourTitle(fullWindow() ? null : formatCalendarDay(firstDay()), s().outages);
   const subtitle = () => {
     if (!started()) return t().trends.startsOn(formatDate(props.stats.trackingSince));
     return fullWindow() ? t().trends.last30 : t().trends.since(formatDate(props.stats.trackingSince));
@@ -384,7 +385,7 @@ export const Trends: Component<TrendsProps> = (props) => {
             ]}
           />
           <BarChart
-            title={t().trends.byHourTitle(fullWindow() ? null : formatCalendarDay(firstDay()), s().outages)}
+            title={byHourTitle()}
             label={t().trends.byHourLabel}
             bars={hourBars()}
             initial={peakHour(props.stats.last30ByHour)}
@@ -396,6 +397,7 @@ export const Trends: Component<TrendsProps> = (props) => {
       <details class="gg-trends-details">
         <summary>{t().trends.tableLabel}</summary>
         <table class={css.table}>
+          <caption class={css.caption}>{t().trends.chartTitle}</caption>
           <thead>
             <tr>
               <th class={css.th} scope="col">
@@ -425,6 +427,32 @@ export const Trends: Component<TrendsProps> = (props) => {
             </Index>
           </tbody>
         </table>
+        {/* The time-of-day chart's figures, which its readout gives only one hour at a time. */}
+        <Show when={peakHour(props.stats.last30ByHour) >= 0}>
+          <table class={css.table}>
+            <caption class={css.caption}>{byHourTitle()}</caption>
+            <thead>
+              <tr>
+                <th class={css.th} scope="col">
+                  {t().trends.hourCol}
+                </th>
+                <th class={css.th} scope="col">
+                  {t().trends.withoutPower}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <Index each={props.stats.last30ByHour}>
+                {(minutes, hour) => (
+                  <tr>
+                    <td class={css.td}>{hourRange(hour)}</td>
+                    <td class={css.td}>{tileDuration(minutes())}</td>
+                  </tr>
+                )}
+              </Index>
+            </tbody>
+          </table>
+        </Show>
         <a class={css.download} href={CSV_PATH} download={CSV_FILE_NAME}>
           <Download size={14} aria-hidden="true" /> {t().trends.download}
         </a>

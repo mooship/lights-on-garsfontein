@@ -90,7 +90,7 @@ export const af = {
   },
   trends: {
     title: 'Statistiek',
-    tableLabel: 'Wys die weeklikse syfers',
+    tableLabel: 'Wys die syfers',
     refreshFailed: (time: string) => `Kon nie die statistiek bywerk nie. Dit is die syfers soos dit om ${time} was.`,
     // Retried every STATS_POLL_MS (src/lib/poll.ts).
     loadFailed: 'Kon nie die statistiek laai nie. Ons probeer oor ’n paar minute weer.',
@@ -124,6 +124,7 @@ export const af = {
     partial: (day: string) => ` (vanaf ${day})`,
     thisWeek: 'Hierdie week',
     weekCol: 'Week van',
+    hourCol: 'Uur',
     hoursCol: 'Ure sonder krag',
     outagesCol: 'Onderbrekings',
     download: 'Laai alle onderbrekings af (CSV)',

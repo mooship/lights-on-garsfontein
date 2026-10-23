@@ -1033,6 +1033,33 @@ test.describe('outages by time of day', () => {
     await expect(next.and(page.locator('[aria-live]'))).toHaveCount(1);
   });
 
+  for (const locale of LOCALES) {
+    test.describe(`${locale} figures`, () => {
+      test.use({ appLocale: locale });
+
+      // The chart's readout needs the keyboard; the table gives every hour at once.
+      test(`gives the time off by hour as a table too (${locale})`, async ({ page }) => {
+        const m = DICTIONARIES[locale];
+        const u = m.units;
+        await withOutages(page);
+        await page.goto(localePath(locale));
+        await page.getByText(m.trends.tableLabel, { exact: true }).click();
+        await expect(page.getByRole('table', { name: m.trends.chartTitle })).toBeVisible();
+        const table = page.getByRole('table', { name: byHourTitle(locale) });
+        await expect(table.getByRole('columnheader')).toHaveText([m.trends.hourCol, m.trends.withoutPower]);
+        await expect(table.getByRole('row')).toHaveCount(25);
+        const cells = (hour: string) =>
+          table
+            .getByRole('row')
+            .filter({ has: page.getByRole('cell', { name: hour }) })
+            .getByRole('cell');
+        await expect(cells('18:00–19:00')).toHaveText(['18:00–19:00', `1 ${u.h} 30 ${u.min}`]);
+        await expect(cells('19:00–20:00')).toHaveText(['19:00–20:00', `30 ${u.min}`]);
+        await expect(cells('00:00–01:00')).toHaveText(['00:00–01:00', `0 ${u.min}`]);
+      });
+    });
+  }
+
   test.describe('af', () => {
     test.use({ appLocale: 'af' });
 

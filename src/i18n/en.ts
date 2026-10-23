@@ -79,7 +79,7 @@ export const en = {
   },
   trends: {
     title: 'Statistics',
-    tableLabel: 'Show weekly figures',
+    tableLabel: 'Show the figures',
     refreshFailed: (time: string) => `Unable to refresh the statistics. Showing figures as at ${time}.`,
     // Retried every STATS_POLL_MS (src/lib/poll.ts).
     loadFailed: 'Unable to load the statistics. Retrying in a few minutes.',
@@ -110,6 +110,7 @@ export const en = {
     partial: (day: string) => ` (from ${day})`,
     thisWeek: 'This week',
     weekCol: 'Week of',
+    hourCol: 'Hour',
     hoursCol: 'Hours without power',
     outagesCol: 'Outages',
     download: 'Download all outages (CSV)',
