@@ -31,7 +31,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "cf-typegen": "wrangler types worker/worker-configuration.d.ts",
+    "cf-typegen": "wrangler types worker/worker-configuration.d.ts --env-file=.dev.vars.example",
     "hash-password": "node scripts/hash-password.ts",
     "vapid-keys": "node scripts/vapid-keys.ts",
     "og": "node scripts/build-og.ts",
