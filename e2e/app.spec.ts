@@ -1049,6 +1049,47 @@ test.describe('outages by time of day', () => {
         await expect(page.locator('.gg-trends-body')).toContainText(m.trends.typically(`30 ${m.units.min}`));
       });
 
+      const subtitle = (page: Page) => page.locator('.gg-trends-body > p').first();
+      const withCoverage = (page: Page, coverage: number | null) =>
+        withOutages(page, undefined, (stats) => ({ ...stats, last30: { ...stats.last30, coverage } }));
+
+      test(`says how much of the period was measured, as a whole percent (${locale})`, async ({ page }) => {
+        // 0.57 * 100 is 56.99999999999999 in floating point.
+        await withCoverage(page, 0.57);
+        await page.goto(localePath(locale));
+        await expect(subtitle(page)).toHaveText(
+          `${DICTIONARIES[locale].trends.last30} ${DICTIONARIES[locale].trends.measured(57)}`,
+        );
+      });
+
+      test(`says nothing about measurement while it is unknown (${locale})`, async ({ page }) => {
+        await withCoverage(page, null);
+        await page.goto(localePath(locale));
+        await expect(subtitle(page)).toHaveText(DICTIONARIES[locale].trends.last30);
+      });
+
+      // A cached response from before the field existed must not read "NaN% measured".
+      test(`says nothing about measurement when the statistics predate it (${locale})`, async ({ page }) => {
+        await withOutages(page, undefined, (stats) => {
+          const { coverage: _, ...older } = stats.last30;
+          return { ...stats, last30: older as typeof stats.last30 };
+        });
+        await page.goto(localePath(locale));
+        await expect(subtitle(page)).toHaveText(DICTIONARIES[locale].trends.last30);
+      });
+
+      test(`keeps the measured sentence on one line at 320px (${locale})`, async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 800 });
+        await withCoverage(page, 0.9687);
+        await page.goto(localePath(locale));
+        await expect(subtitle(page)).toContainText(DICTIONARIES[locale].trends.measured(96));
+        const { height, lineHeight } = await subtitle(page).evaluate((el) => ({
+          height: el.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(getComputedStyle(el).lineHeight),
+        }));
+        expect(height).toBeLessThan(lineHeight * 1.5);
+      });
+
       // The chart's readout needs the keyboard; the table gives every hour at once.
       test(`gives the time off by hour as a table too (${locale})`, async ({ page }) => {
         const m = DICTIONARIES[locale];

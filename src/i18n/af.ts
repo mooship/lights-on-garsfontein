@@ -99,6 +99,8 @@ export const af = {
     startsOn: (date: string) => `Die rekord begin op ${date}.`,
     since: (date: string) => `Sedert ${date}.`,
     last30: 'Afgelope 30 dae.',
+    // WindowStats.coverage, floored to a whole percent; the README's GET /api/stats row defines it.
+    measured: (percent: number) => `${percent}% gemeet.`,
     withoutPower: 'Tyd sonder krag',
     outages: 'Onderbrekings',
     planned: (n: number) => `${n} beplan`,
@@ -136,6 +138,7 @@ export const af = {
       'Beplande onderbrekings is ingesluit.',
       '’n Dag tel as daar op enige tydstip daardie dag ’n onderbreking was.',
       'Die syfers dek net onderbrekings wat by die meetpunt aangeteken is.',
+      '‘Gemeet’ is die deel van die tydperk met ’n intydse lesing. Tyd sonder ’n lesing tel nie as tyd sonder krag nie.',
     ],
   },
   // The alerts bell (src/components/AlertsBell.tsx) and card (AlertsCard.tsx). The bell's name is

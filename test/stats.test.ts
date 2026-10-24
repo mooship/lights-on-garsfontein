@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  COVERAGE_SINCE,
   DAY_MS,
   HOUR_MS as H,
   MINUTE_MS,
@@ -62,6 +63,7 @@ describe('windowStats', () => {
       daysTracked: 5,
       daysWithOutage: 2,
       plannedOutages: 0,
+      coverage: null,
     });
   });
 
@@ -177,6 +179,52 @@ describe('windowStats', () => {
 
   it('reports null availability before tracking starts', () => {
     expect(windowStats([], since - 48 * H, since - 24 * H, since).availability).toBeNull();
+  });
+
+  describe('coverage', () => {
+    const from = t('2026-11-01T00:00:00Z');
+    const to = t('2026-11-02T00:00:00Z');
+    const gap = (start: string, end: string) => ({ startTime: start, endTime: end });
+    const cov = (gaps: { startTime: string; endTime: string }[], coverageSince = since) =>
+      windowStats([], from, to, since, [], { gaps: mergeOutages(gaps, to), since: coverageSince }).coverage;
+
+    it('is the whole window without gaps', () => {
+      expect(cov([])).toBe(1);
+    });
+
+    it('counts overlapping gaps once', () => {
+      const gaps = [
+        gap('2026-11-01T08:00:00Z', '2026-11-01T12:00:00Z'),
+        gap('2026-11-01T10:00:00Z', '2026-11-01T14:00:00Z'),
+      ];
+      expect(cov(gaps)).toBe(0.75);
+    });
+
+    it('counts only the part of a gap inside the window', () => {
+      expect(cov([gap('2026-10-31T18:00:00Z', '2026-11-01T06:00:00Z')])).toBe(0.75);
+    });
+
+    it('is zero, never negative, when a gap covers the whole window', () => {
+      expect(cov([gap('2026-10-31T00:00:00Z', '2026-11-03T00:00:00Z')])).toBe(0);
+    });
+
+    it('rounds down, so it never claims full coverage it lacks', () => {
+      expect(cov([gap('2026-11-01T08:00:00.000Z', '2026-11-01T08:00:00.001Z')])).toBe(0.9999);
+    });
+
+    it('rounds an exact share exactly, despite floating point', () => {
+      // 15 638 400 ms of 86 400 000 leaves exactly 0.819; 1 - 0.181 alone gives 0.8189.
+      expect(cov([gap('2026-11-01T00:00:00.000Z', new Date(from + 15_638_400).toISOString())])).toBe(0.819);
+    });
+
+    it('is unknown for a window starting before pause history began', () => {
+      expect(cov([], t('2026-11-01T12:00:00Z'))).toBeNull();
+    });
+
+    it('is unknown without gaps to go on, or without tracked time', () => {
+      expect(windowStats([], from, to, since).coverage).toBeNull();
+      expect(windowStats([], from, from, since, [], { gaps: [], since }).coverage).toBeNull();
+    });
   });
 });
 
@@ -395,6 +443,23 @@ describe('GET /api/stats over time', () => {
 
   const stats = async () => (await (await call(STATS_PATH)).json()) as StatsResponse;
 
+  it('counts pauses and false positives the sensor raised as unmeasured, but not manual ones', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(t(COVERAGE_SINCE) + 10 * DAY_MS);
+    const now = Date.now();
+    const ago = (ms: number) => new Date(now - ms).toISOString();
+    await insertOutage({ startTime: ago(48 * H), endTime: ago(47 * H), source: 'sensor', isFalsePositive: 1 });
+    await insertOutage({ startTime: ago(24 * H), endTime: ago(23 * H), source: 'manual', isFalsePositive: 1 });
+    await env.DB.prepare('INSERT INTO sensor_pauses (start_time, end_time) VALUES (?, ?)')
+      .bind(ago(5 * H), ago(4 * H))
+      .run();
+    const body = await stats();
+    expect(body.coverageSince).toBe(new Date(COVERAGE_SINCE).toISOString());
+    expect(body.last7.coverage).toBe(Math.floor((1 - 2 / (7 * 24)) * 10_000) / 10_000);
+    // It starts before pause history began.
+    expect(body.last30.coverage).toBeNull();
+  });
+
   it('has no previous 30 days to compare until 60 days are on record', async () => {
     daysTracked(59);
     expect((await stats()).previous30).toBeNull();
@@ -425,6 +490,7 @@ describe('GET /api/stats over time', () => {
     const body = await stats();
     for (const key of [
       'trackingSince',
+      'coverageSince',
       'last7',
       'last30',
       'last365',
@@ -446,6 +512,7 @@ describe('GET /api/stats over time', () => {
       'daysTracked',
       'daysWithOutage',
       'plannedOutages',
+      'coverage',
     ]) {
       expect(body.last30, key).toHaveProperty(key);
     }

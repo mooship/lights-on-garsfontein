@@ -17,8 +17,8 @@ tests {
   });
 
   test('stats shape', () => {
-    expect(res.getBody()).to.have.all.keys('trackingSince', 'last7', 'last30', 'last365', 'previous30', 'weeks', 'last30ByHour', 'generatedAt');
+    expect(res.getBody()).to.have.all.keys('trackingSince', 'coverageSince', 'last7', 'last30', 'last365', 'previous30', 'weeks', 'last30ByHour', 'generatedAt');
     expect(res.getBody().last30ByHour).to.have.lengthOf(24);
-    expect(res.getBody().last30).to.include.keys('longestMinutes', 'medianMinutes');
+    expect(res.getBody().last30).to.include.keys('longestMinutes', 'medianMinutes', 'coverage');
   });
 }
