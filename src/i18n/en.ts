@@ -88,6 +88,7 @@ export const en = {
     startsOn: (date: string) => `Records begin on ${date}.`,
     since: (date: string) => `Since ${date}.`,
     last30: 'Last 30 days.',
+    measured: (percent: number) => `${percent}% measured.`,
     withoutPower: 'Time without power',
     outages: 'Outages',
     planned: (n: number) => `${n} planned`,
@@ -121,6 +122,7 @@ export const en = {
       'Planned outages are included.',
       'A day counts if any part of it had an outage.',
       'The figures cover only outages recorded at the measuring point.',
+      '‘Measured’ is the share of the period with a live reading; time without one counts as neither on nor off.',
     ],
   },
   alerts: {

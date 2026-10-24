@@ -324,7 +324,12 @@ export const Trends: Component<TrendsProps> = (props) => {
   const byHourTitle = () => t().trends.byHourTitle(fullWindow() ? null : formatCalendarDay(firstDay()), s().outages);
   const subtitle = () => {
     if (!started()) return t().trends.startsOn(formatDate(props.stats.trackingSince));
-    return fullWindow() ? t().trends.last30 : t().trends.since(formatDate(props.stats.trackingSince));
+    const period = fullWindow() ? t().trends.last30 : t().trends.since(formatDate(props.stats.trackingSince));
+    const coverage = s().coverage;
+    // From whole ten-thousandths, as the API rounds them: 0.57 * 100 alone is 56.99999999999999.
+    return coverage === null
+      ? period
+      : `${period} ${t().trends.measured(Math.floor(Math.round(coverage * 10_000) / 100))}`;
   };
 
   return (
