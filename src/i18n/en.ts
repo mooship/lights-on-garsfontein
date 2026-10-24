@@ -122,7 +122,7 @@ export const en = {
       'Planned outages are included.',
       'A day counts if any part of it had an outage.',
       'The figures cover only outages recorded at the measuring point.',
-      '‘Measured’ is the share of the period with a live reading; time without one counts as neither on nor off.',
+      '‘Measured’ is the share of the period with a live reading. Time without one is not counted as time without power.',
     ],
   },
   alerts: {

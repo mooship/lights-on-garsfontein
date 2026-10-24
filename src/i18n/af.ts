@@ -138,7 +138,7 @@ export const af = {
       'Beplande onderbrekings is ingesluit.',
       '’n Dag tel as daar op enige tydstip daardie dag ’n onderbreking was.',
       'Die syfers dek net onderbrekings wat by die meetpunt aangeteken is.',
-      '‘Gemeet’ is die deel van die tydperk met ’n lewendige lesing; tyd sonder een tel as nóg aan nóg af.',
+      '‘Gemeet’ is die deel van die tydperk met ’n intydse lesing. Tyd sonder ’n lesing tel nie as tyd sonder krag nie.',
     ],
   },
   // The alerts bell (src/components/AlertsBell.tsx) and card (AlertsCard.tsx). The bell's name is

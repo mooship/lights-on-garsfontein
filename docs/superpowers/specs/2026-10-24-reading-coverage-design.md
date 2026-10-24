@@ -1,6 +1,6 @@
 # Reading coverage: design
 
-**Status:** awaiting the operator's review.
+**Status:** approved 24 October 2026; built in the pull request for `feat/reading-coverage`.
 
 24 October 2026. The operator chose this from a shortlist and asked Claude to "handle this intelligently", so the decisions below are Claude's, made under the rules in AGENTS.md. Each says why.
 
@@ -40,7 +40,7 @@ The statistics count every hour since records began as either off (inside an out
 
 4. **Rounding.** `coverage` is a 0–1 share to four decimals, like `availability`, rounded down at the fourth decimal. The card floors it to a whole percent.
 
-5. **Wording.** "measured" / "gemeet", the plain word for what the figure is. "How we measure" gets one more bullet: "‘Measured’ is the share of the period with a live reading; time without one counts as neither on nor off." In Afrikaans: "‘Gemeet’ is die deel van die tydperk met ’n lewendige lesing; tyd sonder een tel as nóg aan nóg af."
+5. **Wording.** "measured" / "gemeet", the plain word for what the figure is. "How we measure" gets one more bullet: "‘Measured’ is the share of the period with a live reading. Time without one is not counted as time without power." In Afrikaans: "‘Gemeet’ is die deel van die tydperk met ’n intydse lesing. Tyd sonder ’n lesing tel nie as tyd sonder krag nie." (Revised after review: the first wording overstated, since `availability` still counts that time as on, and `lewendige` reads as animated.)
 
 ## Design
 

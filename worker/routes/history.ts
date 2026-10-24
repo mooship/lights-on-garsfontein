@@ -67,7 +67,7 @@ async function getStats({ db }: RouteContext): Promise<Response> {
     last30ByHour: hourlyMinutes(intervals, now - 30 * DAY_MS, now, since),
     generatedAt: new Date(now).toISOString(),
   };
-  // Changes only when an outage starts or ends, so a minute of caching is harmless.
+  // Changes only when an outage or a pause starts or ends, so a minute of caching is harmless.
   return json(body, 200, { 'Cache-Control': publicCache(MINUTE_MS) });
 }
 

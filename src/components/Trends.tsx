@@ -327,7 +327,8 @@ export const Trends: Component<TrendsProps> = (props) => {
     const period = fullWindow() ? t().trends.last30 : t().trends.since(formatDate(props.stats.trackingSince));
     const coverage = s().coverage;
     // From whole ten-thousandths, as the API rounds them: 0.57 * 100 alone is 56.99999999999999.
-    return coverage === null
+    // Not just null: a response cached from before the field existed has none.
+    return typeof coverage !== 'number'
       ? period
       : `${period} ${t().trends.measured(Math.floor(Math.round(coverage * 10_000) / 100))}`;
   };

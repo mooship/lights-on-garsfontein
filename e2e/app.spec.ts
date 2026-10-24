@@ -1068,6 +1068,16 @@ test.describe('outages by time of day', () => {
         await expect(subtitle(page)).toHaveText(DICTIONARIES[locale].trends.last30);
       });
 
+      // A cached response from before the field existed must not read "NaN% measured".
+      test(`says nothing about measurement when the statistics predate it (${locale})`, async ({ page }) => {
+        await withOutages(page, undefined, (stats) => {
+          const { coverage: _, ...older } = stats.last30;
+          return { ...stats, last30: older as typeof stats.last30 };
+        });
+        await page.goto(localePath(locale));
+        await expect(subtitle(page)).toHaveText(DICTIONARIES[locale].trends.last30);
+      });
+
       test(`keeps the measured sentence on one line at 320px (${locale})`, async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 800 });
         await withCoverage(page, 0.9687);
