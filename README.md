@@ -24,10 +24,10 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 Embed the status badge, in Afrikaans (`/badge.svg`) or English (`/en/badge.svg`):
 
 ```html
-<a href="https://garsfontein.timothybrits.co.za"><img src="https://garsfontein.timothybrits.co.za/badge.svg" alt="Lights On, Garsfontein?" height="20"></a>
+<a href="https://garsfontein.timothybrits.co.za"><img src="https://garsfontein.timothybrits.co.za/badge.svg" alt="Lights On, Garsfontein?" height="20" style="max-width:100%;height:auto"></a>
 ```
 
-It words the status as the site does: green for on, red for off, and grey for "No outage reported" whenever no live reading backs the status. Browsers may show it up to a minute late. Each language has its own path because the edge cache ignores query strings.
+It words the status as the site does: green for on, red for off, and grey for "No outage reported" whenever no live reading backs the status. Browsers keep their copy for a minute, on top of the short copy at the edge (`STATUS_EDGE_TTL_SECONDS`), so the badge can lag the site by a little over a minute. Its width stays the same whatever the status, so the page around it does not move. Each language has its own path because the edge cache ignores query strings.
 
 ### API
 

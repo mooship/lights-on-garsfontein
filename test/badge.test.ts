@@ -51,6 +51,22 @@ describe('GET /badge.svg', () => {
     expect(await badge()).toContain(DICTIONARIES.af.status.ON);
   });
 
+  // A fixed width, so a page showing it does not shift when the status changes.
+  it('keeps the same width in every state', async () => {
+    // The writes below go straight to D1, which purges nothing, so each read skips the edge copy.
+    const width = async () => {
+      await caches.default.delete(`${env.SITE_URL}${badgePath('af')}`);
+      return (await badge()).match(/^<svg [^>]*width="(\d+)"/)?.[1];
+    };
+    const none = await width();
+    await setHeartbeat(30);
+    const on = await width();
+    await insertOutage({});
+    const off = await width();
+    expect(none).toBeDefined();
+    expect([on, off]).toEqual([none, none]);
+  });
+
   it('shares the status rate limit', async () => {
     const limiter = stubLimiter();
     expect((await call(badgePath('en'), { env: { ...env, STATUS_LIMITER: limiter } })).status).toBe(429);

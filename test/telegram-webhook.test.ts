@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { ERROR } from '../shared/errors';
-import { STATUS_PATH, TELEGRAM_WEBHOOK_PATH } from '../shared/paths';
+import { badgePath, LIVE_VIEWS, TELEGRAM_WEBHOOK_PATH } from '../shared/paths';
 import { admin } from '../src/admin/copy';
+import { DICTIONARIES } from '../src/i18n';
 import { HEARTBEAT_ROW_ID } from '../worker/db/schema';
 import { MAX_BODY_BYTES } from '../worker/lib/http';
 import { TELEGRAM_SECRET_HEADER } from '../worker/routes/telegram';
@@ -98,11 +99,12 @@ describe('the Telegram webhook', () => {
   it('shows a pause on the site at once', async () => {
     await setHeartbeat(30);
     expect((await getStatus()).monitored).toBe(true);
-    // The status is now in the edge cache.
-    expect((await call(STATUS_PATH)).status).toBe(200);
+    // The status and the badges are now in the edge cache.
+    for (const path of LIVE_VIEWS) expect((await call(path)).status, path).toBe(200);
 
     expect((await send(update('/pause 3h'))).status).toBe(200);
 
     expect((await getStatus()).monitored).toBe(false);
+    expect(await (await call(badgePath('af'))).text()).toContain(DICTIONARIES.af.status.NONE);
   });
 });
