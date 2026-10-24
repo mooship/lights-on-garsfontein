@@ -105,6 +105,8 @@ export interface WindowStats {
   /** How many of those days had at least one outage. */
   daysWithOutage: number;
   plannedOutages: number;
+  /** Share of the window with a live reading (0–1, rounded down to four decimals); null when it starts before COVERAGE_SINCE. */
+  coverage: number | null;
 }
 
 /** One Monday-to-Sunday week, its figures as in WindowStats; the current week runs only until now. */
@@ -116,6 +118,8 @@ export type WeekStats = Pick<WindowStats, 'hoursOff' | 'minutesOff' | 'outages'>
 export interface StatsResponse {
   /** No statistic counts time before this (TRACKING_SINCE). */
   trackingSince: string;
+  /** Windows starting before this have no coverage (COVERAGE_SINCE). */
+  coverageSince: string;
   /** The 7, 30 and 365 days up to `generatedAt`. */
   last7: WindowStats;
   last30: WindowStats;
@@ -192,6 +196,9 @@ export const silentSince = (lastSeen: string, pausedUntil: string | null) =>
 
 /** Statistics never count time before this. */
 export const TRACKING_SINCE = site.trackingSince;
+
+/** Reading coverage is known only for windows starting from this. */
+export const COVERAGE_SINCE = site.coverageSince;
 
 /** The download name of the CSV at CSV_PATH (shared/paths.ts). */
 export const CSV_FILE_NAME = `${site.slug}-outages.csv`;

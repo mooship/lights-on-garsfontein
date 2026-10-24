@@ -45,6 +45,13 @@ function medianOf(sorted: number[]): number | null {
   return sorted.length % 2 ? upper : ((sorted[mid - 1] ?? 0) + upper) / 2;
 }
 
+/** Share of [start, to) outside the gaps, rounded down to four decimals so it never overclaims. */
+function coverageOf(coverage: { gaps: Interval[]; since: number } | undefined, start: number, to: number) {
+  if (!coverage || to <= start || start < coverage.since) return null;
+  const unmeasured = coverage.gaps.reduce((sum, gap) => sum + overlap(gap, start, to), 0);
+  return Math.floor((1 - unmeasured / (to - start)) * 10_000) / 10_000;
+}
+
 function overlap(i: Interval, from: number, to: number): number {
   return Math.max(0, Math.min(i.end, to) - Math.max(i.start, from));
 }
@@ -53,6 +60,8 @@ function overlap(i: Interval, from: number, to: number): number {
  * Statistics for [from, to), never counting time before `trackingSince`. `intervals` must be
  * sorted and non-overlapping, as `mergeOutages` returns them.
  * `planned` holds the planned outages (already merged) so they can be counted separately.
+ * `coverage.gaps` (merged) is the time without a live reading; without it, or for a window starting
+ * before `coverage.since`, coverage is unknown.
  */
 export function windowStats(
   intervals: Interval[],
@@ -60,6 +69,7 @@ export function windowStats(
   to: number,
   trackingSince: number,
   planned: Interval[] = [],
+  coverage?: { gaps: Interval[]; since: number },
 ): WindowStats {
   const start = Math.max(from, trackingSince);
   const tracked = Math.max(0, to - start);
@@ -99,6 +109,7 @@ export function windowStats(
     daysTracked,
     daysWithOutage,
     plannedOutages: planned.filter((i) => overlap(i, start, to) > 0).length,
+    coverage: coverageOf(coverage, start, to),
   };
 }
 

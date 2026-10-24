@@ -34,6 +34,11 @@ export const site = {
   securityTxtExpires: '2027-04-19T00:00:00.000Z',
   /** When records begin; nothing before it counts as tracked time. */
   trackingSince: '2026-10-17T00:00:00+02:00',
+  /**
+   * When pause history begins, so reading coverage is known only for windows starting from then. A new
+   * deployment sets it to trackingSince; never earlier than the release that added the history.
+   */
+  coverageSince: '2026-10-25T00:00:00+02:00',
   /** IANA zone for every displayed date and time. */
   timeZone: 'Africa/Johannesburg',
   /**

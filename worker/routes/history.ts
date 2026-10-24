@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, isNull, or } from 'drizzle-orm';
 import {
+  COVERAGE_SINCE,
   CSV_FILE_NAME,
   DAY_MS,
   MINUTE_MS,
@@ -12,7 +13,7 @@ import { formatDurationIn } from '../../shared/format';
 import { CSV_PATH, FEED_PATH, OUTAGES_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n/index';
-import { outages } from '../db/schema';
+import { outages, sensorPauses } from '../db/schema';
 import { SUMMARY_COLUMNS, summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
@@ -34,11 +35,30 @@ async function getStats({ db }: RouteContext): Promise<Response> {
     rows.filter((r) => r.isPlanned),
     now,
   );
+  // Time without a live reading: pauses, and silences the sensor raised that proved false.
+  const [pauses, falseSilences] = await Promise.all([
+    db
+      .select({ startTime: sensorPauses.startTime, endTime: sensorPauses.endTime })
+      .from(sensorPauses)
+      .where(gte(sensorPauses.endTime, earliest)),
+    db
+      .select({ startTime: outages.startTime, endTime: outages.endTime })
+      .from(outages)
+      .where(
+        and(
+          eq(outages.isFalsePositive, true),
+          eq(outages.source, 'sensor'),
+          or(isNull(outages.endTime), gte(outages.endTime, earliest)),
+        ),
+      ),
+  ]);
+  const coverage = { gaps: mergeOutages([...pauses, ...falseSilences], now), since: Date.parse(COVERAGE_SINCE) };
   const window = (days: number, offsetDays = 0) =>
-    windowStats(intervals, now - (days + offsetDays) * DAY_MS, now - offsetDays * DAY_MS, since, planned);
+    windowStats(intervals, now - (days + offsetDays) * DAY_MS, now - offsetDays * DAY_MS, since, planned, coverage);
 
   const body: StatsResponse = {
     trackingSince: new Date(since).toISOString(),
+    coverageSince: new Date(coverage.since).toISOString(),
     last7: window(7),
     last30: window(30),
     last365: window(365),
