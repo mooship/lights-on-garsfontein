@@ -1,7 +1,7 @@
 // The owner's Telegram commands. Only the owner's chat reaches these (worker/routes/telegram.ts),
 // so the replies may say how an outage was recorded.
 
-import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
+import { badgeState, DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { formatDurationIn } from '../../shared/format';
 import { admin } from '../../src/admin/copy';
 import { sensorState } from '../../src/admin/sensor';
@@ -45,8 +45,7 @@ export async function runCommand(text: string, db: Db, now: Date): Promise<{ tex
 
 async function statusText(db: Db, now: Date): Promise<string> {
   const { grid, heartbeat, open } = await readGridState(db, now);
-  // Unless the sensor vouches for it, ON claims only that no outage has been reported.
-  const lines = [grid.status === 'OFF' ? statusCopy.OFF : grid.monitored ? statusCopy.ON : statusCopy.NONE];
+  const lines = [statusCopy[badgeState(grid.status, grid.monitored)]];
 
   const state = sensorState(heartbeat ?? null, now.getTime());
   if (state.kind === 'never') lines.push(sensorCopy.never);

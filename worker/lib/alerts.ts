@@ -1,11 +1,12 @@
 import { and, asc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
-import { MINUTE_MS, SECOND_MS } from '../../shared/api';
-import { formatDurationIn, formatTimeOfDay } from '../../shared/format';
+import { MINUTE_MS, outageDurationMs, SECOND_MS } from '../../shared/api';
+import { formatLasted, formatTimeOfDay } from '../../shared/format';
 import { localePath } from '../../shared/locale';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n/index';
 import type { Db } from '../db/client';
 import { type Outage, outages, pushSubscriptions } from '../db/schema';
+import { isPublic } from './grid';
 
 /** `dismissed` follows an `off` for an outage later found to be a false positive, replacing it on screen. */
 export type AlertKind = 'off' | 'on' | 'dismissed';
@@ -35,11 +36,7 @@ export function alertMessage(
   }
   if (kind === 'dismissed') return { ...base, ...push.dismissed };
   if (!outage.endTime) throw new Error('An on alert needs an outage that has ended');
-  // "2 h 13 min", "26 h" or "7 min": an alert needs no seconds or days.
-  const lasted = formatDurationIn(Date.parse(outage.endTime) - Date.parse(outage.startTime), units, {
-    days: false,
-    seconds: false,
-  });
+  const lasted = formatLasted(outageDurationMs(outage, 0), units);
   return { ...base, title: push.on.title, body: push.on.body(formatTime(outage.endTime, locale), lasted) };
 }
 
@@ -102,26 +99,12 @@ export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
     db
       .update(outages)
       .set({ offAlertAt: claimedAt })
-      .where(
-        and(
-          isNull(outages.endTime),
-          eq(outages.isFalsePositive, false),
-          isNull(outages.offAlertAt),
-          lte(outages.startTime, dueBefore),
-        ),
-      )
+      .where(and(isNull(outages.endTime), isPublic, isNull(outages.offAlertAt), lte(outages.startTime, dueBefore)))
       .returning({ id: outages.id }),
     db
       .update(outages)
       .set({ onAlertAt: claimedAt })
-      .where(
-        and(
-          isNotNull(outages.endTime),
-          eq(outages.isFalsePositive, false),
-          isNotNull(outages.offAlertAt),
-          isNull(outages.onAlertAt),
-        ),
-      )
+      .where(and(isNotNull(outages.endTime), isPublic, isNotNull(outages.offAlertAt), isNull(outages.onAlertAt)))
       .returning({ id: outages.id }),
     db
       .update(outages)

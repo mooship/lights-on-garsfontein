@@ -1,14 +1,15 @@
 // The owner's private Telegram alerts: one chat, set by the TELEGRAM_* secrets, never residents.
 // They follow the push claims (worker/lib/alerts.ts), so both always tell the same story.
 
-import { formatDurationIn, formatTimeOfDay } from '../../shared/format';
+import { outageDurationMs } from '../../shared/api';
+import { formatLasted, formatTimeOfDay } from '../../shared/format';
 import { site } from '../../site.config';
 import { admin } from '../../src/admin/copy';
 import { DICTIONARIES } from '../../src/i18n/index';
 import { createDb } from '../db/client';
 import type { Outage } from '../db/schema';
 import { type AlertKind, loadDueOutage, retryAlert, type TelegramAlert } from './alerts';
-import { FETCH_TIMEOUT_MS } from './http';
+import { errorName, FETCH_TIMEOUT_MS, isTransient } from './http';
 
 export const TELEGRAM_HOST = 'api.telegram.org';
 
@@ -41,12 +42,16 @@ export function telegramText(
       : telegram.dismissed.plain;
   }
   if (!outage.endTime) throw new Error('An on message needs an outage that has ended');
-  const lasted = formatDurationIn(Date.parse(outage.endTime) - Date.parse(outage.startTime), DICTIONARIES.en.units, {
-    days: false,
-    seconds: false,
-  });
+  const lasted = formatLasted(outageDurationMs(outage, 0), DICTIONARIES.en.units);
   return telegram.on(formatAt(outage.endTime, now), lasted);
 }
+
+/** A sendMessage body for the owner's chat; link previews off, as no message needs one. */
+export const telegramMessage = (chatId: unknown, text: string) => ({
+  chat_id: chatId,
+  text,
+  link_preview_options: { is_disabled: true },
+});
 
 /**
  * Sends one alert to the owner. A 429, a 5xx or a failed fetch goes back on the queue, waiting longer
@@ -64,23 +69,18 @@ export async function deliverTelegramAlert(alert: TelegramAlert, env: Env, now: 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      body: JSON.stringify({
-        chat_id: env.TELEGRAM_CHAT_ID,
-        text: telegramText(alert.kind, outage, now),
-        link_preview_options: { is_disabled: true },
-      }),
+      body: JSON.stringify(telegramMessage(env.TELEGRAM_CHAT_ID, telegramText(alert.kind, outage, now))),
     });
     status = response.status;
     if (response.ok) return;
-    if (status !== 429 && status < 500) {
+    if (!isTransient(status)) {
       // A body that is not JSON still leaves the status to log.
       const { description } = await response.json<{ description?: string }>().catch(() => ({ description: '' }));
       console.warn(`Dropped a Telegram alert: Telegram answered ${status} (${description})`);
       return;
     }
   } catch (error) {
-    // The error's message may quote the URL, and with it the token.
-    console.warn(`Telegram send failed: ${error instanceof Error ? error.name : typeof error}`);
+    console.warn(`Telegram send failed: ${errorName(error)}`);
   }
 
   if (!(await retryAlert(env.PUSH_QUEUE, alert))) {

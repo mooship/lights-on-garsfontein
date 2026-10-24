@@ -3,6 +3,7 @@ import { refuseBadToken } from '../lib/auth';
 import { safeEqual } from '../lib/crypto';
 import { errors, json, readCappedText } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
+import { telegramMessage } from '../lib/telegram';
 import { runCommand } from '../lib/telegram-commands';
 
 /** Telegram sends the `secret_token` given to setWebhook in this header (README, Owner alerts on Telegram). */
@@ -37,12 +38,7 @@ async function postUpdate({ request, env, db }: RouteContext): Promise<Response>
   }
   const { text, statusChanged } = await runCommand(message.text, db, new Date());
   if (statusChanged) await purgeEdgeCache(new URL(request.url).origin, LIVE_VIEWS);
-  return json({
-    method: 'sendMessage',
-    chat_id: message.chat?.id,
-    text,
-    link_preview_options: { is_disabled: true },
-  });
+  return json({ method: 'sendMessage', ...telegramMessage(message.chat?.id, text) });
 }
 
 export const telegramRoutes: Routes = {

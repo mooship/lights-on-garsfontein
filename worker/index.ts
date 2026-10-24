@@ -4,7 +4,7 @@ import { createDb } from './db/client';
 import { type AlertJob, claimAlerts, enqueueAlerts, retryAlert } from './lib/alerts';
 import { deliverAlertPage } from './lib/deliver';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
-import { errors } from './lib/http';
+import { errorName, errors } from './lib/http';
 import { dispatch, purgeEdgeCache } from './lib/router';
 import { deliverTelegramAlert, telegramConfigured } from './lib/telegram';
 import { routes } from './routes';
@@ -71,11 +71,9 @@ export default {
         if ('channel' in job) await deliverTelegramAlert(job, env, new Date());
         else await deliverAlertPage(job, env, new Date());
       } catch (error) {
-        // Only the name: a message can quote an endpoint or the Telegram token.
-        const name = error instanceof Error ? error.name : typeof error;
         const retried = await retryAlert(env.PUSH_QUEUE, job);
         console.warn(
-          `An alert job failed (${name}); ${retried ? 'retrying' : `gave up after ${job.attempt} attempts`}`,
+          `An alert job failed (${errorName(error)}); ${retried ? 'retrying' : `gave up after ${job.attempt} attempts`}`,
         );
       }
       message.ack();

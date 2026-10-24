@@ -3,7 +3,7 @@ import { badgePath } from '../../shared/paths';
 import { type Locale, site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n/index';
 import { PALETTE } from '../../src/styles/palette';
-import { getGridState } from '../lib/grid';
+import { readLiveState } from '../lib/grid';
 import { publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { escapeXml } from '../lib/xml';
@@ -38,7 +38,7 @@ const badge = (locale: Locale) => {
   const words = DICTIONARIES[locale].status;
   const valueBox = Math.max(...BADGE_STATES.map((s) => textWidth(words[s]))) + 2 * PAD;
   return async ({ db }: RouteContext): Promise<Response> => {
-    const { status, monitored } = await getGridState(db, new Date());
+    const { status, monitored } = await readLiveState(db, new Date());
     const state = badgeState(status, monitored);
     return new Response(svg(site.brand.full, words[state], state, valueBox), {
       headers: {

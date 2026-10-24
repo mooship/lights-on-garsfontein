@@ -58,3 +58,6 @@ export function formatDurationIn(
   if (minutes > 0 || !showSeconds) return `${minutes} ${u.min}`;
   return `${seconds} ${u.s}`;
 }
+
+/** How long an outage lasted, as alerts and the feed word it: "2 h 13 min", "26 h" or "7 min". */
+export const formatLasted = (ms: number, u: DurationUnits) => formatDurationIn(ms, u, { days: false, seconds: false });

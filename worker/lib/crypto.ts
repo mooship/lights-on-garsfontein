@@ -1,20 +1,10 @@
 // The extension, because scripts/hash-password.ts runs this module in Node.
-import { toBase64Url } from '../../shared/base64url.ts';
+import { fromBase64Url, toBase64, toBase64Url } from '../../shared/base64url.ts';
 
 const encoder = new TextEncoder();
 
 // Cloudflare Workers caps PBKDF2 at 100k iterations.
 const PBKDF2_ITERATIONS = 100_000;
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary);
-}
-
-function fromBase64(value: string): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
-}
 
 /** Hand-rolled: scripts/hash-password.ts runs this module in Node, which lacks Workers' `timingSafeEqual`. */
 function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -65,7 +55,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const iterations = Number(iter);
   if (scheme !== 'pbkdf2_sha256' || !salt || !expected) return false;
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > PBKDF2_ITERATIONS) return false;
-  const actual = await pbkdf2(password, fromBase64(salt), iterations);
-  const expectedBytes = fromBase64(expected);
+  const actual = await pbkdf2(password, fromBase64Url(salt), iterations);
+  const expectedBytes = fromBase64Url(expected);
   return constantTimeEqual(actual, expectedBytes);
 }
