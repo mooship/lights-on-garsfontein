@@ -49,7 +49,8 @@ function medianOf(sorted: number[]): number | null {
 function coverageOf(coverage: { gaps: Interval[]; since: number } | undefined, start: number, to: number) {
   if (!coverage || to <= start || start < coverage.since) return null;
   const unmeasured = coverage.gaps.reduce((sum, gap) => sum + overlap(gap, start, to), 0);
-  return Math.floor((1 - unmeasured / (to - start)) * 10_000) / 10_000;
+  // Whole milliseconds times 10 000 stay exact integers; 1 - unmeasured / total can land just under one.
+  return Math.floor(((to - start - unmeasured) * 10_000) / (to - start)) / 10_000;
 }
 
 function overlap(i: Interval, from: number, to: number): number {

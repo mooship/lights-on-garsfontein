@@ -212,6 +212,11 @@ describe('windowStats', () => {
       expect(cov([gap('2026-11-01T08:00:00.000Z', '2026-11-01T08:00:00.001Z')])).toBe(0.9999);
     });
 
+    it('rounds an exact share exactly, despite floating point', () => {
+      // 15 638 400 ms of 86 400 000 leaves exactly 0.819; 1 - 0.181 alone gives 0.8189.
+      expect(cov([gap('2026-11-01T00:00:00.000Z', new Date(from + 15_638_400).toISOString())])).toBe(0.819);
+    });
+
     it('is unknown for a window starting before pause history began', () => {
       expect(cov([], t('2026-11-01T12:00:00Z'))).toBeNull();
     });
