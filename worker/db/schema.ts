@@ -17,6 +17,15 @@ export const heartbeats = sqliteTable('heartbeats', {
   pausedUntil: text('paused_until'),
 });
 
+/** Every pause, for the statistics' reading coverage; `heartbeats.pausedUntil` alone drives detection. */
+export const sensorPauses = sqliteTable('sensor_pauses', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** ISO 8601 UTC, when the pause was set. */
+  startTime: text('start_time').notNull(),
+  /** When it ends or ended: its `until`, moved earlier by a resume or later by a longer pause. */
+  endTime: text('end_time').notNull(),
+});
+
 export const outages = sqliteTable(
   'outages',
   {

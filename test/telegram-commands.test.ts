@@ -96,6 +96,8 @@ describe('/pause', () => {
 
     expect(reply).toEqual({ text: telegram.paused(formatAt(until, now)), statusChanged: true });
     expect(await pausedUntil()).toBe(until);
+    const history = await env.DB.prepare('SELECT end_time FROM sensor_pauses').all<{ end_time: string }>();
+    expect(history.results).toEqual([{ end_time: until }]);
   });
 
   it('answers with the usage and changes nothing for a missing, malformed or too long duration', async () => {

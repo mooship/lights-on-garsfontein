@@ -346,8 +346,62 @@ describe('POST /api/heartbeat/pause', () => {
       (r) => r.start_time,
     );
 
+  const pauses = async () =>
+    (
+      await env.DB.prepare('SELECT start_time, end_time FROM sensor_pauses ORDER BY id').all<{
+        start_time: string;
+        end_time: string;
+      }>()
+    ).results;
+
   it('rejects requests without the sensor token', async () => {
     expect((await requestPause(fromNow(HOUR_MS), 'nope')).status).toBe(401);
+  });
+
+  it('records each pause in the history', async () => {
+    await setHeartbeat(30);
+    const until = fromNow(HOUR_MS);
+    await requestPause(until);
+    const [row, ...rest] = await pauses();
+    expect(rest).toEqual([]);
+    expect(row?.end_time).toBe(until);
+    expect(Date.parse(row?.start_time ?? '')).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('extends a running pause rather than adding another', async () => {
+    await setHeartbeat(30);
+    await requestPause(fromNow(HOUR_MS));
+    const { pausedUntil } = (await (await requestPause(fromNow(2 * HOUR_MS))).json()) as { pausedUntil: string };
+    const rows = await pauses();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.end_time).toBe(pausedUntil);
+  });
+
+  it('starts a new row once the earlier pause has run out', async () => {
+    await setHeartbeat(30);
+    await env.DB.prepare(
+      "INSERT INTO sensor_pauses (start_time, end_time) VALUES ('2026-10-20T08:00:00.000Z', '2026-10-20T09:00:00.000Z')",
+    ).run();
+    await requestPause(fromNow(HOUR_MS));
+    const rows = await pauses();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.end_time).toBe('2026-10-20T09:00:00.000Z');
+  });
+
+  it('ends the running pause at the moment of a resume', async () => {
+    await setHeartbeat(30);
+    await requestPause(fromNow(HOUR_MS));
+    const before = Date.now();
+    await requestPause(null);
+    const end = Date.parse((await pauses())[0]?.end_time ?? '');
+    expect(end).toBeGreaterThanOrEqual(before);
+    expect(end).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('writes nothing for a resume with no pause running', async () => {
+    await setHeartbeat(30);
+    await requestPause(null);
+    expect(await pauses()).toEqual([]);
   });
 
   it('rejects a time that is not in the future, not a time, or beyond MAX_PAUSE_MS', async () => {

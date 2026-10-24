@@ -11,7 +11,7 @@ import {
   SECOND_MS,
 } from '../../shared/api';
 import type { Db } from '../db/client';
-import { HEARTBEAT_ROW_ID, heartbeats, type Outage, outages, sessions } from '../db/schema';
+import { HEARTBEAT_ROW_ID, heartbeats, type Outage, outages, sensorPauses, sessions } from '../db/schema';
 
 /** Open and not flagged as a false positive. */
 const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, false));
@@ -235,7 +235,23 @@ export async function pauseSensor(db: Db, until: string | null, now: Date): Prom
         : and(eq(heartbeats.id, HEARTBEAT_ROW_ID), gt(heartbeats.pausedUntil, iso)),
     )
     .returning({ pausedUntil: heartbeats.pausedUntil });
+  if (row) await recordPause(db, until, iso);
   return row?.pausedUntil ?? null;
+}
+
+/** Keeps `sensorPauses` in step: a running pause (one ending after now) is moved, never duplicated. */
+async function recordPause(db: Db, until: string | null, iso: string): Promise<void> {
+  const running = gt(sensorPauses.endTime, iso);
+  if (!until) {
+    await db.update(sensorPauses).set({ endTime: iso }).where(running);
+    return;
+  }
+  const [moved] = await db
+    .update(sensorPauses)
+    .set({ endTime: until })
+    .where(running)
+    .returning({ id: sensorPauses.id });
+  if (!moved) await db.insert(sensorPauses).values({ startTime: iso, endTime: until });
 }
 
 /** Deletes sessions past `expiresAt`; run by HOURLY_CRON, as checkSession deletes only the ones it meets. */
