@@ -1,6 +1,6 @@
 # Reading coverage: design
 
-**Status:** approved; amended 24 October 2026 (decision 2, show on the page only when low).
+**Status:** awaiting the operator's review.
 
 24 October 2026. The operator chose this from a shortlist and asked Claude to "handle this intelligently", so the decisions below are Claude's, made under the rules in AGENTS.md. Each says why.
 
@@ -11,7 +11,7 @@ The statistics count every hour since records began as either off (inside an out
 ## Goals
 
 - Each statistics window in `/api/stats` says what share of its time was measured.
-- The statistics card says it in a few words when it is known and below `COVERAGE_NOTE_BELOW` (95%): "Last 30 days. 82% measured."
+- The statistics card says it in a few words when it is known: "Last 30 days. 96% measured."
 - The share never rounds up: 99.6% shows as 99%.
 
 ## Non-goals
@@ -34,7 +34,7 @@ The statistics count every hour since records began as either off (inside an out
 
    A pause counts in full even if the operator punched out by hand during it. Nothing watched for the whole pause, so a short dip could have passed unrecorded, and the punch clock records only what someone noticed. A sensor outage that is open or confirmed is *measured*: silence while the power is off is the measurement.
 
-2. **Where it shows, and when.** The API always carries the figure. The page shows it only below `COVERAGE_NOTE_BELOW` (0.95, in `src/components/Trends.tsx`). The operator asked for this after review: the sensor is a laptop that is sometimes paused or asleep, so an always-on figure would draw attention to every routine gap, while one shown only when it is low tells residents exactly when the figures deserve less weight. It is appended to the statistics subtitle as a short sentence: "Last 30 days. 96% measured." / "Afgelope 30 dae. 96% gemeet." The subtitle line already exists in the loading shell, and the addition is short enough to stay on one line at 320px in both languages, so nothing moves. An e2e test checks that it stays one line. It is not a tile, because a fifth tile would change the grid, nor a tile note, because the notes belong to their tiles' figures.
+2. **Where it shows.** Appended to the statistics subtitle as a short sentence: "Last 30 days. 96% measured." / "Afgelope 30 dae. 96% gemeet." The subtitle line already exists in the loading shell, and the addition is short enough to stay on one line at 320px in both languages, so nothing moves. An e2e test checks that it stays one line. It is not a tile, because a fifth tile would change the grid, nor a tile note, because the notes belong to their tiles' figures.
 
 3. **No history before this ships.** Pauses are not recorded anywhere today; `heartbeats.paused_until` keeps only the current one. Coverage is therefore computed only for windows that begin on or after a new config value, `site.coverageSince`. For this deployment that is the day it deploys. For a fork it equals `trackingSince`, so coverage is available from day one. A window that starts earlier gets `coverage: null` and the card shows nothing. For this site, the last 30 days get a figure about 30 days after release, and the last 7 days after a week. Guessing those earlier days as measured would be exactly the overclaim this feature exists to remove.
 
