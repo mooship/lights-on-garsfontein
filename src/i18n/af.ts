@@ -105,7 +105,8 @@ export const af = {
     daysAffected: 'Dae met ’n onderbreking',
     daysOf: (days: number, total: number) => `${days} van ${total}`,
     longest: 'Langste onderbreking',
-    average: (duration: string) => `Gemiddeld ${duration}`,
+    // The median outage: half were shorter, half longer.
+    typically: (duration: string) => `Gewoonlik ${duration}`,
     chartEmpty: 'Nog geen onderbrekings om te wys nie.',
     chartTitle: 'Ure sonder krag per week',
     chartLabel:

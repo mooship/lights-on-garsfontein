@@ -45,7 +45,7 @@ describe('mergeOutages', () => {
 describe('windowStats', () => {
   const since = t(zoned('2026-10-18T00:00:00'));
 
-  it('sums hours off, counts outages and finds the longest', () => {
+  it('sums hours off, counts outages and finds the longest and the median', () => {
     const intervals = [
       { start: t('2026-11-02T10:00:00Z'), end: t('2026-11-02T12:30:00Z') },
       { start: t('2026-11-03T10:00:00Z'), end: t('2026-11-03T11:00:00Z') },
@@ -58,10 +58,40 @@ describe('windowStats', () => {
       outages: 2,
       availability: 0.9635,
       longestMinutes: 150,
+      medianMinutes: 105,
       daysTracked: 5,
       daysWithOutage: 2,
       plannedOutages: 0,
     });
+  });
+
+  it('takes the middle outage as the median of an odd count, so one long outage does not skew it', () => {
+    const intervals = [
+      { start: t('2026-11-02T10:00:00Z'), end: t('2026-11-02T10:10:00Z') },
+      { start: t('2026-11-03T10:00:00Z'), end: t('2026-11-03T10:20:00Z') },
+      { start: t('2026-11-04T10:00:00Z'), end: t('2026-11-04T18:00:00Z') },
+    ];
+    const stats = windowStats(intervals, t('2026-11-01T00:00:00Z'), t('2026-11-05T00:00:00Z'), since);
+    expect(stats).toMatchObject({ outages: 3, longestMinutes: 480, medianMinutes: 20 });
+  });
+
+  it('has no median without outages', () => {
+    const stats = windowStats([], t('2026-11-01T00:00:00Z'), t('2026-11-05T00:00:00Z'), since);
+    expect(stats.medianMinutes).toBeNull();
+  });
+
+  it('counts overlapping records once and only the part inside the window towards the median', () => {
+    const intervals = mergeOutages(
+      [
+        { startTime: '2026-11-01T23:30:00Z', endTime: '2026-11-02T00:30:00Z' },
+        { startTime: '2026-11-02T10:00:00Z', endTime: '2026-11-02T11:00:00Z' },
+        { startTime: '2026-11-02T10:30:00Z', endTime: '2026-11-02T12:00:00Z' },
+      ],
+      t('2026-11-03T00:00:00Z'),
+    );
+    const stats = windowStats(intervals, t('2026-11-02T00:00:00Z'), t('2026-11-03T00:00:00Z'), since);
+    // 30 minutes inside the window and one merged 2-hour outage; unmerged or unclipped would differ.
+    expect(stats).toMatchObject({ outages: 2, medianMinutes: 75 });
   });
 
   it('clips outages to the window edges', () => {
@@ -412,6 +442,7 @@ describe('GET /api/stats over time', () => {
       'outages',
       'availability',
       'longestMinutes',
+      'medianMinutes',
       'daysTracked',
       'daysWithOutage',
       'plannedOutages',

@@ -1038,6 +1038,16 @@ test.describe('outages by time of day', () => {
     test.describe(`${locale} figures`, () => {
       test.use({ appLocale: locale });
 
+      test(`notes the median outage, not the mean that one long outage skews (${locale})`, async ({ page }) => {
+        const m = DICTIONARIES[locale];
+        await withOutages(page, undefined, (stats) => ({
+          ...stats,
+          last30: { ...stats.last30, outages: 3, minutesOff: 200, longestMinutes: 150, medianMinutes: 30 },
+        }));
+        await page.goto(localePath(locale));
+        await expect(page.locator('.gg-trends-body')).toContainText(m.trends.typically(`30 ${m.units.min}`));
+      });
+
       // The chart's readout needs the keyboard; the table gives every hour at once.
       test(`gives the time off by hour as a table too (${locale})`, async ({ page }) => {
         const m = DICTIONARIES[locale];
