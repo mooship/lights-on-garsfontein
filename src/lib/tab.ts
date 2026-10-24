@@ -1,7 +1,6 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
-import type { StatusResponse } from '../../shared/api';
+import { badgeState, type StatusResponse } from '../../shared/api';
 import { site } from '../../site.config';
-import { badgeState } from '../components/StatusBadge';
 import { formatCompactDuration } from './format';
 import { t } from './i18n';
 

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { HEARTBEAT_THRESHOLD_MS, HOUR_MS, OUTAGE_ACTION, TIMER_ACTION } from '../shared/api';
-import { ADMIN_OUTAGES_PATH, OUTAGE_VIEWS, STATUS_PATH, TIMER_PATH } from '../shared/paths';
+import { ADMIN_OUTAGES_PATH, LIVE_VIEWS, OUTAGE_VIEWS, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import {
   asAdmin,
   call,
@@ -93,26 +93,28 @@ describe('edge cache purges', () => {
     for (const path of EDGE_CACHED) expect(await isCached(path), path).toBe(false);
   });
 
-  it('a routine heartbeat purges only the status, whose live reading it changes', async () => {
+  it('a routine heartbeat purges only the live views (status and badges), whose reading it changes', async () => {
     await setHeartbeat(30);
     for (const path of EDGE_CACHED) await call(path);
     expect((await heartbeat()).status).toBe(200);
-    expect(await isCached(STATUS_PATH)).toBe(false);
-    for (const path of EDGE_CACHED.filter((p) => p !== STATUS_PATH)) expect(await isCached(path), path).toBe(true);
+    for (const path of LIVE_VIEWS) expect(await isCached(path), path).toBe(false);
+    for (const path of EDGE_CACHED.filter((p) => !LIVE_VIEWS.includes(p)))
+      expect(await isCached(path), path).toBe(true);
   });
 });
 
 describe('pausing outage detection', () => {
-  // A pause changes whether the status is backed by a live reading, and nothing else.
+  // A pause changes whether the status and badges are backed by a live reading, and nothing else.
   it.each([
     ['starting a pause', () => new Date(Date.now() + HOUR_MS).toISOString()],
     ['ending a pause', () => null],
-  ])('%s purges only the status', async (_name, until) => {
+  ])('%s purges only the live views', async (_name, until) => {
     await setHeartbeat(30);
     for (const path of EDGE_CACHED) await call(path);
     expect((await requestPause(until())).status).toBe(200);
-    expect(await isCached(STATUS_PATH)).toBe(false);
-    for (const path of EDGE_CACHED.filter((p) => p !== STATUS_PATH)) expect(await isCached(path), path).toBe(true);
+    for (const path of LIVE_VIEWS) expect(await isCached(path), path).toBe(false);
+    for (const path of EDGE_CACHED.filter((p) => !LIVE_VIEWS.includes(p)))
+      expect(await isCached(path), path).toBe(true);
   });
 });
 

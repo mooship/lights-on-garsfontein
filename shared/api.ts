@@ -8,6 +8,13 @@ import { type Locale, site } from '../site.config';
 export const POWER_STATUSES = ['ON', 'OFF'] as const;
 export type PowerStatus = (typeof POWER_STATUSES)[number];
 
+/** ON, OFF, or NONE: ON without a live reading only means no outage was reported, so it never claims ON. */
+export const BADGE_STATES = [...POWER_STATUSES, 'NONE'] as const;
+export type BadgeState = (typeof BADGE_STATES)[number];
+
+export const badgeState = (status: PowerStatus, monitored: boolean): BadgeState =>
+  status === 'ON' && !monitored ? 'NONE' : status;
+
 /** How an outage was recorded: by the heartbeat sensor or by an admin. */
 export const OUTAGE_SOURCES = ['sensor', 'manual'] as const;
 export type OutageSource = (typeof OUTAGE_SOURCES)[number];

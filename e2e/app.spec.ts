@@ -19,6 +19,7 @@ import {
   ADMIN_API_PREFIX,
   ADMIN_OUTAGES_PATH,
   ADMIN_PAGE_PATH,
+  badgePath,
   FEED_PATH,
   OG_IMAGE_PATH,
   OUTAGES_PATH,
@@ -1496,4 +1497,13 @@ test.describe('unexpected responses', () => {
     expect(response.headers()['content-type']).toMatch(/javascript/);
     expect(response.headers()['cache-control']).toBe('no-cache');
   });
+
+  for (const locale of LOCALES) {
+    test(`serves the status badge through the Worker, not the asset server (${locale})`, async ({ request }) => {
+      const response = await request.get(badgePath(locale));
+      expect(response.status()).toBe(200);
+      expect(response.headers()['content-type']).toBe('image/svg+xml; charset=utf-8');
+      expect(await response.text()).toContain(site.brand.full);
+    });
+  }
 });

@@ -15,7 +15,7 @@ binding = "ASSETS"
 # Unknown paths get dist/404.html with status 404; the app's pages each have a file (vite.config.ts).
 not_found_handling = "404-page"
 # The same paths as API_PREFIX and WORKER_PAGES in shared/paths.ts; change them together.
-run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png", "/feed.xml"]
+run_worker_first = ["/api/*", "/sitemap.xml", "/robots.txt", "/og.png", "/feed.xml", "/badge.svg", "/en/badge.svg"]
 
 [vars]
 SITE_URL = "https://garsfontein.timothybrits.co.za"

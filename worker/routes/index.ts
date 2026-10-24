@@ -1,6 +1,7 @@
 import type { Routes } from '../lib/router';
 import { adminRoutes } from './admin';
 import { authRoutes } from './auth';
+import { badgeRoutes } from './badge';
 import { contactRoutes } from './contact';
 import { historyRoutes } from './history';
 import { pushRoutes } from './push';
@@ -11,6 +12,7 @@ import { telegramRoutes } from './telegram';
 /** Every Worker endpoint. To add one, see README, "Adding an endpoint". */
 export const routes: Routes = {
   ...statusRoutes,
+  ...badgeRoutes,
   ...historyRoutes,
   ...authRoutes,
   ...adminRoutes,

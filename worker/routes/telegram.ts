@@ -1,4 +1,4 @@
-import { STATUS_PATH, TELEGRAM_WEBHOOK_PATH } from '../../shared/paths';
+import { LIVE_VIEWS, TELEGRAM_WEBHOOK_PATH } from '../../shared/paths';
 import { refuseBadToken } from '../lib/auth';
 import { safeEqual } from '../lib/crypto';
 import { errors, json, readCappedText } from '../lib/http';
@@ -36,7 +36,7 @@ async function postUpdate({ request, env, db }: RouteContext): Promise<Response>
     return nothing();
   }
   const { text, statusChanged } = await runCommand(message.text, db, new Date());
-  if (statusChanged) await purgeEdgeCache(new URL(request.url).origin, [STATUS_PATH]);
+  if (statusChanged) await purgeEdgeCache(new URL(request.url).origin, LIVE_VIEWS);
   return json({
     method: 'sendMessage',
     chat_id: message.chat?.id,
