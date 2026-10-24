@@ -9,6 +9,7 @@ import {
   MINUTE_MS,
   OUTAGE_ACTION,
   RECENT_LIMIT,
+  SECOND_MS,
   type StatsResponse,
   type StatusResponse,
 } from '../shared/api';
@@ -93,6 +94,11 @@ const RECORDING_METHOD = /by hand|sensor|met die hand|handmatig|voeler/i;
 // Log in through the UI once and reuse the cookie: LOGIN_LIMITER (wrangler.toml) allows only a few a minute.
 let sessionCookies: Cookie[] = [];
 
+// A sign-in solves a Turnstile challenge from challenges.cloudflare.com, has the Worker verify it with
+// Cloudflare, and hashes the password (PBKDF2_ITERATIONS): about 2 to 3 s locally, more on a slow link,
+// so the 5 s default flaked. Still a wait for the result, never a fixed delay.
+const SIGN_IN_TIMEOUT_MS = 15 * SECOND_MS;
+
 async function login(page: Page) {
   if (sessionCookies.length) await page.context().addCookies(sessionCookies);
   await page.goto(ADMIN_PAGE_PATH);
@@ -103,7 +109,7 @@ async function login(page: Page) {
   await page.getByLabel(admin.username).fill(ADMIN_USERNAME);
   await password.fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: admin.signIn }).click();
-  await expect(dashboard).toBeVisible();
+  await expect(dashboard).toBeVisible({ timeout: SIGN_IN_TIMEOUT_MS });
   sessionCookies = (await page.context().cookies()).filter((c) => c.name === SESSION_COOKIE);
 }
 
@@ -618,7 +624,7 @@ test.describe('admin', () => {
     await page.getByLabel(admin.username).fill(ADMIN_USERNAME);
     await page.getByLabel(admin.password).fill('not-the-password');
     await page.getByRole('button', { name: admin.signIn }).click();
-    await expect(page.getByRole('alert')).toHaveText(admin.errors.unauthorized);
+    await expect(page.getByRole('alert')).toHaveText(admin.errors.unauthorized, { timeout: SIGN_IN_TIMEOUT_MS });
   });
 
   test('sets an HttpOnly, Strict session cookie', async ({ page, context }) => {
