@@ -11,7 +11,6 @@ import {
   RECENT_LIMIT,
   type StatsResponse,
   type StatusResponse,
-  UTC_OFFSET_MS,
 } from '../shared/api';
 import { ERROR } from '../shared/errors';
 import { DEFAULT_LOCALE, LOCALES, localePath } from '../shared/locale';
@@ -20,12 +19,15 @@ import {
   ADMIN_OUTAGES_PATH,
   ADMIN_PAGE_PATH,
   badgePath,
+  FAVICON_OFF_PATH,
+  FAVICON_ON_PATH,
   FEED_PATH,
   OG_IMAGE_PATH,
   OUTAGES_PATH,
   PRIVACY_PAGE_PATH,
   ROBOTS_PATH,
   SECURITY_TXT_PATH,
+  SERVICE_WORKER_PATH,
   SITEMAP_PATH,
   STATS_PATH,
   STATUS_PATH,
@@ -42,6 +44,7 @@ import { PAGE_SIZE } from '../src/lib/pages';
 import { STATS_POLL_MS } from '../src/lib/poll';
 import { ALERTS_OFFER_DELAY_MS } from '../src/lib/push';
 import { bannerDismissedKey, STORAGE_KEYS } from '../src/lib/storage';
+import { zoned } from '../src/lib/zone';
 import { PALETTE } from '../src/styles/palette';
 import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
@@ -340,7 +343,7 @@ test.describe('public page', () => {
     const lasted = escapeRegExp(en.status.for(`2 ${en.units.h} MM ${en.units.min}`)).replace('MM', '\\d+');
     await expect(page.getByText(new RegExp(`^${lasted}$`))).toBeVisible();
     await expect(page).toHaveTitle(`${en.tab.ON} · ${BRAND}`);
-    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-on.svg');
+    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', FAVICON_ON_PATH);
   });
 
   test('leads with the ward, names the full brand and says what the measurement covers', async ({ page }) => {
@@ -559,7 +562,7 @@ test.describe('public page', () => {
   });
 
   test('lets browsers keep the icons for a day instead of checking them on every visit', async ({ request }) => {
-    for (const path of ['/favicon.svg', '/favicon-on.svg', '/favicon-off.svg', '/favicon.ico']) {
+    for (const path of ['/favicon.svg', FAVICON_ON_PATH, FAVICON_OFF_PATH, '/favicon.ico']) {
       expect((await request.get(path)).headers()['cache-control'], path).toBe('public, max-age=86400');
     }
   });
@@ -638,7 +641,7 @@ test.describe('admin', () => {
     await page.goto('/');
     await expect(page.getByRole('status')).toContainText(en.status.OFF);
     await expect(page).toHaveTitle(outageTitle(en.tab.OFF));
-    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon-off.svg');
+    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', FAVICON_OFF_PATH);
     await page.getByRole('button', { name: en.lang.switchTo }).click();
     await expect(page.getByRole('status')).toContainText(af.status.OFF);
     await expect(page).toHaveTitle(outageTitle(af.tab.OFF));
@@ -965,7 +968,7 @@ test.describe('outages by time of day', () => {
       firstDay = new Date(Date.parse(first.weekStart) + 2 * DAY_MS).toISOString().slice(0, 10);
       return {
         ...stats,
-        trackingSince: new Date(Date.parse(`${firstDay}T00:00:00Z`) - UTC_OFFSET_MS).toISOString(),
+        trackingSince: new Date(zoned(`${firstDay}T00:00`)).toISOString(),
         weeks: [first, { ...current, hoursOff: 0, minutesOff: 0, outages: 0 }],
       };
     });
@@ -1533,7 +1536,7 @@ test.describe('unexpected responses', () => {
   });
 
   test('serves the push service worker at /sw.js, never cached', async ({ request }) => {
-    const response = await request.get('/sw.js');
+    const response = await request.get(SERVICE_WORKER_PATH);
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toMatch(/javascript/);
     expect(response.headers()['cache-control']).toBe('no-cache');

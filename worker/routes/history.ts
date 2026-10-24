@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, or } from 'drizzle-orm';
+import { asc, desc, gte, isNull, or } from 'drizzle-orm';
 import {
   COVERAGE_SINCE,
   CSV_FILE_NAME,
@@ -9,12 +9,12 @@ import {
   type StatsResponse,
   TRACKING_SINCE,
 } from '../../shared/api';
-import { formatDurationIn } from '../../shared/format';
+import { formatLasted } from '../../shared/format';
 import { CSV_PATH, FEED_PATH, OUTAGES_PATH, STATS_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { DICTIONARIES } from '../../src/i18n/index';
 import { outages, sensorPauses } from '../db/schema';
-import { SUMMARY_COLUMNS, summarise } from '../lib/grid';
+import { isPublic, SUMMARY_COLUMNS, summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { hourlyMinutes, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
@@ -26,32 +26,30 @@ async function getStats({ db }: RouteContext): Promise<Response> {
   const since = Date.parse(TRACKING_SINCE);
   const earliest = new Date(Math.max(since, now - 365 * DAY_MS)).toISOString();
 
-  const rows = await db
-    .select({ startTime: outages.startTime, endTime: outages.endTime, isPlanned: outages.isPlanned })
-    .from(outages)
-    .where(and(eq(outages.isFalsePositive, false), or(isNull(outages.endTime), gte(outages.endTime, earliest))));
-  const intervals = mergeOutages(rows, now);
-  const planned = mergeOutages(
-    rows.filter((r) => r.isPlanned),
-    now,
-  );
-  // Time without a live reading: pauses, and silences the sensor raised that proved false.
-  const [pauses, falseSilences] = await Promise.all([
+  // Every outage that ends in range, false positives too: those the sensor raised mark time without a reading.
+  const [rows, pauses] = await db.batch([
+    db
+      .select({
+        startTime: outages.startTime,
+        endTime: outages.endTime,
+        isPlanned: outages.isPlanned,
+        isFalsePositive: outages.isFalsePositive,
+        source: outages.source,
+      })
+      .from(outages)
+      .where(or(isNull(outages.endTime), gte(outages.endTime, earliest))),
     db
       .select({ startTime: sensorPauses.startTime, endTime: sensorPauses.endTime })
       .from(sensorPauses)
       .where(gte(sensorPauses.endTime, earliest)),
-    db
-      .select({ startTime: outages.startTime, endTime: outages.endTime })
-      .from(outages)
-      .where(
-        and(
-          eq(outages.isFalsePositive, true),
-          eq(outages.source, 'sensor'),
-          or(isNull(outages.endTime), gte(outages.endTime, earliest)),
-        ),
-      ),
   ]);
+  const real = rows.filter((r) => !r.isFalsePositive);
+  const intervals = mergeOutages(real, now);
+  const planned = mergeOutages(
+    real.filter((r) => r.isPlanned),
+    now,
+  );
+  const falseSilences = rows.filter((r) => r.isFalsePositive && r.source === 'sensor');
   const coverage = { gaps: mergeOutages([...pauses, ...falseSilences], now), since: Date.parse(COVERAGE_SINCE) };
   const window = (days: number, offsetDays = 0) =>
     windowStats(intervals, now - (days + offsetDays) * DAY_MS, now - offsetDays * DAY_MS, since, planned, coverage);
@@ -79,11 +77,7 @@ function csvField(value: string | number | null): string {
 
 /** Open data, every outage but false positives, oldest first; a public contract (README, CSV contract). */
 async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
-  const rows = await db
-    .select(SUMMARY_COLUMNS)
-    .from(outages)
-    .where(eq(outages.isFalsePositive, false))
-    .orderBy(asc(outages.startTime));
+  const rows = await db.select(SUMMARY_COLUMNS).from(outages).where(isPublic).orderBy(asc(outages.startTime));
   const lines = [
     'id,start_time_utc,end_time_utc,duration_minutes,planned',
     ...rows.map((r) => {
@@ -108,11 +102,7 @@ async function getOutagesCsv({ db }: RouteContext): Promise<Response> {
  * browser's copy would bring back the old list.
  */
 async function getOutages({ db }: RouteContext): Promise<Response> {
-  const rows = await db
-    .select(SUMMARY_COLUMNS)
-    .from(outages)
-    .where(eq(outages.isFalsePositive, false))
-    .orderBy(desc(outages.startTime));
+  const rows = await db.select(SUMMARY_COLUMNS).from(outages).where(isPublic).orderBy(desc(outages.startTime));
   const body: OutagesResponse = { outages: rows.map(summarise), generatedAt: new Date().toISOString() };
   return json(body);
 }
@@ -135,9 +125,6 @@ function feedDate(iso: string): string {
   return `${part.day} ${part.month} ${part.year} ${part.hour}:${part.minute}`;
 }
 
-/** Worded as the page and alerts word durations, in English like the rest of the feed. */
-const feedDuration = (ms: number) => formatDurationIn(ms, DICTIONARIES.en.units, { days: false, seconds: false });
-
 /**
  * Atom feed of the latest outages (false positives excluded), newest first. English only, as feeds
  * are read by software, so its copy skips the site's dictionaries.
@@ -146,7 +133,7 @@ async function getFeed({ env, db }: RouteContext): Promise<Response> {
   const rows = await db
     .select(SUMMARY_COLUMNS)
     .from(outages)
-    .where(eq(outages.isFalsePositive, false))
+    .where(isPublic)
     .orderBy(desc(outages.startTime))
     .limit(FEED_LIMIT);
   const home = `${env.SITE_URL}/`;
@@ -154,7 +141,7 @@ async function getFeed({ env, db }: RouteContext): Promise<Response> {
     const kind = r.isPlanned ? 'Planned outage' : 'Outage';
     const start = feedDate(r.startTime);
     const title = r.endTime
-      ? `${kind} ${start} (${feedDuration(outageDurationMs(r, 0))})`
+      ? `${kind} ${start} (${formatLasted(outageDurationMs(r, 0), DICTIONARIES.en.units)})`
       : `${kind} in progress since ${start}`;
     const summary = r.endTime ? `Started ${start}, ended ${feedDate(r.endTime)}.` : `Started ${start}; not over yet.`;
     return { id: r.id, title, summary, updated: r.endTime ?? r.startTime };

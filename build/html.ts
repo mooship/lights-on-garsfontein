@@ -33,10 +33,7 @@ function placeholder(name: string): string | readonly string[] {
     const format = { day: 'numeric', month: 'long', year: 'numeric', timeZone: site.timeZone } as const;
     return new Intl.DateTimeFormat(intl, format).format(new Date(site.trackingSince));
   }
-  const value =
-    scope === 'site'
-      ? path.reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], site)
-      : undefined;
+  const value = scope === 'site' ? lookup(site, path) : undefined;
   if (typeof value === 'string' || typeof value === 'number') return String(value);
   if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value;
   throw new Error(`site-config: unknown placeholder %${name}%`);
@@ -71,9 +68,13 @@ export function fill(text: string, mode: Mode, file: string): string {
   return out;
 }
 
+/** The value at a dotted path such as ['faultReporting', 'url'], or undefined. */
+const lookup = (root: object, path: readonly string[]) =>
+  path.reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], root);
+
 /** A string from the dictionaries, or a message function's result for `args`. */
 function message(dict: object, key: string, args: readonly string[] = []): string {
-  const value = key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], dict);
+  const value = lookup(dict, key.split('.'));
   const text = typeof value === 'function' ? (value as (...a: readonly string[]) => unknown)(...args) : value;
   if (typeof text !== 'string') throw new Error(`static-i18n: ${key} is not a string in the dictionaries`);
   return escapeHtml(text);

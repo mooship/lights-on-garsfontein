@@ -4,12 +4,12 @@ import type { Locale } from '../../site.config';
 import { createDb } from '../db/client';
 import { type PushSubscriptionRow, pushSubscriptions } from '../db/schema';
 import { type AlertPage, type AlertPayload, alertMessage, loadDueOutage, retryAlert } from './alerts';
+import { errorName, isTransient } from './http';
 import { buildPushRequest, PUSH_TTL_SECONDS, vapidSigner } from './webpush';
 
 // Logs name only the push service's host and an error's name: an endpoint path identifies a
 // subscriber, and some error messages quote the URL they failed on.
 const hostOf = (endpoint: string) => URL.parse(endpoint)?.host ?? 'invalid endpoint';
-const errorName = (reason: unknown) => (reason instanceof Error ? reason.name : typeof reason);
 
 /**
  * Sends one page of an alert. Subscriptions the push service reports gone are deleted, and
@@ -65,7 +65,7 @@ export async function deliverAlertPage(page: AlertPage, env: Env, now: Date): Pr
     // A rejection is retried like a 429 or a 5xx, but it may be ours (a bad row), so it is logged.
     if (result.status === 'rejected') console.warn(`Push to ${host} failed: ${errorName(result.reason)}`);
     const status = result.status === 'fulfilled' ? result.value : null;
-    if (status === null || status === 429 || status >= 500) {
+    if (status === null || isTransient(status)) {
       retry.push(id);
       retryHosts.add(host);
     } else if (status === 404 || status === 410) gone.push(id);

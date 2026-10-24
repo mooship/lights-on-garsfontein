@@ -1,5 +1,6 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
 import { badgeState, type StatusResponse } from '../../shared/api';
+import { FAVICON_OFF_PATH, FAVICON_ON_PATH } from '../../shared/paths';
 import { site } from '../../site.config';
 import { formatCompactDuration } from './format';
 import { t } from './i18n';
@@ -26,7 +27,7 @@ export function useStatusTab(status: Accessor<StatusResponse | undefined>, minut
     }
     const duration = s.status === 'OFF' && s.since ? ` ${formatCompactDuration(minute() - Date.parse(s.since))}` : '';
     document.title = `${t().tab[s.status]}${duration} · ${site.brand.short}`;
-    if (icon) icon.href = s.status === 'ON' ? '/favicon-on.svg' : '/favicon-off.svg';
+    if (icon) icon.href = s.status === 'ON' ? FAVICON_ON_PATH : FAVICON_OFF_PATH;
   });
 
   onCleanup(() => {

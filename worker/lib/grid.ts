@@ -13,8 +13,11 @@ import {
 import type { Db } from '../db/client';
 import { HEARTBEAT_ROW_ID, heartbeats, type Outage, outages, sensorPauses, sessions } from '../db/schema';
 
-/** Open and not flagged as a false positive. */
-const isOpen = and(isNull(outages.endTime), eq(outages.isFalsePositive, false));
+/** Not flagged as a false positive: the outages every public view shows. */
+export const isPublic = eq(outages.isFalsePositive, false);
+
+/** Open and public. */
+const isOpen = and(isNull(outages.endTime), isPublic);
 
 /**
  * silentSince (shared/api.ts) in SQL; change them together. During a pause it lies in the future,
@@ -106,6 +109,18 @@ function powerState(
   return { status: 'ON', since: null };
 }
 
+/** Whether a sensor is reporting now; says nothing about how any outage was recorded. */
+const isMonitored = (heartbeat: Heartbeat | undefined, now: Date) =>
+  heartbeat !== undefined &&
+  !isStale(heartbeat.lastSeen, now.getTime()) &&
+  !isPaused(heartbeat.pausedUntil, now.getTime());
+
+/** The status and whether a reading backs it, without the recent outages: all the badge needs. */
+export async function readLiveState(db: Db, now: Date) {
+  const [[heartbeat], [open]] = await db.batch([heartbeatQuery(db), openOutageQuery(db)]);
+  return { status: powerState(open?.startTime, heartbeat, now).status, monitored: isMonitored(heartbeat, now) };
+}
+
 /**
  * The D1-backed part of StatusResponse, read in one batch, as `grid`, with the heartbeat and the
  * open outage behind it for the owner's views. Only `grid` is public: the rows say how an outage was recorded.
@@ -114,12 +129,7 @@ export async function readGridState(db: Db, now: Date) {
   const [[heartbeat], [open], recentRows] = await db.batch([
     heartbeatQuery(db),
     openOutageQuery(db),
-    db
-      .select()
-      .from(outages)
-      .where(eq(outages.isFalsePositive, false))
-      .orderBy(desc(outages.startTime))
-      .limit(RECENT_LIMIT),
+    db.select(SUMMARY_COLUMNS).from(outages).where(isPublic).orderBy(desc(outages.startTime)).limit(RECENT_LIMIT),
   ]);
   const state = powerState(open?.startTime, heartbeat, now);
   // When ON, the current state began when the last outage ended (outages can overlap, so the latest end).
@@ -132,11 +142,7 @@ export async function readGridState(db: Db, now: Date) {
     since: state.since ?? lastEnd,
     outage: open ? summarise(open) : null,
     recent: recentRows.map(summarise),
-    // Whether a sensor is reporting now; says nothing about how any outage was recorded.
-    monitored:
-      heartbeat !== undefined &&
-      !isStale(heartbeat.lastSeen, now.getTime()) &&
-      !isPaused(heartbeat.pausedUntil, now.getTime()),
+    monitored: isMonitored(heartbeat, now),
   };
   return { grid, heartbeat, open };
 }

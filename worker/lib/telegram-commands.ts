@@ -1,10 +1,10 @@
 // The owner's Telegram commands. Only the owner's chat reaches these (worker/routes/telegram.ts),
 // so the replies may say how an outage was recorded.
 
-import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
+import { badgeState, DAY_MS, HOUR_MS, MINUTE_MS } from '../../shared/api';
 import { formatDurationIn } from '../../shared/format';
 import { admin } from '../../src/admin/copy';
-import { sensorState } from '../../src/admin/sensor';
+import { sensorState, sensorText } from '../../src/admin/sensor';
 import { DICTIONARIES } from '../../src/i18n/index';
 import type { Db } from '../db/client';
 import { MAX_PAUSE_MS, pauseSensor, readGridState } from './grid';
@@ -45,18 +45,15 @@ export async function runCommand(text: string, db: Db, now: Date): Promise<{ tex
 
 async function statusText(db: Db, now: Date): Promise<string> {
   const { grid, heartbeat, open } = await readGridState(db, now);
-  // Unless the sensor vouches for it, ON claims only that no outage has been reported.
-  const lines = [grid.status === 'OFF' ? statusCopy.OFF : grid.monitored ? statusCopy.ON : statusCopy.NONE];
+  const lines = [statusCopy[badgeState(grid.status, grid.monitored)]];
 
-  const state = sensorState(heartbeat ?? null, now.getTime());
-  if (state.kind === 'never') lines.push(sensorCopy.never);
-  else if (state.kind === 'paused') lines.push(sensorCopy.paused(formatAt(state.until, now)));
-  else if (state.kind === 'reporting') lines.push(sensorCopy.reporting(formatAt(state.lastSeen, now)));
-  else if (state.kind === 'resuming') lines.push(sensorCopy.resuming(formatAt(state.since, now)));
-  else {
-    const silentFor = formatDurationIn(state.forMs, units, { seconds: false });
-    lines.push(sensorCopy.silent(silentFor, formatAt(state.since, now)));
-  }
+  lines.push(
+    sensorText(
+      sensorState(heartbeat ?? null, now.getTime()),
+      (iso) => formatAt(iso, now),
+      (ms) => formatDurationIn(ms, units, { seconds: false }),
+    ),
+  );
 
   if (open) lines.push(telegram.outage(formatAt(open.startTime, now), sourceCopy[open.source]));
   return lines.join('\n');

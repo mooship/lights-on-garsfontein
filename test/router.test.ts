@@ -1,8 +1,10 @@
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
 import { ERROR } from '../shared/errors';
+import { API_PREFIX, WORKER_PAGES } from '../shared/paths';
 import { json } from '../worker/lib/http';
 import { dispatch, type Route } from '../worker/lib/router';
+import { routes } from '../worker/routes';
 import { ORIGIN } from './helpers';
 
 /** Dispatches, then waits for the work it left running, as the runtime would before the next request. */
@@ -57,5 +59,15 @@ describe('cross-site guard', () => {
     expect((await send('POST', bearer, { authorize: async () => null })).status).toBe(200);
     // A route that never checks a bearer token is not exempted by sending one.
     expect((await send('POST', bearer)).status).toBe(403);
+  });
+});
+
+describe('route table', () => {
+  // A page missing from WORKER_PAGES is answered by the asset server in production (run_worker_first).
+  it('lists every route outside the API in WORKER_PAGES', () => {
+    const pages = Object.keys(routes)
+      .map((key) => key.slice(key.indexOf(' ') + 1))
+      .filter((path) => !path.startsWith(API_PREFIX));
+    expect([...new Set(pages)].sort()).toEqual([...WORKER_PAGES].sort());
   });
 });

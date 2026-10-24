@@ -116,6 +116,12 @@ function isCrossSite(request: Request): boolean {
   return site !== null && site !== 'same-origin' && site !== 'none';
 }
 
+/** An error's name, never its message, for logs: a message can quote an endpoint or a token in a URL. */
+export const errorName = (error: unknown) => (error instanceof Error ? error.name : typeof error);
+
+/** A 429 or a 5xx: worth retrying later, unlike any other failure. */
+export const isTransient = (status: number) => status === 429 || status >= 500;
+
 export const isJson = (type: string) => type.split(';')[0]?.trim().toLowerCase() === 'application/json';
 
 /**

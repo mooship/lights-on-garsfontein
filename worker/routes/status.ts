@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { StatusResponse } from '../../shared/api';
 import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, LIVE_VIEWS, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
-import { requireBearer } from '../lib/auth';
+import { authorizeSensor } from '../lib/auth';
 import { getGridState, MAX_PAUSE_MS, pauseSensor, recordHeartbeat } from '../lib/grid';
 import { isJson, isoTime, json, parseBody } from '../lib/http';
 import { purgeEdgeCache, type RouteContext, type Routes } from '../lib/router';
@@ -66,10 +66,10 @@ export const statusRoutes: Routes = {
   },
   [`POST ${HEARTBEAT_PATH}`]: {
     handler: postHeartbeat,
-    authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),
+    authorize: authorizeSensor,
   },
   [`POST ${HEARTBEAT_PAUSE_PATH}`]: {
     handler: postPause,
-    authorize: requireBearer((env) => env.HEARTBEAT_TOKEN),
+    authorize: authorizeSensor,
   },
 };

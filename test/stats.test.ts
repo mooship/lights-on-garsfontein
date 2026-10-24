@@ -4,6 +4,7 @@ import {
   COVERAGE_SINCE,
   DAY_MS,
   HOUR_MS as H,
+  localDate,
   MINUTE_MS,
   type OutagesResponse,
   RECENT_LIMIT,
@@ -110,7 +111,7 @@ describe('windowStats', () => {
 
   it('never counts time before tracking began', () => {
     const intervals = [{ start: t(zoned('2026-10-17T20:00:00')), end: t(zoned('2026-10-18T02:00:00')) }];
-    const stats = windowStats(intervals, since - 10 * 24 * H, since + 24 * H, since);
+    const stats = windowStats(intervals, since - 10 * DAY_MS, since + DAY_MS, since);
     expect(stats.trackedHours).toBe(24);
     expect(stats.hoursOff).toBe(2);
   });
@@ -140,27 +141,29 @@ describe('windowStats', () => {
   });
 
   it('counts the same days with an outage as checking every outage against every day', () => {
-    const D = 24 * H;
     let seed = 7;
     const random = () => {
       seed = (seed * 16807) % 2147483647;
       return seed / 2147483647;
     };
     for (let run = 0; run < 50; run++) {
-      const base = since + Math.floor(random() * 10) * D;
+      const base = since + Math.floor(random() * 10) * DAY_MS;
       const rows = Array.from({ length: Math.floor(random() * 12) }, () => {
-        const start = base + random() * 20 * D;
-        return { startTime: new Date(start).toISOString(), endTime: new Date(start + random() * 2 * D).toISOString() };
+        const start = base + random() * 20 * DAY_MS;
+        return {
+          startTime: new Date(start).toISOString(),
+          endTime: new Date(start + random() * 2 * DAY_MS).toISOString(),
+        };
       });
-      const intervals = mergeOutages(rows, base + 30 * D);
-      const from = base + random() * 5 * D;
-      const to = from + random() * 25 * D;
+      const intervals = mergeOutages(rows, base + 30 * DAY_MS);
+      const from = base + random() * 5 * DAY_MS;
+      const to = from + random() * 25 * DAY_MS;
       // Reference: a plain per-day scan to check windowStats's single forward pass against.
       const start = Math.max(from, since);
       let expected = 0;
-      for (let day = Math.floor((start + UTC_OFFSET_MS) / D) * D - UTC_OFFSET_MS; day < to; day += D) {
+      for (let day = Math.floor((start + UTC_OFFSET_MS) / DAY_MS) * DAY_MS - UTC_OFFSET_MS; day < to; day += DAY_MS) {
         const dayFrom = Math.max(day, start);
-        const dayTo = Math.min(day + D, to);
+        const dayTo = Math.min(day + DAY_MS, to);
         if (intervals.some((i) => Math.min(i.end, dayTo) - Math.max(i.start, dayFrom) > 0)) expected += 1;
       }
       expect(windowStats(intervals, from, to, since).daysWithOutage).toBe(expected);
@@ -178,7 +181,7 @@ describe('windowStats', () => {
   });
 
   it('reports null availability before tracking starts', () => {
-    expect(windowStats([], since - 48 * H, since - 24 * H, since).availability).toBeNull();
+    expect(windowStats([], since - 2 * DAY_MS, since - DAY_MS, since).availability).toBeNull();
   });
 
   describe('coverage', () => {
@@ -254,7 +257,7 @@ describe('weekly stats', () => {
 
   it('caps the series at 26 weeks', () => {
     const since = t(TRACKING_SINCE);
-    expect(weeklyStats([], since + 400 * 24 * H, since)).toHaveLength(26);
+    expect(weeklyStats([], since + 400 * DAY_MS, since)).toHaveLength(26);
   });
 });
 
@@ -338,7 +341,7 @@ describe('GET /api/stats', () => {
     const week = weekStartOf(now);
     const inWeek = outages.map((o) => Math.max(0, (o.endTime ? t(o.endTime) : now) - Math.max(t(o.startTime), week)));
     expect(body.weeks.at(-1)).toEqual({
-      weekStart: new Date(week + UTC_OFFSET_MS).toISOString().slice(0, 10),
+      weekStart: localDate(week),
       hoursOff: Math.round((inWeek.reduce((a, b) => a + b, 0) / H) * 10) / 10,
       minutesOff: Math.round(inWeek.reduce((a, b) => a + b, 0) / MINUTE_MS),
       outages: inWeek.filter((ms) => ms > 0).length,

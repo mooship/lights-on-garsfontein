@@ -98,6 +98,9 @@ export async function resaveAlerts(locale: Locale): Promise<void> {
   if (subscription) await save(subscription, locale);
 }
 
+/** Whether the card can turn alerts on, or explain how to: 'ios-install' gets home-screen steps. */
+export const canOffer = (state: AlertsState | undefined) => state === 'off' || state === 'ios-install';
+
 export function shouldOfferCard(input: {
   visits: number;
   snoozedUntil: number | null;
@@ -108,8 +111,7 @@ export function shouldOfferCard(input: {
   const { visits, snoozedUntil, declined, state, now } = input;
   if (visits < MIN_VISITS || declined) return false;
   if (snoozedUntil !== null && snoozedUntil > now) return false;
-  // 'ios-install' is offered too: the card then explains how to add the site to the home screen.
-  return state === 'off' || state === 'ios-install';
+  return canOffer(state);
 }
 
 /**
