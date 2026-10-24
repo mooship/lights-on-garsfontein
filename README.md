@@ -19,6 +19,16 @@ The code runs on one Cloudflare Worker with a D1 database, and anyone can run it
 
 The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): credit "Lights On, Garsfontein?" and link to the site. It is provided as is, with no warranty of accuracy. Times are ISO 8601 UTC; local time is SAST (UTC+2, no daylight saving). Please poll no more than once every 30 seconds. A plain-text summary for language models is at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt). To report a security problem, see [SECURITY.md](SECURITY.md) or [`/.well-known/security.txt`](https://garsfontein.timothybrits.co.za/.well-known/security.txt).
 
+### Show the status on your site
+
+Embed the status badge, in Afrikaans (`/badge.svg`) or English (`/en/badge.svg`):
+
+```html
+<a href="https://garsfontein.timothybrits.co.za"><img src="https://garsfontein.timothybrits.co.za/badge.svg" alt="Lights On, Garsfontein?" height="20"></a>
+```
+
+It words the status as the site does: green for on, red for off, and grey for "No outage reported" whenever no live reading backs the status. Browsers may show it up to a minute late. Each language has its own path because the edge cache ignores query strings.
+
 ### API
 
 | Method and path | Returns | Caching | Limits and access |
@@ -29,6 +39,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `GET /api/outages.csv` | Every outage, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /feed.xml` | Atom feed of the 20 most recent outages, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /og.png` | Social card; status-neutral | `max-age=60` | None |
+| `GET /badge.svg`, `/en/badge.svg` | The status as an image to embed ([Show the status on your site](#show-the-status-on-your-site)) | `max-age=60`; 12 s at the edge | Shared 60/min; CORS |
 | `GET /sitemap.xml`, `/robots.txt` | Search engine files | `max-age=3600` | None |
 | `POST /api/contact` | The privacy contact address | `no-store` | 5/min; Turnstile |
 | `GET /api/push/key` | The public key (`publicKey`, base64url) that a browser subscribes to power alerts with; `404` with `not_configured` while the key is unset | `max-age=86400` | Shared 60/min |
@@ -39,7 +50,7 @@ The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creati
 | `POST /api/admin/login`, `/logout` | Sets or clears the admin session cookie | `no-store` | Login: Turnstile, 5/min per connection and 30/min site-wide |
 | `GET`/`POST /api/admin/outages`, `POST /api/admin/timer` | Manage outages and the punch clock | `no-store` | Session or `ADMIN_API_TOKEN` |
 
-- "Shared 60/min" is one limit per connection across those five endpoints and `GET /api/push/key`, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` and the push subscription writes each have their own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
+- "Shared 60/min" is one limit per connection across those five endpoints, `GET /api/push/key` and the badges, and only requests the edge cache cannot answer count against it, so readers sharing one address (as on mobile networks) are not refused during an outage; `POST /api/contact` and the push subscription writes each have their own 5/min. IPv6 addresses are counted per /64. Over a limit the API answers `429` with `Retry-After: 60`.
 - A `POST` without a bearer token must come from the site itself and carry a JSON body: other sites get `403`, other bodies `415`. Bearer requests (scripts, the sensor) are exempt. A JSON body larger than 16 KB (`MAX_BODY_BYTES` in `worker/lib/http.ts`) gets `413` with `payload_too_large`, bearer or not.
 - Every `GET` route also answers `HEAD`, but the edge cache holds `GET` responses only. It is per Cloudflare datacentre. Writes clear it only in the datacentre that handled them; elsewhere the TTL bounds the delay.
 - `monitored` is `true` while the sensor's last heartbeat is fresh and it is not paused. When it is `false`, `ON` means only that no outage has been reported.

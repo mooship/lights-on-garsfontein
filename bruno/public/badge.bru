@@ -1,0 +1,25 @@
+meta {
+  name: badge.svg
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/badge.svg
+}
+
+tests {
+  test('200 SVG, cached for a minute, embeddable on any site', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('content-type')).to.equal('image/svg+xml; charset=utf-8');
+    expect(res.getHeader('cache-control')).to.equal('public, max-age=60');
+    expect(res.getHeader('cross-origin-resource-policy')).to.equal('cross-origin');
+    expect(res.getHeader('access-control-allow-origin')).to.equal('*');
+  });
+
+  test('names the site and one of the three states', () => {
+    const svg = res.getBody();
+    expect(svg).to.include('Lights On, Garsfontein?');
+    expect(svg).to.match(/Die krag is aan|Die krag is af|Geen onderbreking aangemeld nie/);
+  });
+}

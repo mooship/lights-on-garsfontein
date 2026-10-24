@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { StatusResponse } from '../../shared/api';
-import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
+import { HEARTBEAT_PATH, HEARTBEAT_PAUSE_PATH, LIVE_VIEWS, OUTAGE_VIEWS, STATUS_PATH } from '../../shared/paths';
 import { requireBearer } from '../lib/auth';
 import { getGridState, MAX_PAUSE_MS, pauseSensor, recordHeartbeat } from '../lib/grid';
 import { isJson, isoTime, json, parseBody } from '../lib/http';
@@ -42,9 +42,9 @@ async function postHeartbeat({ db, request }: RouteContext): Promise<Response> {
     poweredFor = parsed.data.poweredFor;
   }
   const { closed, changed } = await recordHeartbeat(db, new Date(), poweredFor);
-  // The status always, as its live reading changed; the other views only when an outage did, so a
+  // The live views always, as the reading changed; the other views only when an outage did, so a
   // sensor posting every minute does not keep emptying them.
-  await purgeEdgeCache(new URL(request.url).origin, changed ? OUTAGE_VIEWS : [STATUS_PATH]);
+  await purgeEdgeCache(new URL(request.url).origin, changed ? OUTAGE_VIEWS : LIVE_VIEWS);
   return json({ ok: true, closedOutages: closed });
 }
 
@@ -53,7 +53,7 @@ async function postPause({ db, request }: RouteContext): Promise<Response> {
   const parsed = await parseBody(request, pauseSchema);
   if ('response' in parsed) return parsed.response;
   const pausedUntil = await pauseSensor(db, parsed.data.until, new Date());
-  await purgeEdgeCache(new URL(request.url).origin, [STATUS_PATH]);
+  await purgeEdgeCache(new URL(request.url).origin, LIVE_VIEWS);
   return json({ ok: true, pausedUntil });
 }
 

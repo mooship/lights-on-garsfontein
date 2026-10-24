@@ -2,7 +2,7 @@ import CalendarClock from 'lucide-solid/icons/calendar-clock';
 import Zap from 'lucide-solid/icons/zap';
 import ZapOff from 'lucide-solid/icons/zap-off';
 import { type Component, Match, onMount, Show, Switch } from 'solid-js';
-import type { PowerStatus } from '../../shared/api';
+import { type BadgeState, badgeState, type PowerStatus } from '../../shared/api';
 import { formatDuration } from '../lib/format';
 import { t } from '../lib/i18n';
 import * as motion from '../styles/motion.css';
@@ -19,12 +19,6 @@ interface StatusBadgeProps {
   /** Current time in ms, injected so the duration ticks. */
   now: number;
 }
-
-/** ON, OFF, or NONE: ON without a live reading, shown in a neutral tone and without a duration. */
-type BadgeState = PowerStatus | 'NONE';
-
-export const badgeState = (status: PowerStatus, monitored: boolean): BadgeState =>
-  status === 'ON' && !monitored ? 'NONE' : status;
 
 export const StatusBadge: Component<StatusBadgeProps> = (props) => {
   const state = () => badgeState(props.status, props.monitored);

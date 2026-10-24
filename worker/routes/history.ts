@@ -17,6 +17,7 @@ import { SUMMARY_COLUMNS, summarise } from '../lib/grid';
 import { json, publicCache } from '../lib/http';
 import type { RouteContext, Routes } from '../lib/router';
 import { hourlyMinutes, mergeOutages, weeklyStats, windowStats } from '../lib/stats';
+import { escapeXml } from '../lib/xml';
 import { STATUS_EDGE_TTL_SECONDS } from './status';
 
 async function getStats({ db }: RouteContext): Promise<Response> {
@@ -97,9 +98,6 @@ async function getOutages({ db }: RouteContext): Promise<Response> {
 }
 
 const FEED_LIMIT = 20;
-
-const XML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' };
-const escapeXml = (text: string) => text.replace(/[&<>"']/g, (c) => XML_ESCAPES[c] ?? c);
 
 const feedDateParts = new Intl.DateTimeFormat('en-GB', {
   timeZone: site.timeZone,
