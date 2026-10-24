@@ -9,6 +9,7 @@ import {
   ALERTS_SNOOZE_MS,
   type AlertsState,
   alertsState,
+  canOffer,
   resaveAlerts,
   shouldOfferCard,
   turnOffAlerts,
@@ -70,7 +71,7 @@ function openCard(byVisitor: boolean) {
 }
 
 /** Whether the card offers alerts, rather than only explaining why they cannot be turned on. */
-export const offering = () => state() === 'off' || state() === 'ios-install';
+export const offering = () => canOffer(state());
 
 type Choice = 'notNow' | 'noThanks' | 'close';
 

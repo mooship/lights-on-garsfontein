@@ -298,7 +298,8 @@ const BarChart: Component<BarChartProps> = (props) => {
 
 export const Trends: Component<TrendsProps> = (props) => {
   const since = () => Date.parse(props.stats.trackingSince);
-  const started = () => props.now >= since();
+  // A memo, so the tiles that read it rebuild only when it flips, not on every minute's tick.
+  const started = createMemo(() => props.now >= since());
   const s = () => props.stats.last30;
   // The day records began, in the same form as WeekStats.weekStart.
   const firstDay = () => localDate(since());

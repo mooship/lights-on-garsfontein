@@ -27,7 +27,7 @@ export const ROBOTS_PATH = '/robots.txt';
 export const OG_IMAGE_PATH = '/og.png';
 /** The status image other sites embed, one per language: the edge cache ignores query strings. */
 export const badgePath = (locale: Locale) => `${localePath(locale)}badge.svg`;
-export const BADGE_PATHS: readonly string[] = LOCALES.map(badgePath);
+const BADGE_PATHS: readonly string[] = LOCALES.map(badgePath);
 /** The static card that OG_IMAGE_PATH serves, written by scripts/build-og.ts. */
 export const OG_CARD_ASSET_PATH = '/og/card.png';
 /** RFC 9116; a static file built from templates/.well-known/security.txt. */
@@ -38,6 +38,9 @@ export const ADMIN_PAGE_PATH = '/admin';
 export const PRIVACY_PAGE_PATH = '/privacy';
 /** The push-only service worker, built from templates/sw.js and registered by src/lib/push.ts at scope '/'. */
 export const SERVICE_WORKER_PATH = '/sw.js';
+/** The tab icons src/lib/tab.ts swaps in while the status is ON or OFF (public/). */
+export const FAVICON_ON_PATH = '/favicon-on.svg';
+export const FAVICON_OFF_PATH = '/favicon-off.svg';
 
 /**
  * Worker routes outside API_PREFIX. wrangler.toml and wrangler.example.toml list them again in

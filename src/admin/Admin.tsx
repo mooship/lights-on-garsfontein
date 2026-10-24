@@ -43,7 +43,7 @@ import { getTurnstileToken, loadTurnstile } from '../lib/turnstile';
 import { button, errorText, input, label, plainList } from '../styles/ui.css';
 import * as css from './Admin.css';
 import { type AdminErrorCode, admin } from './copy';
-import { sensorState } from './sensor';
+import { sensorState, sensorText } from './sensor';
 
 const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401;
 
@@ -287,21 +287,7 @@ const SensorLine: Component<{ sensor: SensorReading | null; asOf: number }> = (p
   const state = () => sensorState(props.sensor, props.asOf);
   return (
     <p class={css.sensor} classList={{ [css.sensorSilent]: state().kind === 'silent' }}>
-      {(() => {
-        const s = state();
-        switch (s.kind) {
-          case 'never':
-            return admin.sensor.never;
-          case 'paused':
-            return admin.sensor.paused(at(s.until, props.asOf));
-          case 'resuming':
-            return admin.sensor.resuming(at(s.since, props.asOf));
-          case 'reporting':
-            return admin.sensor.reporting(at(s.lastSeen, props.asOf));
-          case 'silent':
-            return admin.sensor.silent(formatDuration(s.forMs), at(s.since, props.asOf));
-        }
-      })()}
+      {sensorText(state(), (iso) => at(iso, props.asOf), formatDuration)}
     </p>
   );
 };

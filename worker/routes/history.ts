@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, or } from 'drizzle-orm';
+import { asc, desc, gte, isNull, or } from 'drizzle-orm';
 import {
   COVERAGE_SINCE,
   CSV_FILE_NAME,

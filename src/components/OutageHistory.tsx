@@ -41,7 +41,8 @@ const OutageList: Component<{ outages: OutageSummary[]; now: number; markArrival
                     [css.ongoingPlanned]: !outage.endTime && outage.planned,
                   }}
                 >
-                  {formatDuration(outageDurationMs(outage, props.now))}
+                  {/* Only an open outage reads the clock, so closed rows do not re-render every tick. */}
+                  {formatDuration(outageDurationMs(outage, outage.endTime ? 0 : props.now))}
                 </div>
                 <div class={css.secondary}>
                   {outage.endTime ? '' : t().history.ongoing}

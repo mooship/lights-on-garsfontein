@@ -51,7 +51,7 @@ export const PUSH_PAGE_SIZE = 40;
 /** How many times one page, or one Telegram message, is tried before it is dropped. */
 export const PUSH_MAX_ATTEMPTS = 3;
 /** The wait before a retry, multiplied by the attempts so far. */
-export const ALERT_RETRY_DELAY_SECONDS = MINUTE_MS / SECOND_MS;
+const ALERT_RETRY_DELAY_SECONDS = MINUTE_MS / SECOND_MS;
 /** The most messages Queues accepts in one `sendBatch`. */
 const QUEUE_BATCH_LIMIT = 100;
 

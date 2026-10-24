@@ -1,4 +1,5 @@
 import { isPaused, isStale, type SensorReading, silentSince } from '../../shared/api';
+import { admin } from './copy';
 
 type SensorState =
   | { kind: 'never' }
@@ -17,4 +18,20 @@ export function sensorState(sensor: SensorReading | null, now: number): SensorSt
   if (!isStale(lastSeen, now)) return { kind: 'reporting', lastSeen };
   const since = silentSince(lastSeen, pausedUntil);
   return isStale(since, now) ? { kind: 'silent', since, forMs: now - Date.parse(since) } : { kind: 'resuming', since };
+}
+
+/** The sensor line in the owner's words; the admin page and Telegram each pass their own formatters. */
+export function sensorText(state: SensorState, at: (iso: string) => string, duration: (ms: number) => string): string {
+  switch (state.kind) {
+    case 'never':
+      return admin.sensor.never;
+    case 'paused':
+      return admin.sensor.paused(at(state.until));
+    case 'resuming':
+      return admin.sensor.resuming(at(state.since));
+    case 'reporting':
+      return admin.sensor.reporting(at(state.lastSeen));
+    case 'silent':
+      return admin.sensor.silent(duration(state.forMs), at(state.since));
+  }
 }

@@ -20,10 +20,7 @@ export async function checkBearer(request: Request, secret: string | undefined):
   return secret ? safeEqual(token, secret) : false;
 }
 
-/** An `authorize` guard for bearer-token endpoints. An unset secret refuses every request. */
-export function requireBearer(secretOf: (env: Env) => string | undefined) {
-  return async (ctx: RouteContext): Promise<Response | null> => {
-    if (await checkBearer(ctx.request, secretOf(ctx.env))) return null;
-    return refuseBadToken(ctx);
-  };
+/** The `authorize` guard for the sensor's endpoints. An unset HEARTBEAT_TOKEN refuses every request. */
+export async function authorizeSensor(ctx: RouteContext): Promise<Response | null> {
+  return (await checkBearer(ctx.request, ctx.env.HEARTBEAT_TOKEN)) ? null : refuseBadToken(ctx);
 }
