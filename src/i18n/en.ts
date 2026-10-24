@@ -94,7 +94,7 @@ export const en = {
     daysAffected: 'Days with an outage',
     daysOf: (days: number, total: number) => `${days} of ${total}`,
     longest: 'Longest outage',
-    average: (duration: string) => `Average ${duration}`,
+    typically: (duration: string) => `Typically ${duration}`,
     chartEmpty: 'No outages to chart yet.',
     chartTitle: 'Hours without power per week',
     chartLabel: 'Hours without power per week. Use the arrow keys to move between weeks, or open the table below.',

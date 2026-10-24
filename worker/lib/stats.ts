@@ -37,6 +37,14 @@ export function mergeOutages(rows: { startTime: string; endTime: string | null }
   return merged;
 }
 
+/** The middle of an ascending list, or the mean of its two middle values; null when empty. */
+function medianOf(sorted: number[]): number | null {
+  if (sorted.length === 0) return null;
+  const mid = Math.floor(sorted.length / 2);
+  const upper = sorted[mid] ?? 0;
+  return sorted.length % 2 ? upper : ((sorted[mid - 1] ?? 0) + upper) / 2;
+}
+
 function overlap(i: Interval, from: number, to: number): number {
   return Math.max(0, Math.min(i.end, to) - Math.max(i.start, from));
 }
@@ -55,16 +63,16 @@ export function windowStats(
 ): WindowStats {
   const start = Math.max(from, trackingSince);
   const tracked = Math.max(0, to - start);
-  let offMs = 0;
-  let outages = 0;
-  let longest = 0;
+  const durations: number[] = [];
   for (const i of intervals) {
     const ms = overlap(i, start, to);
-    if (ms <= 0) continue;
-    offMs += ms;
-    outages += 1;
-    longest = Math.max(longest, ms);
+    if (ms > 0) durations.push(ms);
   }
+  durations.sort((a, b) => a - b);
+  const offMs = durations.reduce((sum, ms) => sum + ms, 0);
+  const outages = durations.length;
+  const longest = durations.at(-1) ?? 0;
+  const median = medianOf(durations);
 
   // Calendar days (configured zone) touched by the window, and how many of them had any outage. Merged
   // intervals are sorted by both start and end, so one index moves forward with the days.
@@ -87,6 +95,7 @@ export function windowStats(
     outages,
     availability: tracked > 0 ? Math.round((1 - offMs / tracked) * 10_000) / 10_000 : null,
     longestMinutes: Math.round(longest / MINUTE_MS),
+    medianMinutes: median === null ? null : Math.round(median / MINUTE_MS),
     daysTracked,
     daysWithOutage,
     plannedOutages: planned.filter((i) => overlap(i, start, to) > 0).length,

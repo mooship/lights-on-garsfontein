@@ -91,6 +91,8 @@ export interface WindowStats {
   availability: number | null;
   /** The longest outage, in whole minutes, counting only the part inside the window. */
   longestMinutes: number;
+  /** The median outage, in whole minutes and counted like `longestMinutes`; null without outages. */
+  medianMinutes: number | null;
   /** Calendar days in the configured zone that the window covers since tracking began. */
   daysTracked: number;
   /** How many of those days had at least one outage. */

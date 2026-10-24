@@ -26,6 +26,9 @@ const { AXIS_WIDTH } = css;
 
 /** A tile duration like the history's ("5 u 23 min"); none at all reads "0 min". */
 const tileDuration = (minutes: number) => (minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `0 ${t().units.min}`);
+/** One outage's length: it happened, so under half a minute reads as less than one, never zero. */
+const outageDuration = (minutes: number) =>
+  minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `< 1 ${t().units.min}`;
 
 // Durations use `minutesOff`, to the minute like `longestMinutes`: `hoursOff` is rounded to 6 minutes, so
 // one outage could disagree with itself. The charts use `hoursOff`, which they plot in hours.
@@ -353,22 +356,8 @@ export const Trends: Component<TrendsProps> = (props) => {
           />
           <Tile
             label={t().trends.longest}
-            value={
-              s().outages === 0 ? (
-                '—'
-              ) : (
-                <DurationValue
-                  text={
-                    s().longestMinutes > 0 ? formatDuration(s().longestMinutes * MINUTE_MS) : `< 1 ${t().units.min}`
-                  }
-                />
-              )
-            }
-            note={
-              s().outages > 1
-                ? t().trends.average(formatDuration((s().minutesOff / s().outages) * MINUTE_MS))
-                : undefined
-            }
+            value={s().outages === 0 ? '—' : <DurationValue text={outageDuration(s().longestMinutes)} />}
+            note={s().outages > 1 ? t().trends.typically(outageDuration(s().medianMinutes ?? 0)) : undefined}
           />
         </div>
         <Show when={anyOutage()} fallback={<p class={`${css.chartEmpty} ${motion.enter}`}>{t().trends.chartEmpty}</p>}>
