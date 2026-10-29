@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
-import { MINUTE_MS } from '../shared/api';
+import backfill from '../drizzle/0014_telegram_alert_backfill.sql?raw';
+import { HEARTBEAT_THRESHOLD_MS, MINUTE_MS } from '../shared/api';
 import { admin } from '../src/admin/copy';
 import { MINUTE_CRON } from '../worker/crons';
 import { createDb } from '../worker/db/client';
@@ -10,7 +11,11 @@ import {
   type AlertJob,
   claimAlerts,
   enqueueAlerts,
+  enqueueTelegramAlerts,
+  loadDueOutage,
   PUSH_MAX_ATTEMPTS,
+  TELEGRAM_ALERT_DELAY_MS,
+  TELEGRAM_CHANNEL,
   type TelegramAlert,
 } from '../worker/lib/alerts';
 import { deliverTelegramAlert, TELEGRAM_HOST, telegramConfigured, telegramText } from '../worker/lib/telegram';
@@ -18,7 +23,7 @@ import { expireTimeouts, insertOutage, insertSubscription, runCron, stubFetchHos
 
 const NOW = new Date('2026-10-22T12:00:00.000Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
-const DUE_MS = ALERT_DELAY_MS + MINUTE_MS;
+const DUE_MS = TELEGRAM_ALERT_DELAY_MS + MINUTE_MS;
 const TOKEN = '123456:test-bot-token';
 const CHAT_ID = '42';
 
@@ -87,6 +92,99 @@ function stubQueue() {
 const sentBodies = (sendBatch: ReturnType<typeof stubQueue>['sendBatch']) =>
   sendBatch.mock.calls.flatMap(([messages]) => [...messages].map((message) => message.body));
 
+const telegramColumns = async (id: number) =>
+  env.DB.prepare(
+    'SELECT off_alert_at, on_alert_at, telegram_off_alert_at, telegram_on_alert_at FROM outages WHERE id = ?',
+  )
+    .bind(id)
+    .first<{
+      off_alert_at: string | null;
+      on_alert_at: string | null;
+      telegram_off_alert_at: string | null;
+      telegram_on_alert_at: string | null;
+    }>();
+
+describe('the Telegram delay', () => {
+  it('is sooner than the push delay, and still above the time a silent sensor takes to be detected', () => {
+    // Literal minutes on purpose: this pins the delay the owner chose, so changing it fails here.
+    expect(TELEGRAM_ALERT_DELAY_MS).toBe(5 * MINUTE_MS);
+    expect(TELEGRAM_ALERT_DELAY_MS).toBeLessThan(ALERT_DELAY_MS);
+    expect(TELEGRAM_ALERT_DELAY_MS).toBeGreaterThan(HEARTBEAT_THRESHOLD_MS);
+  });
+});
+
+describe('claiming Telegram alerts', () => {
+  const db = () => createDb(env.DB);
+
+  it('claims off at its own delay, while push is still waiting', async () => {
+    const id = await insertOutage({ startTime: ago(6 * MINUTE_MS) });
+
+    expect(await claimAlerts(db(), NOW)).toEqual([]);
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([{ kind: 'off', outageId: id }]);
+
+    expect(await telegramColumns(id)).toMatchObject({
+      telegram_off_alert_at: NOW.toISOString(),
+      off_alert_at: null,
+    });
+  });
+
+  it('waits until the delay has passed', async () => {
+    await insertOutage({ startTime: ago(TELEGRAM_ALERT_DELAY_MS - MINUTE_MS) });
+
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([]);
+  });
+
+  it("claims independently of push, and never the other channel's column", async () => {
+    const id = await insertOutage({ startTime: ago(2 * ALERT_DELAY_MS) });
+
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([{ kind: 'off', outageId: id }]);
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([]);
+    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'off', outageId: id }]);
+    expect(await telegramColumns(id)).toMatchObject({
+      off_alert_at: NOW.toISOString(),
+      telegram_off_alert_at: NOW.toISOString(),
+    });
+  });
+
+  it('tells Telegram off and back on for an outage that ends between the two delays, and push nothing', async () => {
+    const id = await insertOutage({ startTime: ago(8 * MINUTE_MS) });
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([{ kind: 'off', outageId: id }]);
+
+    await env.DB.prepare('UPDATE outages SET end_time = ? WHERE id = ?').bind(ago(MINUTE_MS), id).run();
+
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([{ kind: 'on', outageId: id }]);
+    expect(await claimAlerts(db(), NOW)).toEqual([]);
+    expect(await telegramColumns(id)).toMatchObject({ off_alert_at: null, on_alert_at: null });
+  });
+
+  it('follows up only an off alert that Telegram sent, not one that push sent', async () => {
+    await insertOutage({
+      startTime: ago(30 * MINUTE_MS),
+      endTime: ago(MINUTE_MS),
+      offAlertAt: ago(MINUTE_MS),
+    });
+
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([]);
+  });
+
+  it('claims dismissed for a false positive whose Telegram off alert was sent', async () => {
+    const id = await insertOutage({ startTime: ago(DUE_MS), isFalsePositive: 1, telegramOffAlertAt: ago(MINUTE_MS) });
+
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([{ kind: 'dismissed', outageId: id }]);
+    expect((await telegramColumns(id))?.telegram_on_alert_at).toBe(NOW.toISOString());
+  });
+
+  it('finds the outages awaiting a Telegram follow-up without scanning the table', async () => {
+    const { results } = await env.DB.prepare(
+      'EXPLAIN QUERY PLAN UPDATE outages SET telegram_on_alert_at = ? WHERE telegram_off_alert_at IS NOT NULL AND telegram_on_alert_at IS NULL',
+    )
+      .bind(NOW.toISOString())
+      .all<{ detail: string }>();
+
+    expect(results.map(({ detail }) => detail)).not.toContainEqual(expect.stringMatching(/^SCAN outages/));
+  });
+});
+
 describe('queueing Telegram alerts', () => {
   const db = () => createDb(env.DB);
   const claim = { kind: 'off', outageId: 7 } as const;
@@ -94,12 +192,12 @@ describe('queueing Telegram alerts', () => {
   it('queues one Telegram message per claim, even without push subscribers', async () => {
     const { queue, sendBatch } = stubQueue();
 
-    await enqueueAlerts(db(), queue, [claim], NOW, { telegram: true });
+    await enqueueTelegramAlerts(db(), queue, [claim], NOW);
 
     expect(sentBodies(sendBatch)).toEqual([{ ...claim, channel: 'telegram', attempt: 1, queuedAt: NOW.toISOString() }]);
   });
 
-  it('queues no Telegram message unless asked to', async () => {
+  it('queues no Telegram message for a push alert', async () => {
     await insertSubscription('a');
     const { queue, sendBatch } = stubQueue();
 
@@ -108,16 +206,17 @@ describe('queueing Telegram alerts', () => {
     expect(sentBodies(sendBatch).some((body) => 'channel' in body)).toBe(false);
   });
 
-  it('releases the claim when queueing fails, so the next run tries again', async () => {
-    const id = await insertOutage({ startTime: ago(DUE_MS) });
-    const claims = await claimAlerts(db(), NOW);
+  it('releases only the Telegram claim when queueing fails, so the next run tries again', async () => {
+    const id = await insertOutage({ startTime: ago(2 * ALERT_DELAY_MS), offAlertAt: ago(MINUTE_MS) });
+    const claims = await claimAlerts(db(), NOW, TELEGRAM_CHANNEL);
     const sendBatch = vi.fn().mockRejectedValue(new Error('queue down'));
 
-    await expect(
-      enqueueAlerts(db(), { sendBatch } as unknown as Queue<AlertJob>, claims, NOW, { telegram: true }),
-    ).rejects.toThrow('queue down');
+    await expect(enqueueTelegramAlerts(db(), { sendBatch } as unknown as Queue<AlertJob>, claims, NOW)).rejects.toThrow(
+      'queue down',
+    );
 
-    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'off', outageId: id }]);
+    expect(await telegramColumns(id)).toMatchObject({ telegram_off_alert_at: null, off_alert_at: ago(MINUTE_MS) });
+    expect(await claimAlerts(db(), NOW, TELEGRAM_CHANNEL)).toEqual([{ kind: 'off', outageId: id }]);
   });
 
   it('is queued by the minute cron only when both secrets are set', async () => {
@@ -126,10 +225,75 @@ describe('queueing Telegram alerts', () => {
     await runCron(MINUTE_CRON, NOW.getTime(), { ...env, PUSH_QUEUE: unset.queue });
     expect(unset.sendBatch).not.toHaveBeenCalled();
 
-    await insertOutage({ startTime: ago(DUE_MS) });
     const set = stubQueue();
     await runCron(MINUTE_CRON, NOW.getTime(), telegramEnv(set.queue));
     expect(sentBodies(set.sendBatch)).toMatchObject([{ kind: 'off', channel: 'telegram' }]);
+  });
+
+  it('does not let a failing push queue hold back the Telegram message', async () => {
+    await insertOutage({ startTime: ago(2 * ALERT_DELAY_MS) });
+    await insertSubscription('a');
+    const sendBatch = vi.fn(async (messages: Iterable<MessageSendRequest<AlertJob>>) => {
+      if ([...messages].some((message) => !('channel' in message.body))) throw new Error('push queue down');
+    });
+
+    await expect(
+      runCron(MINUTE_CRON, NOW.getTime(), telegramEnv({ sendBatch } as unknown as Queue<AlertJob>)),
+    ).rejects.toThrow('push queue down');
+
+    expect(sentBodies(sendBatch)).toMatchObject(
+      expect.arrayContaining([expect.objectContaining({ kind: 'off', channel: 'telegram' })]),
+    );
+  });
+});
+
+describe('a dismissal that is undone', () => {
+  const db = () => createDb(env.DB);
+
+  it("releases the Telegram claim for a Telegram job, and leaves push's alone", async () => {
+    const id = await insertOutage({
+      startTime: ago(DUE_MS),
+      offAlertAt: ago(2 * MINUTE_MS),
+      onAlertAt: ago(MINUTE_MS),
+      telegramOffAlertAt: ago(2 * MINUTE_MS),
+      telegramOnAlertAt: NOW.toISOString(),
+    });
+
+    const outage = await loadDueOutage(
+      db(),
+      { kind: 'dismissed', outageId: id, queuedAt: NOW.toISOString() },
+      TELEGRAM_CHANNEL,
+    );
+
+    expect(outage).toBeNull();
+    expect(await telegramColumns(id)).toMatchObject({
+      telegram_on_alert_at: null,
+      on_alert_at: ago(MINUTE_MS),
+    });
+  });
+});
+
+describe('the data migration', () => {
+  it('copies an earlier push claim to Telegram, so an alerted outage is not alerted twice', async () => {
+    const id = await insertOutage({
+      startTime: ago(30 * MINUTE_MS),
+      endTime: ago(MINUTE_MS),
+      offAlertAt: ago(20 * MINUTE_MS),
+      onAlertAt: ago(MINUTE_MS),
+    });
+    const untouched = await insertOutage({ startTime: ago(3 * MINUTE_MS) });
+    const sql = backfill
+      .split('\n')
+      .filter((line) => !line.startsWith('--'))
+      .join(' ');
+
+    await env.DB.prepare(sql).run();
+
+    expect(await telegramColumns(id)).toMatchObject({
+      telegram_off_alert_at: ago(20 * MINUTE_MS),
+      telegram_on_alert_at: ago(MINUTE_MS),
+    });
+    expect(await telegramColumns(untouched)).toMatchObject({ telegram_off_alert_at: null });
   });
 });
 
@@ -166,7 +330,7 @@ describe('deliverTelegramAlert', () => {
     expect(sent).toEqual({
       chat_id: CHAT_ID,
       // DUE_MS before NOW, in local time.
-      text: telegram.off.sensor('13:49'),
+      text: telegram.off.sensor('13:54'),
       link_preview_options: { is_disabled: true },
     });
   });

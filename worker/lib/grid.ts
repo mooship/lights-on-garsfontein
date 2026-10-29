@@ -192,6 +192,8 @@ export async function recordHeartbeat(
       dismissedBy: sql<null>`null`.as('dismissed_by'),
       offAlertAt: sql<null>`null`.as('off_alert_at'),
       onAlertAt: sql<null>`null`.as('on_alert_at'),
+      telegramOffAlertAt: sql<null>`null`.as('telegram_off_alert_at'),
+      telegramOnAlertAt: sql<null>`null`.as('telegram_on_alert_at'),
     })
     .from(heartbeats)
     .where(

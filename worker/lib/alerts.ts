@@ -46,6 +46,21 @@ export function alertMessage(
  * time to detect it. Long enough to ride out a router reboot or a longer connection drop.
  */
 export const ALERT_DELAY_MS = 10 * MINUTE_MS;
+/** The same, for the owner's Telegram: a heads-up that may prove a false alarm, so it can come sooner. Above HEARTBEAT_THRESHOLD_MS. */
+export const TELEGRAM_ALERT_DELAY_MS = 5 * MINUTE_MS;
+
+/** How long an outage lasts before a channel alerts, and the outage columns that hold its claims. */
+export interface AlertChannel {
+  delayMs: number;
+  offField: 'offAlertAt' | 'telegramOffAlertAt';
+  onField: 'onAlertAt' | 'telegramOnAlertAt';
+}
+export const PUSH_CHANNEL: AlertChannel = { delayMs: ALERT_DELAY_MS, offField: 'offAlertAt', onField: 'onAlertAt' };
+export const TELEGRAM_CHANNEL: AlertChannel = {
+  delayMs: TELEGRAM_ALERT_DELAY_MS,
+  offField: 'telegramOffAlertAt',
+  onField: 'telegramOnAlertAt',
+};
 /** Subscriptions per queue message, so one delivery run stays inside a Worker invocation's limits. */
 export const PUSH_PAGE_SIZE = 40;
 /** How many times one page, or one Telegram message, is tried before it is dropped. */
@@ -86,30 +101,32 @@ export async function retryAlert(queue: Queue<AlertJob>, job: AlertJob): Promise
 }
 
 /**
- * Marks the alerts that are due as sent and returns them: off, then on, then dismissed. Each kind
- * is one conditional UPDATE, so two concurrent runs cannot claim the same alert; the three go in
- * one batch to save round trips. A back-on or dismissed alert needs the off alert to have been
- * claimed, so nobody hears a follow-up to an alert they never got. Both follow-ups set
- * `onAlertAt`, so an outage gets one or the other, never both.
+ * Marks the alerts that are due on `channel` as sent and returns them: off, then on, then dismissed.
+ * Each kind is one conditional UPDATE, so two concurrent runs cannot claim the same alert; the three
+ * go in one batch to save round trips. A back-on or dismissed alert needs the off alert to have been
+ * claimed, so nobody hears a follow-up to an alert they never got. Both follow-ups set the channel's
+ * `onField`, so an outage gets one or the other, never both.
  */
-export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
+export async function claimAlerts(db: Db, now: Date, channel: AlertChannel = PUSH_CHANNEL): Promise<AlertClaim[]> {
   const claimedAt = now.toISOString();
-  const dueBefore = new Date(now.getTime() - ALERT_DELAY_MS).toISOString();
+  const dueBefore = new Date(now.getTime() - channel.delayMs).toISOString();
+  const offAt = outages[channel.offField];
+  const onAt = outages[channel.onField];
   const [off, on, dismissed] = await db.batch([
     db
       .update(outages)
-      .set({ offAlertAt: claimedAt })
-      .where(and(isNull(outages.endTime), isPublic, isNull(outages.offAlertAt), lte(outages.startTime, dueBefore)))
+      .set({ [channel.offField]: claimedAt })
+      .where(and(isNull(outages.endTime), isPublic, isNull(offAt), lte(outages.startTime, dueBefore)))
       .returning({ id: outages.id }),
     db
       .update(outages)
-      .set({ onAlertAt: claimedAt })
-      .where(and(isNotNull(outages.endTime), isPublic, isNotNull(outages.offAlertAt), isNull(outages.onAlertAt)))
+      .set({ [channel.onField]: claimedAt })
+      .where(and(isNotNull(outages.endTime), isPublic, isNotNull(offAt), isNull(onAt)))
       .returning({ id: outages.id }),
     db
       .update(outages)
-      .set({ onAlertAt: claimedAt })
-      .where(and(eq(outages.isFalsePositive, true), isNotNull(outages.offAlertAt), isNull(outages.onAlertAt)))
+      .set({ [channel.onField]: claimedAt })
+      .where(and(eq(outages.isFalsePositive, true), isNotNull(offAt), isNull(onAt)))
       .returning({ id: outages.id }),
   ]);
   return [
@@ -119,9 +136,14 @@ export async function claimAlerts(db: Db, now: Date): Promise<AlertClaim[]> {
   ];
 }
 
-/** Clears a claim, if it is still the one made at `claimedAt`, so the next run claims the alert again. */
-async function releaseClaim(db: Db, { kind, outageId }: AlertClaim, claimedAt: string): Promise<void> {
-  const field = kind === 'off' ? 'offAlertAt' : 'onAlertAt';
+/** Clears a claim on `channel`, if it is still the one made at `claimedAt`, so the next run claims the alert again. */
+async function releaseClaim(
+  db: Db,
+  { kind, outageId }: AlertClaim,
+  claimedAt: string,
+  channel: AlertChannel,
+): Promise<void> {
+  const field = kind === 'off' ? channel.offField : channel.onField;
   await db
     .update(outages)
     .set({ [field]: null })
@@ -132,12 +154,16 @@ async function releaseClaim(db: Db, { kind, outageId }: AlertClaim, claimedAt: s
  * The outage an alert is about, or `null` if it no longer warrants the alert, which would then mislead.
  * A dismissed alert for an undone dismissal releases its claim, so the outage's real end can still send "back on".
  */
-export async function loadDueOutage(db: Db, alert: AlertClaim & { queuedAt: string }): Promise<Outage | null> {
+export async function loadDueOutage(
+  db: Db,
+  alert: AlertClaim & { queuedAt: string },
+  channel: AlertChannel = PUSH_CHANNEL,
+): Promise<Outage | null> {
   const outage = await db.select().from(outages).where(eq(outages.id, alert.outageId)).get();
   if (!outage) return null;
   if (alert.kind === 'dismissed') {
     if (outage.isFalsePositive) return outage;
-    await releaseClaim(db, alert, alert.queuedAt);
+    await releaseClaim(db, alert, alert.queuedAt, channel);
     return null;
   }
   if (outage.isFalsePositive) return null;
@@ -145,45 +171,67 @@ export async function loadDueOutage(db: Db, alert: AlertClaim & { queuedAt: stri
 }
 
 /**
- * Queues every subscription, in pages, for each claimed alert, and with `telegram` one message to
- * the owner ahead of them. If it fails before any message of a claim is queued, that claim is
- * released and the error rethrown, so the alert is retried rather than lost, and an "on" alert
- * never follows an "off" that nobody got. Once a message is queued the claim stays: some
- * subscribers hearing it beats all of them hearing it twice.
+ * Sends `messages` in batches Queues accepts. If one fails before any message of a claim is queued,
+ * that claim is released on `channel` and the error rethrown, so the alert is retried rather than
+ * lost, and an "on" alert never follows an "off" that nobody got. Once a message is queued the claim
+ * stays: some subscribers hearing it beats all of them hearing it twice.
  */
-export async function enqueueAlerts(
+async function queueMessages(
   db: Db,
   queue: Queue<AlertJob>,
+  messages: { claim: AlertClaim; request: MessageSendRequest<AlertJob> }[],
   claims: AlertClaim[],
-  now: Date,
-  { telegram = false } = {},
+  claimedAt: string,
+  channel: AlertChannel,
 ): Promise<void> {
-  if (claims.length === 0) return;
-  const queuedAt = now.toISOString();
   const queued = new Set<AlertClaim>();
   try {
-    const rows = await db
-      .select({ id: pushSubscriptions.id })
-      .from(pushSubscriptions)
-      .orderBy(asc(pushSubscriptions.id));
-    const ids = rows.map(({ id }) => id);
-    const messages: { claim: AlertClaim; request: MessageSendRequest<AlertJob> }[] = [];
-    for (const claim of claims) {
-      if (telegram) {
-        messages.push({ claim, request: { body: { ...claim, channel: 'telegram', attempt: 1, queuedAt } } });
-      }
-      for (let start = 0; start < ids.length; start += PUSH_PAGE_SIZE) {
-        const body = { ...claim, ids: ids.slice(start, start + PUSH_PAGE_SIZE), attempt: 1, queuedAt };
-        messages.push({ claim, request: { body } });
-      }
-    }
     for (let start = 0; start < messages.length; start += QUEUE_BATCH_LIMIT) {
       const slice = messages.slice(start, start + QUEUE_BATCH_LIMIT);
       await queue.sendBatch(slice.map(({ request }) => request));
       for (const { claim } of slice) queued.add(claim);
     }
   } catch (error) {
-    for (const claim of claims) if (!queued.has(claim)) await releaseClaim(db, claim, queuedAt);
+    for (const claim of claims) if (!queued.has(claim)) await releaseClaim(db, claim, claimedAt, channel);
     throw error;
   }
+}
+
+/** Queues every subscription, in pages, for each claimed push alert. */
+export async function enqueueAlerts(db: Db, queue: Queue<AlertJob>, claims: AlertClaim[], now: Date): Promise<void> {
+  if (claims.length === 0) return;
+  const queuedAt = now.toISOString();
+  const messages: { claim: AlertClaim; request: MessageSendRequest<AlertJob> }[] = [];
+  try {
+    const rows = await db
+      .select({ id: pushSubscriptions.id })
+      .from(pushSubscriptions)
+      .orderBy(asc(pushSubscriptions.id));
+    const ids = rows.map(({ id }) => id);
+    for (const claim of claims) {
+      for (let start = 0; start < ids.length; start += PUSH_PAGE_SIZE) {
+        const body = { ...claim, ids: ids.slice(start, start + PUSH_PAGE_SIZE), attempt: 1, queuedAt };
+        messages.push({ claim, request: { body } });
+      }
+    }
+  } catch (error) {
+    for (const claim of claims) await releaseClaim(db, claim, queuedAt, PUSH_CHANNEL);
+    throw error;
+  }
+  await queueMessages(db, queue, messages, claims, queuedAt, PUSH_CHANNEL);
+}
+
+/** Queues one message per claimed Telegram alert, whether or not anyone has subscribed to push. */
+export async function enqueueTelegramAlerts(
+  db: Db,
+  queue: Queue<AlertJob>,
+  claims: AlertClaim[],
+  now: Date,
+): Promise<void> {
+  const queuedAt = now.toISOString();
+  const messages = claims.map((claim) => ({
+    claim,
+    request: { body: { ...claim, channel: 'telegram' as const, attempt: 1, queuedAt } },
+  }));
+  await queueMessages(db, queue, messages, claims, queuedAt, TELEGRAM_CHANNEL);
 }

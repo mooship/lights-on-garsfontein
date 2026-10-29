@@ -109,12 +109,18 @@ async function mutateOutage({ request, db }: RouteContext): Promise<Response> {
   if (!existing) return errors.notFound();
 
   if (input.action === OUTAGE_ACTION.delete) {
-    // While an off alert awaits its follow-up, the outage stays: the follow-up is sent only while
-    // the row exists (loadDueOutage), so subscribers would be left believing the power is off.
-    // Marking it a false positive sends the correction instead.
+    // While an off alert awaits its follow-up, on either channel, the outage stays: the follow-up is
+    // sent only while the row exists (loadDueOutage), so the recipients would be left believing the
+    // power is off. Marking it a false positive sends the correction instead.
     const [deleted] = await db
       .delete(outages)
-      .where(and(eq(outages.id, input.id), or(isNull(outages.offAlertAt), isNotNull(outages.onAlertAt))))
+      .where(
+        and(
+          eq(outages.id, input.id),
+          or(isNull(outages.offAlertAt), isNotNull(outages.onAlertAt)),
+          or(isNull(outages.telegramOffAlertAt), isNotNull(outages.telegramOnAlertAt)),
+        ),
+      )
       .returning({ id: outages.id });
     if (!deleted) return errors.conflict(ERROR.alertSent);
     return json({ ok: true });

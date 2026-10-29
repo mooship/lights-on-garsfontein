@@ -45,14 +45,20 @@ export const outages = sqliteTable(
     offAlertAt: text('off_alert_at'),
     /** When the follow-up to the off alert went out (back on, or dismissed as a false positive); null until sent. */
     onAlertAt: text('on_alert_at'),
+    /** The owner's Telegram counterparts of offAlertAt and onAlertAt: Telegram alerts sooner, so it keeps its own claims. */
+    telegramOffAlertAt: text('telegram_off_alert_at'),
+    telegramOnAlertAt: text('telegram_on_alert_at'),
   },
   (table) => [
     // "Newest first" queries (status, admin list) read only the rows they return.
     index('outages_start_time_idx').on(table.startTime),
     // Open outages (end_time IS NULL) and the stats range scan on end_time.
     index('outages_end_start_idx').on(table.endTime, table.startTime),
-    // The minute cron's follow-up claims (claimAlerts); partial, so it holds only the few rows still waiting.
+    // The minute cron's follow-up claims (claimAlerts), one index per channel; partial, so it holds only the few rows still waiting.
     index('outages_alert_pending_idx').on(table.offAlertAt).where(sql`${table.onAlertAt} is null`),
+    index('outages_telegram_alert_pending_idx')
+      .on(table.telegramOffAlertAt)
+      .where(sql`${table.telegramOnAlertAt} is null`),
   ],
 );
 

@@ -151,7 +151,7 @@ export async function setHeartbeat(secondsAgo: number): Promise<string> {
 
 /**
  * Writes an outage straight to D1, so nothing purges the edge cache; by default an open sensor outage.
- * `offAlertAt` and `onAlertAt` seed alerts as already claimed.
+ * `offAlertAt`, `onAlertAt` and their `telegram` counterparts seed alerts as already claimed.
  */
 export async function insertOutage(values: {
   startTime?: string;
@@ -161,9 +161,11 @@ export async function insertOutage(values: {
   isPlanned?: 0 | 1;
   offAlertAt?: string;
   onAlertAt?: string;
+  telegramOffAlertAt?: string;
+  telegramOnAlertAt?: string;
 }): Promise<number> {
   const row = await env.DB.prepare(
-    'INSERT INTO outages (start_time, end_time, source, is_false_positive, is_planned, off_alert_at, on_alert_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+    'INSERT INTO outages (start_time, end_time, source, is_false_positive, is_planned, off_alert_at, on_alert_at, telegram_off_alert_at, telegram_on_alert_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
   )
     .bind(
       values.startTime ?? new Date(Date.now() - 10 * MINUTE_MS).toISOString(),
@@ -173,6 +175,8 @@ export async function insertOutage(values: {
       values.isPlanned ?? 0,
       values.offAlertAt ?? null,
       values.onAlertAt ?? null,
+      values.telegramOffAlertAt ?? null,
+      values.telegramOnAlertAt ?? null,
     )
     .first<{ id: number }>();
   if (!row) throw new Error('insert failed');

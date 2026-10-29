@@ -1,7 +1,14 @@
 import { API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
 import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
-import { type AlertJob, claimAlerts, enqueueAlerts, retryAlert } from './lib/alerts';
+import {
+  type AlertJob,
+  claimAlerts,
+  enqueueAlerts,
+  enqueueTelegramAlerts,
+  retryAlert,
+  TELEGRAM_CHANNEL,
+} from './lib/alerts';
 import { deliverAlertPage } from './lib/deliver';
 import { detectOutage, purgeExpiredSessions } from './lib/grid';
 import { errorName, errors } from './lib/http';
@@ -57,7 +64,12 @@ export default {
       await purgeExpiredSessions(db, now);
     } else {
       if (await detectOutage(db, now)) await purgeEdgeCache(env.SITE_URL, OUTAGE_VIEWS);
-      await enqueueAlerts(db, env.PUSH_QUEUE, await claimAlerts(db, now), now, { telegram: telegramConfigured(env) });
+      // Telegram first, the sooner of the two; each channel has its own claims, so one failing never holds back the other.
+      const telegram = async () =>
+        enqueueTelegramAlerts(db, env.PUSH_QUEUE, await claimAlerts(db, now, TELEGRAM_CHANNEL), now);
+      const push = async () => enqueueAlerts(db, env.PUSH_QUEUE, await claimAlerts(db, now), now);
+      const results = await Promise.allSettled(telegramConfigured(env) ? [telegram(), push()] : [push()]);
+      for (const result of results) if (result.status === 'rejected') throw result.reason;
     }
   },
 

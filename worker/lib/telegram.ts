@@ -1,5 +1,5 @@
 // The owner's private Telegram alerts: one chat, set by the TELEGRAM_* secrets, never residents.
-// They follow the push claims (worker/lib/alerts.ts), so both always tell the same story.
+// They have claims and a delay of their own (TELEGRAM_CHANNEL in worker/lib/alerts.ts), sooner than push.
 
 import { outageDurationMs } from '../../shared/api';
 import { formatLasted, formatTimeOfDay } from '../../shared/format';
@@ -8,7 +8,7 @@ import { admin } from '../../src/admin/copy';
 import { DICTIONARIES } from '../../src/i18n/index';
 import { createDb } from '../db/client';
 import type { Outage } from '../db/schema';
-import { type AlertKind, loadDueOutage, retryAlert, type TelegramAlert } from './alerts';
+import { type AlertKind, loadDueOutage, retryAlert, TELEGRAM_CHANNEL, type TelegramAlert } from './alerts';
 import { errorName, FETCH_TIMEOUT_MS, isTransient } from './http';
 
 export const TELEGRAM_HOST = 'api.telegram.org';
@@ -60,7 +60,7 @@ export const telegramMessage = (chatId: unknown, text: string) => ({
  */
 export async function deliverTelegramAlert(alert: TelegramAlert, env: Env, now: Date): Promise<void> {
   if (!telegramConfigured(env)) return;
-  const outage = await loadDueOutage(createDb(env.DB), alert);
+  const outage = await loadDueOutage(createDb(env.DB), alert, TELEGRAM_CHANNEL);
   if (!outage) return;
 
   let status: number;

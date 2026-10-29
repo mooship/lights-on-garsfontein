@@ -317,6 +317,18 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(n).toBe(1);
   });
 
+  it('refuses to delete an outage whose Telegram off alert went out with no follow-up yet', async () => {
+    const id = await insertOutage({
+      startTime: '2026-10-12T10:00:00Z',
+      telegramOffAlertAt: '2026-10-12T10:05:00.000Z',
+    });
+
+    const res = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.delete, id });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: ERROR.alertSent });
+  });
+
   it('marks outages as planned and shows it publicly', async () => {
     const created = await post(ADMIN_OUTAGES_PATH, {
       action: OUTAGE_ACTION.create,
