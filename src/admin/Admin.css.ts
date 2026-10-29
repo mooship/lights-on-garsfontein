@@ -39,6 +39,18 @@ export const flagged = style({ textDecoration: 'line-through' });
 
 export const actions = style({ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' });
 
+// A modal the size of a card, inside the screen at 320px; the browser centres it and dims the page behind.
+export const dialog = style({
+  width: 'min(24rem, calc(100% - 2rem))',
+  background: vars.color.card,
+  color: vars.color.text,
+  border: `1px solid ${vars.color.border}`,
+  borderRadius: vars.radius.card,
+  boxShadow: vars.color.shadow,
+  padding: '1.25rem',
+  selectors: { '&::backdrop': { background: 'rgba(0, 0, 0, 0.5)' } },
+});
+
 // The live region stays in the DOM so it announces reliably; while empty it gives back the stack gap.
 export const saved = style({
   fontSize: '0.875rem',

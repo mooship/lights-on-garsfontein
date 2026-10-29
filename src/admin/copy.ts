@@ -30,7 +30,7 @@ export const admin = {
     outage_already_open: 'An outage is already open.',
     no_open_outage: 'There is no open outage to close.',
     alert_sent:
-      'Subscribers were alerted to this outage and have not yet had the follow-up. Mark it a false positive instead.',
+      'An alert went out for this outage and has not yet had its follow-up. Mark it a false positive instead.',
     end_before_start: 'The end must be after the start.',
     invalid_json: 'The request could not be read. Reload the page and try again.',
     bad_request: 'Check the times and try again. Times cannot be in the future.',
@@ -57,6 +57,7 @@ export const admin = {
   planned: 'Planned',
   delete: 'Delete',
   deleteConfirm: 'Delete this outage?',
+  cancel: 'Cancel',
   logged: 'Outage logged.',
   logTitle: 'Log a past outage',
   started: 'Started',

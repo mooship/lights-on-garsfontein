@@ -1504,6 +1504,82 @@ test.describe('admin keyboard focus', () => {
   });
 });
 
+test.describe('admin delete', () => {
+  // The outage the punch clock opens, which is the only row.
+  const openRow = async (page: Page) => {
+    await login(page);
+    await page.getByRole('button', { name: admin.punchOut }).click();
+    const rows = page.getByRole('listitem');
+    await expect(rows).toHaveCount(1);
+    await rows.first().getByRole('button', { name: admin.delete }).click();
+    return { rows, dialog: page.getByRole('dialog', { name: admin.deleteConfirm }) };
+  };
+
+  test('asks in the page, not in the browser, and keeps the outage on cancel', async ({ page }) => {
+    // A browser dialog would be dismissed here, which would look like a cancel.
+    let browserDialogs = 0;
+    page.on('dialog', (dialog) => {
+      browserDialogs++;
+      void dialog.dismiss();
+    });
+    const { rows, dialog } = await openRow(page);
+
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: admin.cancel }).click();
+    await expect(dialog).toBeHidden();
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first().getByRole('button', { name: admin.delete })).toBeFocused();
+
+    await rows.first().getByRole('button', { name: admin.delete }).click();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(rows).toHaveCount(1);
+    expect(browserDialogs).toBe(0);
+  });
+
+  test('starts on Cancel, so Enter does not delete', async ({ page }) => {
+    const { rows, dialog } = await openRow(page);
+
+    await expect(dialog.getByRole('button', { name: admin.cancel })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(dialog).toBeHidden();
+    await expect(rows).toHaveCount(1);
+  });
+
+  test('deletes the outage once confirmed', async ({ page }) => {
+    const { dialog } = await openRow(page);
+
+    await dialog.getByRole('button', { name: admin.delete }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText(admin.noOutages)).toBeVisible();
+  });
+
+  test('shows a refusal in the row, after the dialog has closed', async ({ page }) => {
+    await page.route(`**${ADMIN_OUTAGES_PATH}`, (route) =>
+      route.request().method() === 'POST' && route.request().postDataJSON()?.action === OUTAGE_ACTION.delete
+        ? route.fulfill({ status: 409, json: { error: ERROR.alertSent } })
+        : route.fallback(),
+    );
+    const { rows, dialog } = await openRow(page);
+
+    await dialog.getByRole('button', { name: admin.delete }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(rows.first().getByRole('alert')).toHaveText(admin.errors[ERROR.alertSent]);
+  });
+
+  test('fits a 320px screen', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    const { dialog } = await openRow(page);
+
+    await expect(dialog).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const box = await dialog.boundingBox();
+    expect(box && box.x >= 0 && box.x + box.width <= 320).toBe(true);
+  });
+});
+
 test.describe('unexpected responses', () => {
   // A 200 that is not the expected JSON (a captive portal, a truncated body) is a failure to reach
   // the server, never a reading; the next good answer recovers the page.

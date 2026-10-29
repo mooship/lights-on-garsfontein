@@ -157,6 +157,12 @@ const OutageRow: Component<{
 }> = (props) => {
   const { busy, error, run: act } = createAction({ onError: props.onError });
   const titleId = () => `outage-${props.outage.id}-title`;
+  const deleteTitleId = () => `outage-${props.outage.id}-delete-title`;
+  let confirmDelete!: HTMLDialogElement;
+  const when = () =>
+    `${formatDay(props.outage.startTime)}, ${formatTime(props.outage.startTime)} – ${
+      props.outage.endTime ? formatEnd(props.outage.startTime, props.outage.endTime) : admin.ongoing
+    }`;
   const run = (change: () => Promise<unknown>) =>
     act(async () => {
       await change();
@@ -166,10 +172,7 @@ const OutageRow: Component<{
   return (
     <li class={css.item}>
       <div classList={{ [css.flagged]: props.outage.isFalsePositive }}>
-        <strong id={titleId()}>
-          {formatDay(props.outage.startTime)}, {formatTime(props.outage.startTime)} –{' '}
-          {props.outage.endTime ? formatEnd(props.outage.startTime, props.outage.endTime) : admin.ongoing}
-        </strong>
+        <strong id={titleId()}>{when()}</strong>
         <div class={css.itemMeta}>
           {formatDuration(outageDurationMs(props.outage, props.now))} · {admin.source[props.outage.source]}
           {props.outage.planned ? admin.plannedTag : ''}
@@ -219,11 +222,35 @@ const OutageRow: Component<{
           class={button.ghost}
           aria-describedby={titleId()}
           aria-disabled={busy()}
-          onClick={() => confirm(admin.deleteConfirm) && run(() => api.deleteOutage(props.outage.id))}
+          onClick={() => confirmDelete.showModal()}
         >
           {admin.delete}
         </button>
       </div>
+      {/* A native modal: Esc, the focus trap and the return of focus come with it. It closes
+          before the request runs, so a refusal shows in the row's FormError. */}
+      <dialog ref={confirmDelete} class={css.dialog} aria-labelledby={deleteTitleId()}>
+        <h3 id={deleteTitleId()} class="gg-card-title">
+          {admin.deleteConfirm}
+        </h3>
+        <p>{when()}</p>
+        <div class={css.actions}>
+          {/* Cancel takes the focus, so a stray Enter never deletes. */}
+          <button type="button" class={button.ghost} autofocus onClick={() => confirmDelete.close()}>
+            {admin.cancel}
+          </button>
+          <button
+            type="button"
+            class={button.off}
+            onClick={() => {
+              confirmDelete.close();
+              run(() => api.deleteOutage(props.outage.id));
+            }}
+          >
+            {admin.delete}
+          </button>
+        </div>
+      </dialog>
       <FormError error={error()} />
     </li>
   );
