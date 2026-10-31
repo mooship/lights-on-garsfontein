@@ -1,0 +1,22 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "package.json": "package-lock.json, bun.lock*, pnpm-lock.yaml, yarn.lock, tsconfig*.json, biome.json*, drizzle.config.*, vite.config.*, vitest.config.*, playwright.config.*, lefthook*, wrangler.*, site.config.*, .mcp.json, eslint.config.*, .prettier*",
+    "README.md": "AGENTS.md, CLAUDE.md, GEMINI.md, LICENSE*",
+    ".gitignore": ".env*, .dev.vars*, .editorconfig, .gitattributes"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.wrangler": true,
+    "**/.playwright-mcp": true,
+    "**/.superpowers": true,
+    "**/.lighthouseci": true,
+    "**/blob-report": true,
+    "**/coverage": true,
+    "**/dist": true,
+    "**/playwright-report": true,
+    "**/test-results": true,
+    "**/*.tsbuildinfo": true
+  }
+}

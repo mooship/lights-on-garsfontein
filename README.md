@@ -17,7 +17,7 @@ The code runs on one Cloudflare Worker with a D1 database, and anyone can run it
 
 ## Using the data
 
-The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): credit "Lights On, Garsfontein?" and link to the site. It is provided as is, with no warranty of accuracy. Times are ISO 8601 UTC; local time is SAST (UTC+2, no daylight saving). Please poll no more than once every 30 seconds. A plain-text summary for language models is at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt). To report a security problem, see [SECURITY.md](SECURITY.md) or [`/.well-known/security.txt`](https://garsfontein.timothybrits.co.za/.well-known/security.txt).
+The outage data (API, CSV and feed) is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): credit "Lights On, Garsfontein?" and link to the site. It is provided as is, with no warranty of accuracy. Times are ISO 8601 UTC; local time is SAST (UTC+2, no daylight saving). Please poll no more than once every 30 seconds. A plain-text summary for language models is at [`/llms.txt`](https://garsfontein.timothybrits.co.za/llms.txt). To report a security problem, see [.github/SECURITY.md](.github/SECURITY.md) or [`/.well-known/security.txt`](https://garsfontein.timothybrits.co.za/.well-known/security.txt).
 
 ### Show the status on your site
 
