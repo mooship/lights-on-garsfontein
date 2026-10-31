@@ -28,6 +28,7 @@ npm-debug.log*
 .idea/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 *.swp
 .DS_Store
 Thumbs.db
