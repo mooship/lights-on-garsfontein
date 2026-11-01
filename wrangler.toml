@@ -6,6 +6,7 @@ name = "garsfontein-grid"
 main = "worker/index.ts"
 compatibility_date = "2026-10-01"
 workers_dev = false
+preview_urls = true
 upload_source_maps = true
 routes = [{ pattern = "garsfontein.timothybrits.co.za", custom_domain = true }]
 
