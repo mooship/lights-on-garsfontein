@@ -36,7 +36,7 @@
     "vapid-keys": "node scripts/vapid-keys.ts",
     "og": "node scripts/build-og.ts",
     "deploy": "npm run build && npm run deploy:ci",
-    "prepare": "lefthook install",
+    "prepare": "lefthook install --force",
     "icons": "node scripts/build-icons.ts",
     "deploy:ci": "npm run db:migrate:remote && wrangler deploy"
   },

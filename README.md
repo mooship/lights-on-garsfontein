@@ -311,7 +311,7 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
-Lefthook runs Biome and the typecheck on commit and `npm test` on push. `npm install` installs the hooks; if Git has a global `core.hooksPath`, it cannot, so run `npx lefthook install -f`. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
+Lefthook runs Biome, the typecheck and `npm test` on commit. `npm install` installs the hooks. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
 
 ### API tests (Bruno)
 
