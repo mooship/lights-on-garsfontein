@@ -8,6 +8,9 @@
         "playwright",
         "run-test-mcp-server"
       ]
+    },
+    "cloudflare-api": {
+      "url": "https://mcp.cloudflare.com/mcp"
     }
   }
 }
