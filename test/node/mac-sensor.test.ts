@@ -26,6 +26,9 @@ const RUN_TIMEOUT_MS = 10_000;
 vi.setConfig({ testTimeout: 3 * RUN_TIMEOUT_MS });
 /** The message the curl stub prints when told to fail. */
 const CURL_ERROR = 'curl: (22) The requested URL returned error: 401';
+// The script is for macOS. On Windows, Git's MSYS shell starts processes too slowly for the run loop's
+// timings and the suite times out, so it runs on macOS and Linux only (CI runs on Linux).
+const describeOnPosix = describe.skipIf(process.platform === 'win32');
 
 /**
  * A home with the sensor installed and macOS's tools stubbed: each stub records its call in `calls`.
@@ -114,7 +117,7 @@ async function terminateRun(box: ReturnType<typeof sandbox>) {
 /** The timeout curl applies: the last -m wins. */
 const timeoutOf = (call: string) => Number([...call.matchAll(/ -m (\d+)/g)].at(-1)?.[1]);
 
-describe('lights-on run', () => {
+describeOnPosix('lights-on run', () => {
   it('keeps the Mac awake for as long as its own shell runs', async () => {
     const box = sandbox();
     const { pid } = await terminateRun(box);
@@ -166,7 +169,7 @@ describe('lights-on run', () => {
   });
 });
 
-describe('the log', () => {
+describeOnPosix('the log', () => {
   it('is trimmed to its newest lines after an accepted heartbeat', async () => {
     const box = sandbox();
     const max = Number(/^LOG_MAX_LINES=(\d+)$/m.exec(readFileSync(SCRIPT, 'utf8'))?.[1]);
@@ -177,7 +180,7 @@ describe('the log', () => {
   });
 });
 
-describe('lights-on status', () => {
+describeOnPosix('lights-on status', () => {
   it('shows when a heartbeat was last accepted', async () => {
     const box = sandbox();
     await terminateRun(box);
@@ -198,7 +201,7 @@ describe('lights-on status', () => {
   });
 });
 
-describe('lights-on update', () => {
+describeOnPosix('lights-on update', () => {
   it('removes the download once the new version has installed itself', async () => {
     const box = sandbox();
     copyFileSync(SCRIPT, join(box.appDir, 'lights-on.sh'));
@@ -215,7 +218,7 @@ describe('lights-on update', () => {
   });
 });
 
-describe('lights-on uninstall', () => {
+describeOnPosix('lights-on uninstall', () => {
   it('ends the pause the stopping agent left, so the site does not wait it out', async () => {
     const box = sandbox();
     await box.run('sh "$SCRIPT" uninstall');
