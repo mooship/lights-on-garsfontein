@@ -1,14 +1,12 @@
 # Telegram Commands Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** `/status`, `/pause <duration>` and `/resume` on the owner's private Telegram bot.
 
 **Architecture:** Telegram POSTs updates to `POST /api/telegram`. The route checks the secret header, ignores every chat but the owner's, runs the command and answers with a `sendMessage` method in the webhook response body. The commands reuse `getGridState`, `getOpenOutage` and `pauseSensor` (`worker/lib/grid.ts`), `sensorState` (`src/admin/sensor.ts`) and the admin copy.
 
 **Tech Stack:** Cloudflare Worker, D1 via Drizzle, Vitest in workerd.
 
-**Spec:** `docs/superpowers/specs/2026-10-23-telegram-commands-design.md`
+**Spec:** `docs/specs/2026-10-23-telegram-commands-design.md`
 
 ## Global Constraints
 

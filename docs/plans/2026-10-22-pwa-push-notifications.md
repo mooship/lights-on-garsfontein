@@ -1,14 +1,12 @@
 # PWA push notifications Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Residents can opt in, through a friendly card or a header bell, to Web Push alerts when the power goes off in Extension 16 and when it is back.
 
 **Architecture:** A push-only `public/sw.js` shows notifications. The app saves subscriptions through `/api/push/subscription` into D1. The minute cron claims due alerts on `outages` and enqueues pages of subscription ids on a Cloudflare Queue; the Worker's `queue` handler encrypts (RFC 8291) and signs (VAPID, RFC 8292) each push with WebCrypto and sends it.
 
 **Tech Stack:** Solid, vanilla-extract, Cloudflare Workers, D1 with Drizzle, Cloudflare Queues, Vitest (workerd and Node), Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-10-22-pwa-push-notifications-design.md`
+**Spec:** `docs/specs/2026-10-22-pwa-push-notifications-design.md`
 
 ## Global Constraints
 

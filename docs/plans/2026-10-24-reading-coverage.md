@@ -1,14 +1,12 @@
 # Reading Coverage Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Each `/api/stats` window says what share of its time had a live reading, and the statistics card says "Last 30 days. 96% measured." when that share is known.
 
 **Architecture:** A new `sensor_pauses` history table, written by `pauseSensor` (the only place a pause starts or ends). The stats handler merges pauses with false-positive sensor outages into gaps, and `windowStats` turns the gaps into `coverage` for windows that start on or after `site.coverageSince`. The page appends one sentence to the existing subtitle.
 
 **Tech Stack:** Cloudflare Workers, D1 with Drizzle (`npm run db:generate`), Solid, Vitest in workerd, Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-10-24-reading-coverage-design.md`
+**Spec:** `docs/specs/2026-10-24-reading-coverage-design.md`
 
 ## Global Constraints
 

@@ -1,6 +1,6 @@
 # Telegram alerts: plan
 
-Spec: `docs/superpowers/specs/2026-10-23-telegram-alerts-design.md`. Each step is red, green, refactor.
+Spec: `docs/specs/2026-10-23-telegram-alerts-design.md`. Each step is red, green, refactor.
 
 1. **Secrets.** Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` (empty) to the end of `.dev.vars.example`, list them in the secrets comments of `wrangler.toml` and `wrangler.example.toml`, and run `npm run cf-typegen`.
 2. **Copy and wording.** `admin.telegram` in `src/admin/copy.ts`; `telegramText(kind, outage, now)` in `worker/lib/telegram.ts`. Tests: each kind and source, planned, the date on another day.
