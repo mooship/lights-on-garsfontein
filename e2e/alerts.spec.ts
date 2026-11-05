@@ -127,6 +127,7 @@ for (const locale of LOCALES) {
       await page.clock.runFor(ALERTS_NOTICE_MS);
       await expect(page.getByText(m.card.heading, { exact: true })).toHaveCount(1);
       await expect(card(page)).toBeVisible();
+      await expect(card(page).locator('svg')).toHaveCount(0);
       await expect(card(page)).toContainText(m.card.body);
       await expect(card(page)).toContainText(m.card.scope);
       // Same page and language as the footer's privacy link.

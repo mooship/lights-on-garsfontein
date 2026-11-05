@@ -16,14 +16,14 @@ export const subtitle = style({
 export const tiles = style({
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
-  gap: '0.5rem',
+  columnGap: '1rem',
+  rowGap: '0.5rem',
 });
 
 export const tile = style({
   minHeight: '5.75rem',
-  padding: '0.75rem',
-  borderRadius: vars.radius.control,
-  background: vars.color.bg,
+  padding: '0.75rem 0',
+  borderTop: `1px solid ${vars.color.border}`,
   display: 'flex',
   flexDirection: 'column',
 });
@@ -158,8 +158,7 @@ export const chartEmpty = style({
   placeItems: 'center',
   padding: '1rem',
   textAlign: 'center',
-  borderRadius: vars.radius.control,
-  border: `1px dashed ${vars.color.border}`,
+  borderTop: `1px solid ${vars.color.border}`,
   color: vars.color.muted,
   fontSize: '0.9375rem',
 });

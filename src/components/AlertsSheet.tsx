@@ -1,4 +1,3 @@
-import BellRing from 'lucide-solid/icons/bell-ring';
 import { type Component, createSignal, For, Match, onCleanup, onMount, Show, Switch } from 'solid-js';
 import { busy, CARD_ID, closeCard, offering, state, takesFocus, turnOn } from '../lib/alerts-store';
 import { privacyHref, t } from '../lib/i18n';
@@ -42,14 +41,9 @@ export const AlertsSheet: Component = () => {
 
   return (
     <section id={CARD_ID} ref={card} class={`gg-card ${css.card}`} role="dialog" aria-labelledby="alerts-heading">
-      <div class={css.header}>
-        <span class={css.icon}>
-          <BellRing size={22} aria-hidden="true" />
-        </span>
-        <h2 id="alerts-heading" class={css.heading} tabindex="-1" ref={heading}>
-          {m().heading}
-        </h2>
-      </div>
+      <h2 id="alerts-heading" class={css.heading} tabindex="-1" ref={heading}>
+        {m().heading}
+      </h2>
       <Switch>
         <Match when={state() === 'blocked'}>
           <p class={css.text}>{m().blockedHelp}</p>

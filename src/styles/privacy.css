@@ -7,6 +7,7 @@
   --bg: #f6f4ef;
   --text: #1f2120;
   --muted: #5c5850;
+  --border: #e4dfd4;
   --accent: #2d5a27;
 }
 :root.dark {
@@ -14,6 +15,7 @@
   --bg: #121312;
   --text: #f0efea;
   --muted: #a8a69e;
+  --border: #2e312e;
   --accent: #4caf50;
 }
 * {
@@ -25,6 +27,10 @@ body {
   color: var(--text);
   font-family: var(--gg-font-body);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+p {
+  text-wrap: pretty;
 }
 main {
   max-width: 40rem;
@@ -38,9 +44,11 @@ main {
   hyphens: auto;
 }
 h1,
-h2 {
+h2,
+h3 {
   font-family: var(--gg-font-display);
   line-height: 1.2;
+  text-wrap: balance;
 }
 h1 {
   font-size: clamp(1.75rem, 8vw, 2.25rem);
@@ -53,6 +61,11 @@ h2 {
 a {
   color: var(--accent);
   text-underline-offset: 0.2em;
+  text-decoration-color: color-mix(in srgb, currentColor 60%, transparent);
+  transition: text-decoration-color 150ms ease;
+}
+a:hover {
+  text-decoration-color: currentColor;
 }
 /* The links at the top are taps on a phone: 44px tall, like the app's controls. */
 .jump {
@@ -73,7 +86,7 @@ li + li {
 #en {
   margin-top: 3rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--muted);
+  border-top: 1px solid var(--border);
 }
 h3 {
   font-size: 1.125rem;

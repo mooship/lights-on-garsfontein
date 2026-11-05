@@ -30,7 +30,7 @@ export const vars = createThemeContract({
 
 const fonts = { display: 'var(--gg-font-display)', body: 'var(--gg-font-body)' };
 
-const radius = { card: '1.25rem', pill: '999px', control: '0.75rem' };
+const radius = { card: '0.75rem', pill: '999px', control: '0.5rem' };
 
 // Light is the default so the page is themed even before the boot script runs.
 createGlobalTheme(':root', vars, {

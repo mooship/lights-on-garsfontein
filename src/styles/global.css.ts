@@ -99,7 +99,6 @@ globalStyle('.gg-card', {
   background: vars.color.card,
   border: `1px solid ${vars.color.border}`,
   borderRadius: vars.radius.card,
-  boxShadow: vars.color.shadow,
   padding: '1.25rem',
 });
 
@@ -109,6 +108,7 @@ globalStyle('.gg-status-card', {
   flexDirection: 'column',
   gap: '1rem',
   overflow: 'hidden',
+  boxShadow: vars.color.shadow,
 });
 
 // Room for two lines of detail (padding + 2 × 0.9375rem × 1.5 + the border), as the last outage takes
@@ -260,9 +260,8 @@ globalStyle('*, *::before, *::after', {
 });
 
 globalStyle('.gg-notice', {
-  padding: '0.5rem 0.75rem',
-  borderRadius: vars.radius.control,
-  border: `1px dashed ${vars.color.border}`,
+  paddingLeft: '0.75rem',
+  borderLeft: `2px solid ${vars.color.border}`,
   fontSize: '0.8125rem',
   lineHeight: 1.4,
   color: vars.color.muted,
@@ -293,7 +292,7 @@ globalStyle('.gg-skel::after', {
 // The same min-height as root in src/components/StatusBadge.css.ts; change them together.
 globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem', minHeight: '6.35rem' });
 globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1 });
-globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' });
+globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '1rem', rowGap: '0.5rem' });
 globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.25rem' });
 
 globalStyle('.gg-skel-badge', { width: '4rem', height: '4rem', borderRadius: vars.radius.pill, flex: 'none' });

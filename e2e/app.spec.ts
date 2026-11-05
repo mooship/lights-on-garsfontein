@@ -356,6 +356,9 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(site.brand.full);
     await expect(page.locator('.gg-eyebrow')).toHaveText(en.masthead.eyebrow);
+    await expect(page.locator('.gg-notice')).toHaveCSS('border-top-style', 'none');
+    await expect(page.locator('.gg-status-card')).not.toHaveCSS('box-shadow', 'none');
+    await expect(page.locator('section.gg-card:not(.gg-status-card)').first()).toHaveCSS('box-shadow', 'none');
     const scope = page.getByText(en.scope.measured(site.landmark), { exact: true });
     await expect(scope).toBeVisible();
     await expect(scope.locator('xpath=..').locator('details')).toHaveCount(0);
@@ -371,7 +374,10 @@ test.describe('public page', () => {
   test('statistics show durations and say how they are measured', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.gg-trends-body')).toContainText(`0 ${en.units.min}`);
-    await expect(page.getByText(en.trends.chartEmpty)).toBeVisible();
+    const empty = page.getByText(en.trends.chartEmpty);
+    await expect(empty).toBeVisible();
+    await expect(empty).toHaveCSS('border-top-style', 'solid');
+    await expect(empty).toHaveCSS('border-bottom-style', 'none');
     // Too early for a comparison with the previous 30 days.
     await expect(page.getByText(en.trends.change('', '').trim())).toHaveCount(0);
     await page.getByText(en.trends.howTitle).click();
