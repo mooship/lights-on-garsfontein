@@ -344,12 +344,12 @@ export const Trends: Component<TrendsProps> = (props) => {
         <div class={`${css.tiles} ${motion.enter}`}>
           <Tile
             label={t().trends.withoutPower}
-            value={started() ? <DurationValue text={tileDuration(s().minutesOff)} /> : '—'}
+            value={started() ? <DurationValue text={tileDuration(s().minutesOff)} /> : t().trends.notYet}
             delta={delta(s().minutesOff, props.stats.previous30?.minutesOff, tileDuration, true)}
           />
           <Tile
             label={t().trends.outages}
-            value={started() ? String(s().outages) : '—'}
+            value={started() ? String(s().outages) : t().trends.notYet}
             delta={s().plannedOutages === 0 ? delta(s().outages, props.stats.previous30?.outages, String, true) : null}
             note={
               s().plannedOutages > 0 ? (
@@ -359,11 +359,11 @@ export const Trends: Component<TrendsProps> = (props) => {
           />
           <Tile
             label={t().trends.daysAffected}
-            value={started() ? t().trends.daysOf(s().daysWithOutage, s().daysTracked) : '—'}
+            value={started() ? t().trends.daysOf(s().daysWithOutage, s().daysTracked) : t().trends.notYet}
           />
           <Tile
             label={t().trends.longest}
-            value={s().outages === 0 ? '—' : <DurationValue text={outageDuration(s().longestMinutes)} />}
+            value={s().outages === 0 ? t().trends.notYet : <DurationValue text={outageDuration(s().longestMinutes)} />}
             note={s().outages > 1 ? t().trends.typically(outageDuration(s().medianMinutes ?? 0)) : undefined}
           />
         </div>
