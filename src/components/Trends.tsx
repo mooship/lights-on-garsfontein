@@ -220,10 +220,12 @@ const BarChart: Component<BarChartProps> = (props) => {
       <p class="gg-sr-only" aria-live="polite">
         {announcement()}
       </p>
+      {/* A group, not an img: it takes focus and arrow keys, and the live readout above names each bar. */}
+      {/* biome-ignore lint/a11y/useSemanticElements: an svg cannot be a fieldset. */}
       <svg
         ref={svg}
         class={css.svg}
-        role="img"
+        role="group"
         aria-label={props.label}
         tabindex="0"
         onKeyDown={onKey}

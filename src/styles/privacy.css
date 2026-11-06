@@ -9,6 +9,7 @@
   --muted: #5c5850;
   --border: #e4dfd4;
   --accent: #2d5a27;
+  --focus: #8a5a12;
 }
 :root.dark {
   color-scheme: dark;
@@ -17,6 +18,7 @@
   --muted: #a8a69e;
   --border: #2e312e;
   --accent: #4caf50;
+  --focus: #e6b566;
 }
 * {
   box-sizing: border-box;
@@ -45,16 +47,20 @@ main {
 }
 h1,
 h2,
-h3 {
+h3,
+h4 {
   font-family: var(--gg-font-display);
   line-height: 1.2;
   text-wrap: balance;
 }
-h1 {
+/* One h1 per page: the English half repeats the layout a level down (h2 title, h3 parts, h4). */
+h1,
+.page-title {
   font-size: clamp(1.75rem, 8vw, 2.25rem);
   margin: 1rem 0 0.25rem;
 }
-h2 {
+h2,
+.part {
   font-size: 1.375rem;
   margin-top: 2rem;
 }
@@ -66,6 +72,10 @@ a {
 }
 a:hover {
   text-decoration-color: currentColor;
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 /* The links at the top are taps on a phone: 44px tall, like the app's controls. */
 .jump {
@@ -88,14 +98,24 @@ li + li {
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
-h3 {
+h3,
+h4 {
   font-size: 1.125rem;
   line-height: 1.3;
   margin: 1.5rem 0 0.25rem;
 }
 h3 + p,
-h3 + ul {
+h3 + ul,
+h4 + p,
+h4 + ul {
   margin-top: 0.25rem;
+}
+.part {
+  margin-bottom: 0.83em;
+}
+.part + p,
+.part + ul {
+  margin-top: 1em;
 }
 /* "Show email address" (src/privacy.ts); hidden until the script runs. */
 .contact > p {
@@ -113,11 +133,6 @@ h3 + ul {
 }
 .contact-reveal:hover {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-.contact-reveal:focus-visible,
-.contact a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 .contact-reveal[aria-disabled="true"] {
   cursor: progress;

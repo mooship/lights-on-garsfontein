@@ -99,6 +99,7 @@
            (zero layout shift). The data-i18n* elements are filled from src/i18n in every language at
            build time (staticI18n in vite.config.ts). -->
       <div class="gg-shell">
+        <a class="gg-skip" href="#main" data-i18n="masthead.skip"></a>
         <header class="gg-masthead">
           <p class="gg-eyebrow" data-i18n="masthead.eyebrow"></p>
           <div class="gg-masthead-actions">
@@ -109,7 +110,7 @@
           <h1 class="gg-title">%site.brand.full%</h1>
         </header>
         <p class="gg-notice" data-i18n="masthead.notice"></p>
-        <main class="gg-main">
+        <main id="main" class="gg-main">
           <section class="gg-card gg-status-card">
             <p class="gg-sr-only" data-i18n="status.loading"></p>
             <div class="gg-skel-row" aria-hidden="true">

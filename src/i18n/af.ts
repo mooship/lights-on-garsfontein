@@ -17,6 +17,7 @@ export const af = {
   banner: { region: 'Kennisgewing', dismiss: 'Maak toe' },
   masthead: {
     eyebrow: 'Wyk 45 · Pretoria',
+    skip: 'Gaan na inhoud',
     notice: 'Onafhanklike diens. Nie verbonde aan of onderskryf deur die Stad Tshwane of Eskom nie.',
   },
   footer: {

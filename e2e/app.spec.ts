@@ -961,7 +961,7 @@ test.describe('outages by time of day', () => {
     await expect(page.getByRole('heading', { name: en.trends.chartTitle })).toBeVisible();
     await expect(readout(1).filter({ hasText: en.trends.soFar.trim() })).toHaveCount(1);
     await expect(page.getByText(en.trends.thisWeek, { exact: true })).toBeVisible();
-    await page.getByRole('img', { name: en.trends.chartLabel }).focus();
+    await page.getByRole('group', { name: en.trends.chartLabel }).focus();
     await page.keyboard.press('Home');
     // The visible readout, and the announcement for screen readers.
     await expect(readout(3)).toHaveCount(2);
@@ -1042,7 +1042,7 @@ test.describe('outages by time of day', () => {
     await expect(page.getByRole('heading', { name: byHourTitle('en'), exact: true })).toBeVisible();
     const u = en.units;
     await expect(page.getByText(`18:00–19:00: 1 ${u.h} 30 ${u.min} ${en.trends.off}`, { exact: true })).toBeVisible();
-    await page.getByRole('img', { name: en.trends.byHourLabel }).focus();
+    await page.getByRole('group', { name: en.trends.byHourLabel }).focus();
     await page.keyboard.press('ArrowRight');
     // The visible readout, and the announcement a keyboard move makes for screen readers.
     const next = page.getByText(`19:00–20:00: 30 ${u.min} ${en.trends.off}`, { exact: true });
@@ -1135,7 +1135,7 @@ test.describe('outages by time of day', () => {
       await withOutages(page);
       await page.goto('/');
       await expect(page.getByRole('heading', { name: byHourTitle('af'), exact: true })).toBeVisible();
-      await expect(page.getByRole('img', { name: af.trends.byHourLabel })).toBeVisible();
+      await expect(page.getByRole('group', { name: af.trends.byHourLabel })).toBeVisible();
     });
   });
 

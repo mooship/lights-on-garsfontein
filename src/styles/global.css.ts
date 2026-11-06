@@ -67,6 +67,20 @@ globalStyle('.gg-main', { display: 'flex', flexDirection: 'column', gap: '1rem' 
 // Focused only from script (tabindex=-1, after the banner closes), so it needs no ring.
 globalStyle('.gg-main:focus', { outline: 'none' });
 
+// Off screen until a keyboard user tabs to it; absolute, so the shell and the app keep the same boxes.
+globalStyle('.gg-skip', {
+  position: 'absolute',
+  insetBlockStart: '0.5rem',
+  insetInlineStart: '0.5rem',
+  zIndex: 10,
+  padding: '0.75rem 1rem',
+  background: vars.color.card,
+  color: vars.color.text,
+  border: `2px solid ${vars.color.text}`,
+  transform: 'translateY(-200%)',
+});
+globalStyle('.gg-skip:focus', { transform: 'none' });
+
 // The eyebrow and the switches share the first row; the full brand name gets the width below.
 globalStyle('.gg-masthead', {
   display: 'grid',

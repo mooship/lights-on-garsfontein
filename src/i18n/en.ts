@@ -13,6 +13,7 @@ export const en = {
   banner: { region: 'Notice', dismiss: 'Dismiss' },
   masthead: {
     eyebrow: 'Ward 45 · Pretoria',
+    skip: 'Skip to content',
     notice: 'Independent service. Not affiliated with or endorsed by the City of Tshwane or Eskom.',
   },
   footer: {

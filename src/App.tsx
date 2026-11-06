@@ -259,9 +259,12 @@ export const App: Component<{ initial?: InitialData }> = (props) => {
 
   return (
     <div class="gg-shell">
+      <a class="gg-skip" href="#main">
+        {t().masthead.skip}
+      </a>
       <Masthead isPublic={!!props.initial} />
       {/* tabindex lets the banner hand focus here once it closes. */}
-      <main class="gg-main" tabindex="-1">
+      <main id="main" class="gg-main" tabindex="-1">
         <Show
           when={props.initial}
           fallback={
