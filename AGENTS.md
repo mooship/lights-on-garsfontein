@@ -1,14 +1,14 @@
 # AGENTS.md
 
-Instructions for anyone, human or AI, changing this repository. `CLAUDE.md` and `GEMINI.md` import this file; put every shared rule here, and in them only what is specific to that tool. Setup, deployment, the public API, the commands, the directory map and the how-tos are in [README.md](README.md); this file holds the rules for working on the code.
+Instructions for anyone changing this repository, by hand or with a coding agent. This is the one set of agent instructions: `CLAUDE.md` imports it and adds only what is specific to Claude Code, so every shared rule goes here. Setup, deployment, the public API, the commands, the directory map and the how-tos are in [README.md](README.md); this file holds the rules for working on the code.
 
 ## What this is
 
 **Lights On, Garsfontein?** shows the state of the electricity supply in Garsfontein, Pretoria, and keeps a record of outages. It is measured at one home in Garsfontein Extension 16 (Ward 45), near Mediclinic Denmar, by a heartbeat sensor and an admin punch clock.
 
-- **Ultra-local, and nothing more.** It exists only to show the supply in Garsfontein. It is not a load-shedding app and must never try to replicate one; do not name other outage products anywhere.
-- **Trust comes first.** Residents must find it reliable. Copy never claims more than is measured or than the code does: the reading is one point that speaks only for Extension 16, and some streets can differ. Statements such as how often the page refreshes must match the code (`POLL_MS` and `STATS_POLL_MS` in `src/lib/poll.ts`). Unless a sensor heartbeat is within `HEARTBEAT_THRESHOLD_MS` (`shared/api.ts`) and the sensor is not paused, the status reads "No outage reported", not "on".
-- **Independent and neutral.** Not affiliated with or endorsed by the City of Tshwane or Eskom. Copy states facts and never assigns blame ("failed", "neglect"), implies official status, or uses their logos or branding.
+- It covers Garsfontein and nothing more. It exists only to show the supply there. It is not a load-shedding app and must never try to replicate one; do not name other outage products anywhere.
+- Residents must be able to rely on it. Copy never claims more than is measured or than the code does: the reading is one point that speaks only for Extension 16, and some streets can differ. Statements such as how often the page refreshes must match the code (`POLL_MS` and `STATS_POLL_MS` in `src/lib/poll.ts`). Unless a sensor heartbeat is within `HEARTBEAT_THRESHOLD_MS` (`shared/api.ts`) and the sensor is not paused, the status reads "No outage reported", not "on".
+- It is independent and neutral: not affiliated with or endorsed by the City of Tshwane or Eskom. Copy states facts and never assigns blame ("failed", "neglect"), implies official status, or uses their logos or branding.
 
 ## Principles
 
@@ -73,3 +73,5 @@ The directory map and the steps for adding an endpoint, a language, a banner or 
 ## Style
 
 TypeScript strict, Biome formatting (single quotes), named exports, small modules. Dependencies use caret ranges; ask the owner before adding one. British spelling in English copy and comments; plain, short sentences.
+
+Write docs, copy and comments the way a person would. No em dashes: use a comma, colon, full stop or brackets, and keep en dashes for numeric and time ranges ("18:00–19:00"). Avoid the usual signs of generated text: bold run-in labels on every bullet or paragraph, a punchy closing line that restates the paragraph, question hooks as headings, tagline words such as "ultra-local", "seamless" or "friendly", and narrating which person or tool made each decision. Say what the thing does and stop.
