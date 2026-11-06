@@ -21,7 +21,7 @@ const iconBase = style({
   flex: 'none',
   width: '4rem',
   height: '4rem',
-  borderRadius: vars.radius.pill,
+  borderRadius: vars.radius.control,
   display: 'grid',
   placeItems: 'center',
 });

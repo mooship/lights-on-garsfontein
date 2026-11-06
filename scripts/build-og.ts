@@ -28,18 +28,19 @@ const cta = [PRIMARY, SECONDARY].flatMap((l) => (l ? [l.m.og.cta] : [])).join(' 
 
 const html = `<!doctype html>
 <html lang="${PRIMARY.locale}"><head><style>
-@font-face { font-family: Fraunces; src: url(${DISPLAY_FONT}); font-weight: 100 900; }
-@font-face { font-family: Jakarta; src: url(${BODY_FONT}); font-weight: 200 800; }
+@font-face { font-family: Barlow; src: url(${DISPLAY_FONT}); font-weight: 600; }
+@font-face { font-family: Public; src: url(${BODY_FONT}); font-weight: 100 900; }
 * { margin: 0; box-sizing: border-box; }
-body { width: 1200px; height: 630px; background: ${light.bg}; color: ${light.text}; font-family: Jakarta, sans-serif;
-  padding: 64px 80px; display: flex; flex-direction: column; justify-content: space-between; }
+body { width: 1200px; height: 630px; background: ${light.bg}; color: ${light.text}; font-family: Public, sans-serif;
+  padding: 64px 80px; display: flex; flex-direction: column; justify-content: space-between;
+  border-top: 16px solid ${light.on}; }
 .brand { display: flex; align-items: center; gap: 20px; font-size: 34px; font-weight: 700; color: ${light.muted}; }
-.icon { width: 64px; height: 64px; border-radius: 999px; display: grid; place-items: center;
-  background: ${light.card}; border: 2px solid ${light.border}; color: ${light.text}; }
-h1 { font-family: Fraunces, serif; font-size: 80px; font-weight: 700; line-height: 1.08; letter-spacing: -0.01em; }
-.secondary { font-family: Fraunces, serif; font-size: 48px; font-weight: 600; color: ${light.muted}; margin-top: 16px; }
-.cta { display: inline-block; font-size: 30px; font-weight: 650; padding: 18px 28px; border-radius: 20px;
-  background: ${light.text}; color: ${light.bg}; }
+.icon { width: 64px; height: 64px; border-radius: 4px; display: grid; place-items: center;
+  background: ${light.on}; color: ${light.onContrast}; }
+h1 { font-family: Barlow, sans-serif; font-size: 88px; font-weight: 600; line-height: 1; }
+.secondary { font-family: Barlow, sans-serif; font-size: 56px; font-weight: 600; color: ${light.muted}; margin-top: 16px; }
+.cta { display: inline-block; font-size: 30px; font-weight: 700; padding: 18px 28px; border-radius: 4px;
+  background: ${light.text}; color: ${light.card}; }
 .foot { font-size: 24px; color: ${light.muted}; margin-top: 24px; }
 </style></head><body>
 <div class="brand"><span class="icon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"

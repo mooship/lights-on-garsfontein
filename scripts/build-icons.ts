@@ -9,7 +9,7 @@ const BOLT = 'M36 8 16 36h14l-4 20 22-30H34z';
 
 /** `inset` shrinks the bolt into the centre "safe zone" that maskable icons require. */
 const svg = (rounded: boolean, inset = 0) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="${rounded ? 16 : 0}" fill="${PALETTE.light.on}"/>
+  <rect width="64" height="64" rx="${rounded ? 4 : 0}" fill="${PALETTE.light.on}"/>
   <g transform="translate(${inset} ${inset}) scale(${(64 - inset * 2) / 64})"><path d="${BOLT}" fill="${PALETTE.light.bg}"/></g>
 </svg>`;
 

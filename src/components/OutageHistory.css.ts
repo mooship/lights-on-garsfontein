@@ -24,7 +24,7 @@ export const plannedTag = style({
   alignItems: 'center',
   gap: '0.25rem',
   padding: '0 0.4375rem',
-  borderRadius: vars.radius.pill,
+  borderRadius: vars.radius.control,
   background: vars.color.plannedSoft,
   color: vars.color.planned,
   fontWeight: 600,

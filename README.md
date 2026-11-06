@@ -369,4 +369,4 @@ By contributing, you agree that your contributions are licensed under the MIT li
 
 Code: [MIT](LICENSE). Outage data: see [Using the data](#using-the-data).
 
-Built with SolidJS, Vite, Vanilla Extract, Cloudflare Workers, D1, Drizzle ORM, Zod, Cloudflare Turnstile, Vitest, Playwright, Biome and Lefthook. Fonts: Fraunces and Plus Jakarta Sans (SIL Open Font License), via Fontsource. Icons: Lucide (ISC).
+Built with SolidJS, Vite, Vanilla Extract, Cloudflare Workers, D1, Drizzle ORM, Zod, Cloudflare Turnstile, Vitest, Playwright, Biome and Lefthook. Fonts: Public Sans and Barlow Semi Condensed (SIL Open Font License), via Fontsource. Icons: Lucide (ISC).

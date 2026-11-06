@@ -13,13 +13,13 @@ export const card = style([
     display: 'flex',
     flexDirection: 'column',
     gap: '0.75rem',
-    boxShadow: vars.color.shadow,
+    // Outranks .gg-card's hairline: the card floats, so a heavier rule stands in for a shadow.
+    selectors: { '&.gg-card': { border: `2px solid ${vars.color.text}` } },
   },
 ]);
 
 export const heading = style({
-  fontFamily: vars.font.display,
-  fontWeight: 650,
+  fontWeight: 700,
   fontSize: '1.25rem',
   lineHeight: 1.3,
   selectors: { '&:focus': { outline: 'none' } },

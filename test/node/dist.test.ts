@@ -63,11 +63,14 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
-  it('preloads a font that is in the build', () => {
+  it('preloads both fonts, each in the build', () => {
     for (const { file } of LOCALE_PAGES) {
-      const href = /<link rel="preload" as="font"[^>]*href="\/([^"]+)"/.exec(read(file))?.[1];
-      expect(href, file).toMatch(/^assets\/.+\.woff2$/);
-      expect(exists(href ?? ''), href).toBe(true);
+      const hrefs = [...read(file).matchAll(/<link rel="preload" as="font"[^>]*href="\/([^"]+)"/g)].map((m) => m[1]);
+      expect(hrefs, file).toHaveLength(2);
+      for (const href of hrefs) {
+        expect(href, file).toMatch(/^assets\/.+\.woff2$/);
+        expect(exists(href ?? ''), href).toBe(true);
+      }
     }
   });
 

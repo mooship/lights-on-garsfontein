@@ -46,7 +46,6 @@ export const dialog = style({
   color: vars.color.text,
   border: `1px solid ${vars.color.border}`,
   borderRadius: vars.radius.card,
-  boxShadow: vars.color.shadow,
   padding: '1.25rem',
   selectors: { '&::backdrop': { background: 'rgba(0, 0, 0, 0.5)' } },
 });

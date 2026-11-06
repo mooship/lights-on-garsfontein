@@ -55,7 +55,7 @@ globalStyle('.gg-shell', {
   margin: '0 auto',
   // Keep content clear of notches and home indicators (viewport-fit=cover in index.html).
   padding:
-    'max(1.25rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(2.5rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))',
+    'max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(3rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))',
   display: 'flex',
   flexDirection: 'column',
   gap: '1rem',
@@ -92,20 +92,13 @@ globalStyle('.gg-masthead', {
 
 globalStyle('.gg-masthead .gg-title', { gridColumn: '1 / -1' });
 
-globalStyle('.gg-eyebrow', {
-  fontSize: '0.8125rem',
-  fontWeight: 600,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: vars.color.muted,
-});
+globalStyle('.gg-eyebrow', { fontWeight: 600, color: vars.color.muted });
 
 globalStyle('.gg-title', {
-  fontFamily: vars.font.display,
-  fontWeight: 700,
+  fontWeight: 800,
   fontSize: 'clamp(1.75rem, 8.5vw, 2.25rem)',
   lineHeight: 1.1,
-  letterSpacing: '-0.01em',
+  letterSpacing: '-0.02em',
   marginTop: '0.25rem',
 });
 
@@ -113,7 +106,7 @@ globalStyle('.gg-card', {
   background: vars.color.card,
   border: `1px solid ${vars.color.border}`,
   borderRadius: vars.radius.card,
-  padding: '1.25rem',
+  padding: '1rem',
 });
 
 // Sized to its content: the loading skeleton matches every state.
@@ -122,7 +115,6 @@ globalStyle('.gg-status-card', {
   flexDirection: 'column',
   gap: '1rem',
   overflow: 'hidden',
-  boxShadow: vars.color.shadow,
 });
 
 // Room for two lines of detail (padding + 2 × 0.9375rem × 1.5 + the border), as the last outage takes
@@ -168,7 +160,7 @@ globalStyle(summaries, {
   minHeight: '2.75rem',
   display: 'flex',
   alignItems: 'center',
-  gap: '0.375rem',
+  gap: '0.5rem',
   listStyle: 'none',
 });
 
@@ -189,8 +181,7 @@ globalStyle('.gg-trends-details ul', { margin: '0 0 0.5rem', paddingLeft: '1.25r
 // One line whatever the font, so the shell and the app match; a title that wraps on a narrow screen
 // wraps the same in both.
 globalStyle('.gg-card-title', {
-  fontFamily: vars.font.display,
-  fontWeight: 600,
+  fontWeight: 700,
   fontSize: '1.25rem',
   lineHeight: 1.3,
   minHeight: '1.625rem',
@@ -203,14 +194,14 @@ globalStyle('.gg-icon-button', {
   height: '2.75rem',
   display: 'inline-grid',
   placeItems: 'center',
-  borderRadius: vars.radius.pill,
-  border: `1px solid ${vars.color.border}`,
+  borderRadius: vars.radius.control,
+  border: `1px solid ${vars.color.inputBorder}`,
   background: vars.color.card,
   cursor: 'pointer',
   transition: 'background-color 150ms ease, border-color 150ms ease, transform 120ms ease',
 });
 
-globalStyle('.gg-icon-button:hover', { background: vars.color.bg, borderColor: vars.color.inputBorder });
+globalStyle('.gg-icon-button:hover', { background: vars.color.bg, borderColor: vars.color.text });
 globalStyle('.gg-icon-button:active', { transform: 'translateY(1px)' });
 
 globalStyle('.gg-masthead-actions', { flex: 'none', display: 'flex', gap: '0.5rem' });
@@ -289,7 +280,7 @@ globalStyle('.gg-skel', {
   display: 'block',
   position: 'relative',
   overflow: 'hidden',
-  borderRadius: '0.375rem',
+  borderRadius: vars.radius.card,
   background: vars.color.border,
 });
 
@@ -309,7 +300,7 @@ globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '
 globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '1rem', rowGap: '0.5rem' });
 globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.25rem' });
 
-globalStyle('.gg-skel-badge', { width: '4rem', height: '4rem', borderRadius: vars.radius.pill, flex: 'none' });
+globalStyle('.gg-skel-badge', { width: '4rem', height: '4rem', borderRadius: vars.radius.control, flex: 'none' });
 globalStyle('.gg-skel-heading', { height: '1.75rem' });
 globalStyle('.gg-skel-text', { height: '0.875rem' });
 globalStyle('.gg-skel-tile', { height: '5.75rem', borderRadius: vars.radius.control });

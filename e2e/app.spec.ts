@@ -71,7 +71,7 @@ const BRAND = site.brand.short;
 /** The tab title without a live reading: it claims no status. */
 const NEUTRAL_TITLE = site.brand.full;
 
-/** "rgb(179, 58, 43)" for "#B33A2B", as computed styles report a colour. */
+/** "rgb(176, 40, 30)" for "#B0281E", as computed styles report a colour. */
 const rgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Stands for a clock time in a message, for `withTime`. */
@@ -357,8 +357,8 @@ test.describe('public page', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(site.brand.full);
     await expect(page.locator('.gg-eyebrow')).toHaveText(en.masthead.eyebrow);
     await expect(page.locator('.gg-notice')).toHaveCSS('border-top-style', 'none');
-    await expect(page.locator('.gg-status-card')).not.toHaveCSS('box-shadow', 'none');
-    await expect(page.locator('section.gg-card:not(.gg-status-card)').first()).toHaveCSS('box-shadow', 'none');
+    // Panels stand apart by surface and a rule; nothing casts a shadow.
+    for (const card of await page.locator('section.gg-card').all()) await expect(card).toHaveCSS('box-shadow', 'none');
     const scope = page.getByText(en.scope.measured(site.landmark), { exact: true });
     await expect(scope).toBeVisible();
     await expect(scope.locator('xpath=..').locator('details')).toHaveCount(0);

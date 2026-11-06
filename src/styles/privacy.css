@@ -4,21 +4,21 @@
 /* The colours are copies from src/styles/palette.ts, which CSS cannot import. */
 :root {
   color-scheme: light;
-  --bg: #f6f4ef;
-  --text: #1f2120;
-  --muted: #5c5850;
-  --border: #e4dfd4;
-  --accent: #2d5a27;
-  --focus: #8a5a12;
+  --bg: #eceeea;
+  --text: #1b1d1f;
+  --muted: #53595e;
+  --border: #b9beb8;
+  --accent: #1e6b3c;
+  --focus: #8f5300;
 }
 :root.dark {
   color-scheme: dark;
-  --bg: #121312;
-  --text: #f0efea;
-  --muted: #a8a69e;
-  --border: #2e312e;
-  --accent: #4caf50;
-  --focus: #e6b566;
+  --bg: #141619;
+  --text: #eceeea;
+  --muted: #a2a9a6;
+  --border: #4a5050;
+  --accent: #5cc27e;
+  --focus: #f2b84b;
 }
 * {
   box-sizing: border-box;
@@ -49,7 +49,7 @@ h1,
 h2,
 h3,
 h4 {
-  font-family: var(--gg-font-display);
+  font-weight: 700;
   line-height: 1.2;
   text-wrap: balance;
 }
@@ -125,7 +125,7 @@ h4 + ul {
   min-height: 44px;
   padding: 0.5rem 1rem;
   border: 1px solid var(--accent);
-  border-radius: 0.5rem;
+  border-radius: 4px;
   background: transparent;
   color: var(--accent);
   font: inherit;
