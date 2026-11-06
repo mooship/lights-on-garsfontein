@@ -109,6 +109,21 @@ globalStyle('.gg-card', {
   padding: '1rem',
 });
 
+// The status band heads the status card, edge to edge across it, in the state's colour
+// (src/components/StatusBadge.css.ts). The loading row (.gg-skel-row) takes the same box, so every state
+// keeps the shell's height: an ON or OFF headline wrapped to two lines on a phone with the duration under
+// it (2 × 2rem × 1.15 + 0.25rem + 1.5rem = 6.35rem), or a NONE headline of up to three lines, fits.
+globalStyle('.gg-band', {
+  margin: '-1rem -1rem 0',
+  padding: '1rem',
+  borderTopWidth: '3px',
+  borderTopStyle: 'solid',
+  minHeight: 'calc(6.35rem + 2rem + 3px)',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+});
+
 // Sized to its content: the loading skeleton matches every state.
 globalStyle('.gg-status-card', {
   display: 'flex',
@@ -137,11 +152,10 @@ globalStyle('.gg-status-warning', { fontSize: '0.8125rem' });
 // it steps with the width: the tallest loaded body in each range, in either language. Only text that
 // wraps further on a zoomed screen, or the user-opened weekly table below it, may grow the card.
 globalStyle('.gg-trends-body', {
-  minHeight: '53.25rem',
+  minHeight: '51.625rem',
   '@media': {
-    'screen and (min-width: 21.25rem)': { minHeight: '49.6875rem' },
-    'screen and (min-width: 26.25rem)': { minHeight: '48.875rem' },
-    'screen and (min-width: 33.75rem)': { minHeight: '46.4375rem' },
+    'screen and (min-width: 21.25rem)': { minHeight: '50.96875rem' },
+    'screen and (min-width: 33.75rem)': { minHeight: '48.46875rem' },
   },
 });
 
@@ -229,12 +243,13 @@ globalStyle('.gg-footer nav a', {
 
 globalStyle('.gg-scope', { fontSize: '0.9375rem', lineHeight: 1.45, color: vars.color.muted });
 
+// A warning label: a strip on the board's grey with the hazard amber as its left rule.
 globalStyle('.gg-safety', {
-  fontSize: '0.8125rem',
+  fontSize: '0.875rem',
   lineHeight: 1.45,
-  color: vars.color.muted,
-  paddingTop: '0.75rem',
-  borderTop: `1px solid ${vars.color.border}`,
+  padding: '0.5rem 0.75rem',
+  background: vars.color.bg,
+  borderLeft: `4px solid ${vars.color.focus}`,
 });
 
 // The one action a resident may need in an outage: a 44px tap target, with negative margins so the
@@ -294,17 +309,17 @@ globalStyle('.gg-skel::after', {
   animation: 'gg-shimmer 1.4s ease-in-out infinite',
 });
 
-// The same min-height as root in src/components/StatusBadge.css.ts; change them together.
-globalStyle('.gg-skel-row', { display: 'flex', alignItems: 'center', gap: '1rem', minHeight: '6.35rem' });
+// The status band while loading (.gg-band has its box).
+globalStyle('.gg-skel-row', { borderTopColor: vars.color.border });
 globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1 });
-globalStyle('.gg-skel-grid', { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '1rem', rowGap: '0.5rem' });
+globalStyle('.gg-skel-row > .gg-skel-stack', { flex: 'none' });
+globalStyle('.gg-skel-grid', { display: 'flex', flexDirection: 'column', gap: '0.5rem' });
 globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.25rem' });
 
-globalStyle('.gg-skel-badge', { width: '4rem', height: '4rem', borderRadius: vars.radius.control, flex: 'none' });
 globalStyle('.gg-skel-heading', { height: '1.75rem' });
 globalStyle('.gg-skel-text', { height: '0.875rem' });
-globalStyle('.gg-skel-tile', { height: '5.75rem', borderRadius: vars.radius.control });
-globalStyle('.gg-skel-chart', { height: '11.5rem', marginTop: '1.25rem', borderRadius: vars.radius.control });
+globalStyle('.gg-skel-tile', { height: '3rem' });
+globalStyle('.gg-skel-chart', { height: '11.5rem', marginTop: '1.25rem' });
 globalStyle('.gg-skel-item', { height: '2.25rem' });
 
 globalStyle('.gg-w-30', { width: '30%' });

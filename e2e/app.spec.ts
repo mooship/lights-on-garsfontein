@@ -709,9 +709,8 @@ test.describe('planned outages', () => {
         await page.goto(localePath(locale));
         await expect(page.getByRole('status')).toHaveText(m.status.OFF);
         await expect(badge(page)).toHaveAttribute('data-planned', '');
-        // Calm: no pulsing ring, and the planned tone rather than the outage red.
-        await expect(badge(page).locator('[aria-hidden="true"] span')).toHaveCount(0);
-        await expect(page.getByRole('status')).toHaveCSS('color', rgb(PALETTE.light.planned));
+        // Calm: the planned violet rather than the outage red.
+        await expect(badge(page)).toHaveCSS('background-color', rgb(PALETTE.light.planned));
         // Factual: announced in advance, and when it began.
         const DAY = '@@DAY@@';
         const detail = escapeRegExp(m.status.planned(AT, DAY))
@@ -728,8 +727,7 @@ test.describe('planned outages', () => {
     await page.goto('/en/');
     await expect(page.getByRole('status')).toHaveText(en.status.OFF);
     await expect(badge(page)).not.toHaveAttribute('data-planned');
-    await expect(badge(page).locator('[aria-hidden="true"] span')).toHaveCount(1);
-    await expect(page.getByRole('status')).toHaveCSS('color', rgb(PALETTE.light.off));
+    await expect(badge(page)).toHaveCSS('background-color', rgb(PALETTE.light.off));
     await expect(history(page).getByText(en.history.planned, { exact: true })).toHaveCount(0);
   });
 });

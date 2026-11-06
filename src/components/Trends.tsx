@@ -24,8 +24,8 @@ import * as css from './Trends.css';
 
 const { AXIS_WIDTH } = css;
 
-/** A tile duration like the history's ("5 u 23 min"); none at all reads "0 min". */
-const tileDuration = (minutes: number) => (minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `0 ${t().units.min}`);
+/** A figure's duration like the history's ("5 u 23 min"); none at all reads "0 min". */
+const minutesText = (minutes: number) => (minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `0 ${t().units.min}`);
 /** One outage's length: it happened, so under half a minute reads as less than one, never zero. */
 const outageDuration = (minutes: number) =>
   minutes > 0 ? formatDuration(minutes * MINUTE_MS) : `< 1 ${t().units.min}`;
@@ -36,7 +36,7 @@ const outageDuration = (minutes: number) =>
 /** Off time counts only inside a counted outage, so this also covers every week with time off. */
 const hadOutage = (w: WeekStats) => w.outages > 0;
 
-/** The numbers in a duration at full size and its units smaller, so "12 u 34 min" fits a phone tile. */
+/** The numbers in a duration at full size and its units smaller, so "12 u 34 min" stays compact on a phone. */
 const DurationValue: Component<{ text: string }> = (props) => (
   <For each={props.text.split(/(\d+)/).filter(Boolean)}>
     {(part) => (/^\d+$/.test(part) ? part : <span class={css.unit}>{part}</span>)}
@@ -72,11 +72,12 @@ function delta(
   };
 }
 
-const Tile: Component<{ label: string; value: JSX.Element; delta?: Delta | null; note?: JSX.Element }> = (props) => (
-  <div class={css.tile}>
-    <div class={css.tileLabel}>{props.label}</div>
-    <div class={css.tileValue}>{props.value}</div>
-    <div class={css.tileDelta}>
+/** One ruled line of the figures: the label and its change on the left, the figure on the right. */
+const Figure: Component<{ label: string; value: JSX.Element; delta?: Delta | null; note?: JSX.Element }> = (props) => (
+  <div class={css.figure}>
+    <div class={css.figureLabel}>{props.label}</div>
+    <div class={css.figureValue}>{props.value}</div>
+    <div class={css.figureDelta}>
       <Show when={props.delta} fallback={props.note ?? ' '}>
         {(d) => (
           <>
@@ -129,7 +130,7 @@ function weekReadout(w: WeekStats, place: WeekPlace): ReadoutParts {
   const m = t().trends;
   return {
     lead: m.weekOf(formatCalendarDay(w.weekStart)),
-    value: tileDuration(w.minutesOff),
+    value: minutesText(w.minutesOff),
     rest: `${m.off} · ${m.outageCount(w.outages)}${weekNote(place)}`,
   };
 }
@@ -256,24 +257,7 @@ const BarChart: Component<BarChartProps> = (props) => {
                 data-active={activeIndex() === index ? '' : undefined}
               >
                 <Show when={bar().hours > 0}>
-                  <rect
-                    data-bar
-                    class={css.bar}
-                    x={barX()}
-                    y={top()}
-                    width={geometry().barWidth}
-                    height={height()}
-                    rx={Math.min(4, height() / 2)}
-                  />
-                  {/* Square off the baseline end so only the data end is rounded. */}
-                  <rect
-                    data-bar
-                    class={css.bar}
-                    x={barX()}
-                    y={Math.max(top(), CHART_HEIGHT - 4)}
-                    width={geometry().barWidth}
-                    height={Math.min(4, height())}
-                  />
+                  <rect data-bar class={css.bar} x={barX()} y={top()} width={geometry().barWidth} height={height()} />
                 </Show>
                 <Show when={activeIndex() === index}>
                   <rect
@@ -282,7 +266,6 @@ const BarChart: Component<BarChartProps> = (props) => {
                     y={CHART_HEIGHT + 3}
                     width={geometry().barWidth}
                     height={2}
-                    rx={1}
                   />
                 </Show>
               </g>
@@ -300,7 +283,7 @@ const BarChart: Component<BarChartProps> = (props) => {
 
 export const Trends: Component<TrendsProps> = (props) => {
   const since = () => Date.parse(props.stats.trackingSince);
-  // A memo, so the tiles that read it rebuild only when it flips, not on every minute's tick.
+  // A memo, so the figures that read it rebuild only when it flips, not on every minute's tick.
   const started = createMemo(() => props.now >= since());
   const s = () => props.stats.last30;
   // The day records began, in the same form as WeekStats.weekStart.
@@ -320,7 +303,7 @@ export const Trends: Component<TrendsProps> = (props) => {
   const hourBars = createMemo(() =>
     props.stats.last30ByHour.map((minutes, hour) => ({
       hours: minutes / 60,
-      readout: { lead: hourRange(hour), value: tileDuration(minutes), rest: t().trends.off },
+      readout: { lead: hourRange(hour), value: minutesText(minutes), rest: t().trends.off },
     })),
   );
   const fullWindow = () => s().trackedHours >= 30 * 24;
@@ -343,13 +326,13 @@ export const Trends: Component<TrendsProps> = (props) => {
           {t().trends.title}
         </h2>
         <p class={`${css.subtitle} ${motion.enter}`}>{subtitle()}</p>
-        <div class={`${css.tiles} ${motion.enter}`}>
-          <Tile
+        <div class={`${css.figures} ${motion.enter}`}>
+          <Figure
             label={t().trends.withoutPower}
-            value={started() ? <DurationValue text={tileDuration(s().minutesOff)} /> : t().trends.notYet}
-            delta={delta(s().minutesOff, props.stats.previous30?.minutesOff, tileDuration, true)}
+            value={started() ? <DurationValue text={minutesText(s().minutesOff)} /> : t().trends.notYet}
+            delta={delta(s().minutesOff, props.stats.previous30?.minutesOff, minutesText, true)}
           />
-          <Tile
+          <Figure
             label={t().trends.outages}
             value={started() ? String(s().outages) : t().trends.notYet}
             delta={s().plannedOutages === 0 ? delta(s().outages, props.stats.previous30?.outages, String, true) : null}
@@ -359,11 +342,11 @@ export const Trends: Component<TrendsProps> = (props) => {
               ) : undefined
             }
           />
-          <Tile
+          <Figure
             label={t().trends.daysAffected}
             value={started() ? t().trends.daysOf(s().daysWithOutage, s().daysTracked) : t().trends.notYet}
           />
-          <Tile
+          <Figure
             label={t().trends.longest}
             value={s().outages === 0 ? t().trends.notYet : <DurationValue text={outageDuration(s().longestMinutes)} />}
             note={s().outages > 1 ? t().trends.typically(outageDuration(s().medianMinutes ?? 0)) : undefined}
@@ -444,7 +427,7 @@ export const Trends: Component<TrendsProps> = (props) => {
                 {(minutes, hour) => (
                   <tr>
                     <td class={css.td}>{hourRange(hour)}</td>
-                    <td class={css.td}>{tileDuration(minutes())}</td>
+                    <td class={css.td}>{minutesText(minutes())}</td>
                   </tr>
                 )}
               </Index>

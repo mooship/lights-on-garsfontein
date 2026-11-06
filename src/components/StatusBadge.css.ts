@@ -1,70 +1,43 @@
-import { keyframes, style, styleVariants } from '@vanilla-extract/css';
+import { style, styleVariants } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
-// The same min-height as .gg-skel-row (global.css.ts): an ON or OFF headline wrapped to two lines on a
-// phone, with the duration under it (2 × 2rem × 1.15 + 0.25rem + 1.5rem), or a NONE headline of up to
-// three lines, fits in it, so every state keeps the loading shell's height.
-export const root = style({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '1rem',
-  minHeight: '6.35rem',
+// The band's box (.gg-band in the global styles) is shared with the loading row; this is its colour. White
+// on the state colour in light, the page's dark ink on it in dark. NONE has no reading behind it, so it
+// stays neutral and never reads as a measured "on".
+export const band = styleVariants({
+  ON: { background: vars.color.on, color: vars.color.onContrast, borderTopColor: vars.color.on },
+  OFF: { background: vars.color.off, color: vars.color.offContrast, borderTopColor: vars.color.off },
+  // Announced in advance: the planned violet, so it never reads as the outage red.
+  PLANNED: { background: vars.color.planned, color: vars.color.onContrast, borderTopColor: vars.color.planned },
+  NONE: { background: vars.color.card, color: vars.color.text, borderTopColor: vars.color.text },
 });
 
-const pulse = keyframes({
-  '0%': { transform: 'scale(1)', opacity: 0.55 },
-  '100%': { transform: 'scale(1.6)', opacity: 0 },
-});
+export const head = style({ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' });
 
-const iconBase = style({
-  position: 'relative',
+// On the headline's first line: 2rem × 1.15 tall, so the icon centres on it.
+export const icon = style({
   flex: 'none',
-  width: '4rem',
-  height: '4rem',
-  borderRadius: vars.radius.control,
   display: 'grid',
   placeItems: 'center',
-});
-
-export const icon = styleVariants({
-  ON: [iconBase, { background: vars.color.onSoft, color: vars.color.on }],
-  OFF: [iconBase, { background: vars.color.offSoft, color: vars.color.off }],
-  // Announced in advance: calm, and without the pulsing ring.
-  PLANNED: [iconBase, { background: vars.color.plannedSoft, color: vars.color.planned }],
-  // No live reading: neutral, so it never reads as a measured "on".
-  NONE: [iconBase, { background: vars.color.bg, color: vars.color.muted, border: `1px solid ${vars.color.border}` }],
-});
-
-// Only rendered for an outage that was not planned.
-export const ring = style({
-  position: 'absolute',
-  inset: 0,
-  borderRadius: 'inherit',
-  border: '2px solid currentColor',
-  animation: `${pulse} 2.4s ease-out infinite`,
-  pointerEvents: 'none',
+  height: '2.3rem',
+  selectors: { '[data-status="NONE"] &': { height: '1.725rem' } },
 });
 
 export const headline = style({
   fontFamily: vars.font.display,
   fontSize: '2rem',
   lineHeight: 1.15,
-  fontWeight: 650,
+  fontWeight: 600,
   textWrap: 'balance',
 });
 
-export const tone = styleVariants({
-  ON: { color: vars.color.on },
-  OFF: { color: vars.color.off },
-  PLANNED: { color: vars.color.planned },
-  // The longer, neutral headline is smaller so it fits beside the icon on a phone.
-  NONE: { color: vars.color.text, fontSize: '1.25rem' },
-});
+// The longer, neutral headline is smaller so it fits in three lines on a phone.
+export const headlineNone = style({ fontSize: '1.5rem' });
 
 export const detail = style({
   marginTop: '0.25rem',
-  color: vars.color.muted,
+  fontWeight: 600,
   fontVariantNumeric: 'tabular-nums',
-  // NONE has no duration; without the empty line its headline centres on the icon.
-  selectors: { [`${root}[data-status="NONE"] &`]: { display: 'none' } },
+  // NONE has no duration; without the empty line its headline centres in the band.
+  selectors: { '[data-status="NONE"] > &': { display: 'none' } },
 });

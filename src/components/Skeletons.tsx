@@ -10,8 +10,7 @@ import { SafetyLine, Scope } from './StatusNotes';
 export const StatusSkeleton: Component = () => (
   <>
     <p class="gg-sr-only">{t().status.loading}</p>
-    <div class="gg-skel-row" aria-hidden="true">
-      <span class="gg-skel gg-skel-badge" />
+    <div class="gg-band gg-skel-row" aria-hidden="true">
       <span class="gg-skel-stack">
         <span class="gg-skel gg-skel-heading gg-w-60" />
         <span class="gg-skel gg-skel-text gg-w-30" />

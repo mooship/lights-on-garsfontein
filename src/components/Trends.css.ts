@@ -13,33 +13,40 @@ export const subtitle = style({
   color: vars.color.muted,
 });
 
-export const tiles = style({
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  columnGap: '1rem',
-  rowGap: '0.5rem',
-});
+// A ruled table of four lines, like a meter slip: a rule under the last one closes it.
+export const figures = style({ borderBottom: `1px solid ${vars.color.border}` });
 
-export const tile = style({
-  minHeight: '5.75rem',
-  padding: '0.75rem 0',
+export const figure = style({
+  minHeight: '3.5rem',
+  padding: '0.5rem 0',
   borderTop: `1px solid ${vars.color.border}`,
-  display: 'flex',
-  flexDirection: 'column',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gridTemplateAreas: '"label value" "delta value"',
+  alignItems: 'center',
+  columnGap: '1rem',
 });
 
-export const tileLabel = style({ fontSize: '0.8125rem', fontWeight: 600, color: vars.color.muted, lineHeight: 1.2 });
+export const figureLabel = style({ gridArea: 'label', fontSize: '0.875rem', fontWeight: 600, lineHeight: 1.25 });
 
-// Pushed down with its delta, so the values in a row line up when one label wraps.
-export const tileValue = style({ marginTop: 'auto', fontSize: '1.625rem', fontWeight: 700, lineHeight: 1.1 });
+export const figureValue = style({
+  gridArea: 'value',
+  textAlign: 'right',
+  fontFamily: vars.font.display,
+  fontSize: '1.75rem',
+  fontWeight: 600,
+  lineHeight: 1.1,
+  fontVariantNumeric: 'tabular-nums',
+});
 
 // The units in a duration ("u", "min"), smaller than its numbers.
-export const unit = style({ fontSize: '0.6em', fontWeight: 600 });
+export const unit = style({ fontSize: '0.65em' });
 
-/** The count of planned outages under the outages tile. */
+/** The count of planned outages under the outages line. */
 export const plannedNote = style({ color: vars.color.planned });
 
-export const tileDelta = style({
+export const figureDelta = style({
+  gridArea: 'delta',
   display: 'flex',
   alignItems: 'center',
   gap: '0.25rem',
@@ -129,13 +136,13 @@ export const th = style({
   textAlign: 'left',
   fontWeight: 600,
   color: vars.color.muted,
-  padding: '0.375rem 0',
+  padding: '0.5rem 0',
   borderBottom: `1px solid ${vars.color.border}`,
   selectors: { '&:not(:first-child)': { textAlign: 'right' } },
 });
 
 export const td = style({
-  padding: '0.375rem 0',
+  padding: '0.5rem 0',
   borderBottom: `1px solid ${vars.color.border}`,
   selectors: { '&:not(:first-child)': { textAlign: 'right' } },
 });
