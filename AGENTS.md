@@ -20,6 +20,7 @@ The full table, the local setup and what CI runs are in [README, Local developme
 - `npm test`: both Vitest projects, `worker` (workerd with real D1, `test/*.test.ts`) and `node` (`test/node/`). `CHECK_DIST=1` also checks `dist/`, so build first.
 - `npm run test:coverage`: the same two projects with Istanbul coverage; it fails below 95% on any of statements, branches, functions and lines (`thresholds` in `vitest.config.ts`). CI runs this instead of plain `npm test`.
 - `npm run test:e2e`: Playwright against `wrangler dev --env e2e` with a fresh local database.
+- `npm run lighthouse`: Lighthouse CI (mobile profile, median of three runs) on `/`, `/en/` and `/privacy`, against the built Worker started as e2e starts it, so build first. Accessibility, best practices and SEO must be 100 and performance at least 95 (`.github/lighthouserc.cjs`). CI measured 99 to 100 for performance; a busy laptop scores lower and noisier, so judge a failure by the CI run, whose reports are uploaded as the `lighthouse-reports` artifact. Do not lower a threshold or skip an audit to get green.
 - `npm run lint`, `npm run lint:fix` and `npm run lint:ci`: Biome, check, write and check as CI does. Biome is the formatter too, so there is no separate format command: `lint:fix` formats and lints.
 - `npm run db:generate`: create a migration after changing `worker/db/schema.ts`.
 
@@ -71,7 +72,7 @@ Write docs, copy and comments the way a person would. No em dashes: use a comma,
 ## Definition of done
 
 - Tests added or updated first, and they fail without the change.
-- `npm run lint:ci`, `npm run typecheck`, `npm run build`, `CHECK_DIST=1 npm run test:coverage` and `npm run test:e2e` all pass, in that order. The coverage run is both Vitest projects and fails below 95% on statements, branches, functions and lines; it replaces plain `npm test`. A change to docs only needs `npm run lint:ci`.
+- `npm run lint:ci`, `npm run typecheck`, `npm run build`, `CHECK_DIST=1 npm run test:coverage` and `npm run test:e2e` all pass, in that order. A change to a page, the head, styles, fonts or scripts also needs `npm run lighthouse` (after the build) to pass; CI runs it as its own job. The coverage run is both Vitest projects and fails below 95% on statements, branches, functions and lines; it replaces plain `npm test`. A change to docs only needs `npm run lint:ci`.
 - Both languages updated; zero layout shift and no horizontal scroll at 320px still hold.
 - README updated when behaviour, configuration or the public API changes.
 - Say in the hand-over which checks were skipped, and why.
