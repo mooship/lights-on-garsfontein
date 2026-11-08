@@ -46,11 +46,11 @@ Summaries follow [Conventional Commits 1.0.0](https://www.conventionalcommits.or
 
 `package-lock.json` is the only npm lockfile (`skills-lock.json` belongs to agent skills, not npm).
 
-- One npm major everywhere. `packageManager` in `package.json` pins npm 11.19.1 for Cloudflare Workers Builds, every CI job runs `npm install --global npm@11` before `npm ci`, and the lockfile is written by npm 11. If npm 10 accepts the lockfile and npm 11 does not, or the reverse, the environment is wrong, not the pull request.
-- After any `package.json` change, run a real `npm install` and commit `package.json` and `package-lock.json` together. Do not use `--package-lock-only`: it keeps stale nested entries when a range or an override in `overrides` changes. If `npm ls` then prints `invalid` or `missing`, delete the stale nested entries from the lockfile and install again; never edit versions by hand.
-- Verify with a real `npm ci --ignore-scripts` in a clean clone, not `--dry-run`, which has passed on a lockfile that then failed to install. Check that `@typescript/typescript-linux-x64` is in the lockfile, since CI and Cloudflare run Linux.
+- The lockfile must install under both npm 10 and npm 11. Cloudflare Workers Builds can run npm 10.9, while CI and laptops run npm 11, and npm 11 can write a lockfile that a real npm 10 `npm ci` rejects ("Missing: proxy-agent@8.0.2 from lock file") when it updates an existing one, as Dependabot does. An npm 10 lockfile also passes npm 11, so write it with `npx -y npm@10 install --package-lock-only --ignore-scripts`. Every CI job still runs `npm install --global npm@11` before `npm ci`, and `packageManager` pins npm 11.19.1.
+- Commit `package.json` and `package-lock.json` together. After a range or an `overrides` change, `--package-lock-only` can keep stale nested entries, so check `npm ls` for `invalid` or `missing` lines; delete the stale entries from the lockfile and regenerate, never edit versions by hand.
+- Verify with a real `npm ci --ignore-scripts` under both `npx -y npm@10` and npm 11 in a clean clone, not `--dry-run`, which has passed on a lockfile that then failed to install. Check that `@typescript/typescript-linux-x64` is in the lockfile, since CI and Cloudflare run Linux.
 - Pin a prerelease exactly. A caret on one (such as `^7.1.0-beta`) resolves to nightly builds, and a prerelease does not satisfy a plain peer range such as `>=2.9`.
-- Dependabot owns its own lockfile changes. Fix one only when a real `npm ci` fails under npm 11, and push the fix to its branch.
+- Dependabot owns its own lockfile changes. Fix one only when a real `npm ci` fails under either npm, and push the fix to its branch.
 - Run the project's binaries with `npm run` or `npx --no-install <tool>`, so a missing local binary cannot fetch an unrelated package of the same name.
 - Do not install in a working tree someone else is using; use a throwaway clone.
 
@@ -87,7 +87,7 @@ Write docs, copy and comments the way a person would. No em dashes: use a comma,
 
 - Tests added or updated first, and they fail without the change.
 - `npm run lint:ci`, `npm run typecheck`, `npm run build`, `CHECK_DIST=1 npm run test:coverage` and `npm run test:e2e` all pass, in that order. A change to a page, the head, styles, fonts or scripts also needs `npm run lighthouse` (after the build) to pass; CI runs it as its own job. The coverage run is both Vitest projects and fails below 95% on statements, branches, functions and lines; it replaces plain `npm test`. A change to docs only needs `npm run lint:ci`.
-- A dependency or `package.json` change follows [Dependencies and lockfiles](#dependencies-and-lockfiles): a real `npm install`, both files committed together, and a real `npm ci --ignore-scripts` in a clean clone.
+- A dependency or `package.json` change follows [Dependencies and lockfiles](#dependencies-and-lockfiles): both files committed together, and a real `npm ci --ignore-scripts` under npm 10 and npm 11 in a clean clone.
 - Both languages updated; zero layout shift and no horizontal scroll at 320px still hold.
 - README updated when behaviour, configuration or the public API changes.
 - Say in the hand-over which checks were skipped, and why.
