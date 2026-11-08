@@ -41,5 +41,15 @@
     "formatter": {
       "expand": "always"
     }
+  },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "yaml": {
+    "formatter": {
+      "enabled": false
+    }
   }
 }

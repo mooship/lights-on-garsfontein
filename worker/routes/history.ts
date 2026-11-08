@@ -148,6 +148,7 @@ async function getFeed({ env, db }: RouteContext): Promise<Response> {
   });
   // Stable while nothing changes, so readers and caches see the same document.
   const updated = entries.reduce(
+    // biome-ignore lint/complexity/useMathMinMax: these are ISO timestamp strings, which Math.max would turn into NaN
     (max, e) => (e.updated > max ? e.updated : max),
     new Date(TRACKING_SINCE).toISOString(),
   );
