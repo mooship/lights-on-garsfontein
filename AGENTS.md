@@ -24,7 +24,7 @@ The full table, the local setup and what CI runs are in [README, Local developme
 - `npm run lint`, `npm run lint:fix` and `npm run lint:ci`: Biome, check, write and check as CI does. Biome is the formatter too, so there is no separate format command: `lint:fix` formats and lints.
 - `npm run db:generate`: create a migration after changing `worker/db/schema.ts`.
 
-Node 24.22.1 or newer (24 and 26 are supported; `.node-version` says 24) and npm 11 or newer; `packageManager` pins npm 11.19.1.
+Node 24.22.1 or newer (24 is tested; `.node-version` says 24) and npm 11 or newer; `packageManager` pins npm 11.19.1.
 
 Lefthook runs on commit: `biome check --write` on the staged files (format and lint, with the fixes staged) and the typecheck on staged TypeScript. It never runs tests, so run them yourself.
 

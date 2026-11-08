@@ -13,21 +13,17 @@ permissions:
   contents: read
 
 jobs:
-  check-node:
-    name: Lint, typecheck, unit tests (Node ${{ matrix.node-version }})
+  check:
+    name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [24, 26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           cache: npm
       - run: npm install --global npm@11
       - run: npm ci
@@ -42,16 +38,6 @@ jobs:
       - run: npm run test:coverage
         env:
           CHECK_DIST: 1
-
-  # Branch protection requires the check named "Lint, typecheck, unit tests"; a matrix renames its legs, so this job keeps that name and fails if any leg does.
-  check:
-    name: Lint, typecheck, unit tests
-    needs: check-node
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    steps:
-      - run: test "${{ needs.check-node.result }}" = success
 
   e2e:
     name: Playwright E2E

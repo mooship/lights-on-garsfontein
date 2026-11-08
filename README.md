@@ -206,7 +206,7 @@ The Mac sends how long it has been on the charger as `poweredFor`, so if the Wi-
 
 ## Run it for your area
 
-You need Node 24.22.1 or newer (Node 24 and 26 are supported), npm 11 or newer, a Cloudflare account and, optionally, a domain on Cloudflare. `.node-version` pins Node 24 and `packageManager` in `package.json` pins npm 11.19.1, so fnm, Corepack and Cloudflare Workers Builds pick them up on their own.
+You need Node 24.22.1 or newer (Node 24 is tested), npm 11 or newer, a Cloudflare account and, optionally, a domain on Cloudflare. `.node-version` pins Node 24 and `packageManager` in `package.json` pins npm 11.19.1, so fnm, Corepack and Cloudflare Workers Builds pick them up on their own.
 
 1. **Fork and clone**, then `npm install`.
 2. **Edit `site.config.ts`**, the deployment's identity:
@@ -342,7 +342,7 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
-On commit, Lefthook formats and lints the matching staged files with Biome (writing the fixes) and type-checks them; it never runs tests. `npm install` installs the hooks. Run the tests yourself; CI runs them too. CI installs npm 11 and runs lint, typecheck, build and both Vitest projects under the coverage gate (with `dist/` checks) on Node 24 and 26, and e2e on Node 24, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file. A separate job builds the site and runs Lighthouse, which fails the build unless accessibility, best practices and SEO score 100 and performance at least 95 on every audited page.
+On commit, Lefthook formats and lints the matching staged files with Biome (writing the fixes) and type-checks them; it never runs tests. `npm install` installs the hooks. Run the tests yourself; CI runs them too. CI installs npm 11 and runs lint, typecheck, build and both Vitest projects under the coverage gate (with `dist/` checks) on Node 24, and e2e on Node 24, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file. A separate job builds the site and runs Lighthouse, which fails the build unless accessibility, best practices and SEO score 100 and performance at least 95 on every audited page.
 
 ### API tests (Bruno)
 
