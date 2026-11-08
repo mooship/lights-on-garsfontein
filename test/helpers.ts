@@ -34,6 +34,22 @@ export function stubLimiter(success = false) {
   return { limit: vi.fn(async (_options: RateLimitOptions) => ({ success })) };
 }
 
+/** The test database, except that any statement whose SQL matches `pattern` fails with 'D1 is down'. */
+export function d1FailingOn(pattern: RegExp): D1Database {
+  return new Proxy(env.DB, {
+    get(target, property) {
+      if (property === 'prepare') {
+        return (query: string) => {
+          if (pattern.test(query)) throw new Error('D1 is down');
+          return target.prepare(query);
+        };
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
 let ipCounter = 0;
 /** A fresh client IP so rate-limit buckets never leak between tests. */
 export function uniqueIp(): string {

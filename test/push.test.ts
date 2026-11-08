@@ -93,6 +93,9 @@ describe('push subscriptions', () => {
       { p256dh: notUncompressed, auth: keys.auth },
       { p256dh: short, auth: keys.auth },
       { p256dh: 'p256dh', auth: keys.auth },
+      // One character more than a whole number of groups of four is not base64 at all.
+      { p256dh: 'A', auth: keys.auth },
+      { p256dh: keys.p256dh, auth: 'A' },
       { p256dh: keys.p256dh, auth: longAuth },
       { p256dh: keys.p256dh, auth: shortAuth },
       { p256dh: keys.p256dh, auth: 'auth' },
@@ -110,6 +113,16 @@ describe('push subscriptions', () => {
     expect(await res.json()).toEqual({ ok: true });
     expect(await rows()).toEqual([]);
     expect((await unsubscribe('https://fcm.googleapis.com/fcm/send/unknown')).status).toBe(200);
+  });
+
+  it('refuses to delete without a push endpoint, and deletes nothing', async () => {
+    await subscribe();
+
+    for (const body of [{}, { endpoint: 'https://example.com/x' }]) {
+      const res = await call(PUSH_SUBSCRIPTION_PATH, { method: 'DELETE', body });
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    expect(await rows()).toEqual([{ endpoint: FCM, ...keys, locale: 'af' }]);
   });
 
   it('is rate limited', async () => {

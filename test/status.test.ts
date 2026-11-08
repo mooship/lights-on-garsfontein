@@ -5,7 +5,7 @@ import { ERROR } from '../shared/errors';
 import { HEARTBEAT_PATH, STATUS_PATH, TIMER_PATH } from '../shared/paths';
 import { createDb } from '../worker/db/client';
 import { HEARTBEAT_ROW_ID } from '../worker/db/schema';
-import { getGridState, MAX_PAUSE_MS } from '../worker/lib/grid';
+import { getGridState, MAX_PAUSE_MS, recordHeartbeat } from '../worker/lib/grid';
 import {
   asAdmin,
   call,
@@ -329,6 +329,18 @@ describe('POST /api/heartbeat with poweredFor', () => {
     await poweredFor(3600);
     const [row] = await outageRows();
     expect(row).toMatchObject({ is_false_positive: 0 });
+    expect(isAgo(row?.end_time ?? null, 0)).toBe(true);
+  });
+
+  it('vouches only for the moment it is sent when the sensor says nothing about its power', async () => {
+    const lastSeen = await setHeartbeat(600);
+    await insertOutage({ startTime: lastSeen });
+
+    const result = await recordHeartbeat(createDb(env.DB), new Date());
+
+    expect(result).toEqual({ closed: 1, changed: true });
+    const [row] = await outageRows();
+    expect(row).toMatchObject({ start_time: lastSeen, is_false_positive: 0 });
     expect(isAgo(row?.end_time ?? null, 0)).toBe(true);
   });
 });

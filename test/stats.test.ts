@@ -396,6 +396,19 @@ describe('GET /api/outages.csv', () => {
       ].join('\n'),
     );
   });
+
+  // The API only writes ISO times, but the column is free text, so one odd row must not shift the columns after it.
+  it.each([
+    ['a comma', 'a,b', '"a,b"'],
+    ['a quote', 'a"b', '"a""b"'],
+    ['a line break', 'a\nb', '"a\nb"'],
+  ])('quotes a stored value that contains %s', async (_name, startTime, quoted) => {
+    const odd = await insertOutage({ startTime, source: 'manual' });
+
+    const text = await (await call(CSV_PATH)).text();
+
+    expect(text.split('\n').slice(1).join('\n')).toBe(`${odd},${quoted},,,no\n`);
+  });
 });
 
 describe('GET /api/outages', () => {

@@ -69,6 +69,10 @@ describe('telegramText', () => {
     expect(telegramText('dismissed', { ...back, source: 'manual' }, sameDay)).toBe(telegram.dismissed.plain);
   });
 
+  it('refuses to word a back-on message for an outage that has not ended', () => {
+    expect(() => telegramText('on', off, sameDay)).toThrow('An on message needs an outage that has ended');
+  });
+
   it('adds the date to a time on another day', () => {
     const nextDay = new Date('2026-10-23T08:00:00Z');
 
@@ -407,6 +411,18 @@ describe('deliverTelegramAlert', () => {
     const logged = warn.mock.calls.flat().join(' ');
     expect(logged).toContain('chat not found');
     expect(logged).not.toContain(TOKEN);
+  });
+
+  it('drops an error whose body is not JSON, and still logs its status', async () => {
+    const outage = await insertOutage({ startTime: ago(DUE_MS) });
+    stubFetchHost(TELEGRAM_HOST, () => new Response('<html>Bad Request</html>', { status: 400 }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { send, queue } = retryQueue();
+
+    await deliverTelegramAlert(alertFor(outage), telegramEnv(queue), NOW);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(warn.mock.calls.flat().join(' ')).toContain('Telegram answered 400');
   });
 
   it('never logs the token when the fetch fails', async () => {

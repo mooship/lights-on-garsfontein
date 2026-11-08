@@ -34,7 +34,7 @@ jobs:
       - run: git add -N drizzle/ && git diff --exit-code drizzle/
       - run: npm run typecheck
       - run: npm run build
-      - run: npm test
+      - run: npm run test:coverage
         env:
           CHECK_DIST: 1
 

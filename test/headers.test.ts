@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ERROR } from '../shared/errors';
 import { CSV_PATH, LOGIN_PATH, ROBOTS_PATH, SITEMAP_PATH, STATS_PATH, STATUS_PATH } from '../shared/paths';
 import { call } from './helpers';
@@ -30,6 +30,19 @@ describe('security headers on Worker responses', () => {
     expect(JSON.parse(body)).toEqual({ error: ERROR.internal });
     expect(body).not.toContain('secret detail');
     expect(res.headers.get('Content-Security-Policy')).toBe("default-src 'none'; frame-ancestors 'none'");
+  });
+
+  it('hands every other path to the static assets, but never an unknown API path', async () => {
+    const fetchAsset = vi.fn(async (_request: Request) => new Response('<h1>Privacy</h1>'));
+    const withAssets = { ...env, ASSETS: { fetch: fetchAsset } } as unknown as Env;
+
+    const page = await call('/privacy.html', { env: withAssets });
+    const unknownApi = await call('/api/nope', { env: withAssets });
+
+    expect(await page.text()).toBe('<h1>Privacy</h1>');
+    expect(page.headers.get('X-Frame-Options')).toBe('DENY');
+    expect(fetchAsset).toHaveBeenCalledOnce();
+    expect(unknownApi.status).toBe(404);
   });
 
   it('opens CORS only on the public read endpoints', async () => {

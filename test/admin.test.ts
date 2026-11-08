@@ -257,6 +257,57 @@ describe(ADMIN_OUTAGES_PATH, () => {
     expect(await currentStatus()).toBe('ON');
   });
 
+  it('answers an update that changes nothing with the outage as it is, without writing', async () => {
+    const id = await insertOutage({ startTime: '2026-10-01T10:00:00Z', endTime: '2026-10-01T11:00:00Z' });
+
+    const res = await post(ADMIN_OUTAGES_PATH, { action: OUTAGE_ACTION.update, id });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      outage: { id, startTime: '2026-10-01T10:00:00Z', endTime: '2026-10-01T11:00:00Z' },
+    });
+  });
+
+  it('answers not_found when the outage is deleted between reading it and updating it', async () => {
+    const id = await insertOutage({ startTime: '2026-10-01T10:00:00Z', endTime: '2026-10-01T11:00:00Z' });
+    // The first write finds the row gone, as if another request had deleted it a moment before.
+    const gone = () => env.DB.prepare('DELETE FROM outages WHERE id = ?').bind(id).run();
+    const racing = (statement: D1PreparedStatement): D1PreparedStatement =>
+      new Proxy(statement, {
+        get(target, property) {
+          const value = Reflect.get(target, property);
+          if (typeof value !== 'function') return value;
+          if (property === 'bind') return (...values: unknown[]) => racing(target.bind(...values));
+          if (property === 'run' || property === 'all' || property === 'raw' || property === 'first') {
+            return async (...args: unknown[]) => {
+              await gone();
+              return value.apply(target, args);
+            };
+          }
+          return value.bind(target);
+        },
+      });
+    const DB = new Proxy(env.DB, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (query: string) => (/^update/i.test(query) ? racing(target.prepare(query)) : target.prepare(query));
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+
+    const res = await call(ADMIN_OUTAGES_PATH, {
+      method: 'POST',
+      body: { action: OUTAGE_ACTION.update, id, endTime: '2026-10-01T12:00:00Z' },
+      cookie,
+      env: { ...env, DB },
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: ERROR.notFound });
+  });
+
   it('records that the admin dismissed an outage, lists it, and clears it when restored', async () => {
     const id = await insertOutage({ startTime: '2026-10-01T10:00:00.000Z', endTime: '2026-10-01T11:00:00.000Z' });
     const listed = async () => {

@@ -137,6 +137,35 @@ describe('admin auth', () => {
     expect((await call(ADMIN_OUTAGES_PATH, { cookie })).status).toBe(401);
   });
 
+  it('finds the session cookie among other cookies, and refuses a request that has only other cookies', async () => {
+    const cookie = await createSession();
+
+    expect((await call(ADMIN_OUTAGES_PATH, { cookie: `theme=dark; ${cookie}; lang=en` })).status).toBe(200);
+    expect((await call(ADMIN_OUTAGES_PATH, { cookie: 'theme=dark; lang=en' })).status).toBe(401);
+  });
+
+  it('refuses all logins while no username is configured', async () => {
+    mockTurnstile(true, TURNSTILE_ACTION.login);
+
+    for (const ADMIN_USERNAME of ['', undefined]) {
+      const res = await loginAttempt(ADMIN_PASSWORD, { env: { ...env, ADMIN_USERNAME } as Env });
+
+      expect(res.status, String(ADMIN_USERNAME)).toBe(401);
+      expect(res.headers.get('Set-Cookie')).toBeNull();
+    }
+  });
+
+  it('logout without a session cookie still clears the cookie, and deletes nothing', async () => {
+    const other = await createSession();
+
+    const res = await call(LOGOUT_PATH, { method: 'POST' });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Set-Cookie')).toContain('Max-Age=0');
+    expect(await sessionCount()).toBe(1);
+    expect((await call(ADMIN_OUTAGES_PATH, { cookie: other })).status).toBe(200);
+  });
+
   it('logout deletes the session and clears the cookie', async () => {
     const cookie = await createSession();
     const res = await call(LOGOUT_PATH, { method: 'POST', cookie });
