@@ -1,7 +1,3 @@
-import Link from 'lucide-solid/icons/link';
-import MessageCircle from 'lucide-solid/icons/message-circle';
-import Send from 'lucide-solid/icons/send';
-import Share2 from 'lucide-solid/icons/share-2';
 import { type Component, createSignal, Show } from 'solid-js';
 import { localePath } from '../../shared/locale';
 import { site } from '../../site.config';
@@ -20,8 +16,8 @@ const telegramHref = (text: string, url: string) => `https://t.me/share/url?url=
 
 /**
  * "Share with neighbours": the system share sheet where there is one (phones), plus direct WhatsApp
- * and Telegram links. Without a share sheet (most desktops) "Copy link" takes its place. Neutral
- * glyphs only: no app logos.
+ * and Telegram links. Without a share sheet (most desktops) "Copy link" takes its place. Plain text
+ * buttons: no app logos.
  */
 export const Share: Component = () => {
   const canShare = typeof navigator.share === 'function';
@@ -63,12 +59,12 @@ export const Share: Component = () => {
           when={canShare}
           fallback={
             <button type="button" class={button.ghost} onClick={copy}>
-              <Link size={16} aria-hidden="true" /> {t().share.copy}
+              {t().share.copy}
             </button>
           }
         >
           <button type="button" class={button.ghost} onClick={share}>
-            <Share2 size={16} aria-hidden="true" /> {t().share.button}
+            {t().share.button}
           </button>
         </Show>
         <a
@@ -77,7 +73,7 @@ export const Share: Component = () => {
           aria-label={`${t().share.whatsapp} ${t().share.newTab}`}
           {...external}
         >
-          <MessageCircle size={16} aria-hidden="true" /> WhatsApp
+          WhatsApp
         </a>
         <a
           class={`${button.ghost} ${css.link}`}
@@ -85,7 +81,7 @@ export const Share: Component = () => {
           aria-label={`${t().share.telegram} ${t().share.newTab}`}
           {...external}
         >
-          <Send size={16} aria-hidden="true" /> Telegram
+          Telegram
         </a>
       </div>
       <p class={css.status} aria-live="polite">

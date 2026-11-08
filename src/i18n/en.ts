@@ -13,6 +13,7 @@ export const en = {
   banner: { region: 'Notice', dismiss: 'Dismiss' },
   masthead: {
     eyebrow: 'Ward 45 · Pretoria',
+    skip: 'Skip to content',
     notice: 'Independent service. Not affiliated with or endorsed by the City of Tshwane or Eskom.',
   },
   footer: {
@@ -95,6 +96,7 @@ export const en = {
     daysAffected: 'Days with an outage',
     daysOf: (days: number, total: number) => `${days} of ${total}`,
     longest: 'Longest outage',
+    notYet: 'Not yet',
     typically: (duration: string) => `Typically ${duration}`,
     chartEmpty: 'No outages to chart yet.',
     chartTitle: 'Hours without power per week',
@@ -134,7 +136,7 @@ export const en = {
       install: 'How to get power alerts',
     },
     card: {
-      heading: 'Want a heads-up?',
+      heading: 'Power alerts',
       body: 'Get a notification when the power goes off in Extension 16, and when it’s back.',
       scope: 'It’s measured at one point in Extension 16, so some streets may differ.',
       privacy: 'What we store',

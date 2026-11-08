@@ -7,11 +7,17 @@ Shows whether the electricity supply is on in Garsfontein, Pretoria, and keeps a
 
 **Live at https://garsfontein.timothybrits.co.za** (Afrikaans at `/`, English at `/en/`).
 
-- **Where it is measured.** At one home in Garsfontein Extension 16 (Ward 45, Region 6, City of Tshwane), near Mediclinic Denmar. Extension 16 is supplied by the Garsfontein substation (fed from Highlands, which is fed from Njala). The reading speaks only for Extension 16; anything wider would be a guess.
-- **Its limits.** It is one measuring point, so some streets can differ: parts of the network can be back-fed from another substation, and an outage limited to another street or extension will not appear. It records every interruption, planned or not; it is not a load-shedding schedule and does not predict outages.
-- **Independent.** Operated by a resident of Garsfontein Extension 16. Not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
+It is measured at one home in Garsfontein Extension 16 (Ward 45, Region 6, City of Tshwane), near Mediclinic Denmar. Extension 16 is supplied by the Garsfontein substation, which is fed from Highlands, which is fed from Njala. The reading covers Extension 16 only.
 
-The site shows the status as last recorded and for how long, statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart, and recent outages, with planned outages tagged; "Show all outages" pages through the rest. Without a reporting sensor, the status reads "No outage reported" rather than claiming the power is on. Once known, the statistics also say how much of the period had a live reading ("96% measured"): time while the sensor was paused, or silent with the power later found on, is not counted as time without power (the other figures, such as `availability`, still count it as on).
+It is one measuring point, so some streets can differ: parts of the network can be back-fed from another substation, and an outage limited to another street or extension will not appear. It records every interruption, planned or not. It is not a load-shedding schedule and does not predict outages.
+
+A resident of Garsfontein Extension 16 runs it. It is not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
+
+The site shows the status as last recorded and for how long, statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart, and recent outages, with planned outages tagged. "Show all outages" pages through the rest.
+
+Without a reporting sensor, the status reads "No outage reported" rather than claiming the power is on.
+
+Once known, the statistics also say how much of the period had a live reading ("96% measured"). Time while the sensor was paused, or silent with the power later found on, is not counted as time without power. The other figures, such as `availability`, still count it as on.
 
 The code runs on one Cloudflare Worker with a D1 database, and anyone can run it for their own area.
 
@@ -34,7 +40,7 @@ It words the status as the site does: green for on, red for off, and grey for "N
 | Method and path | Returns | Caching | Limits and access |
 | --- | --- | --- | --- |
 | `GET /api/status` | `status` (`ON`/`OFF`), `since`, the open `outage`, the five most `recent` outages, `monitored`, `turnstileSiteKey`, `generatedAt` | `no-store` for browsers; 12 s at the edge | Shared 60/min; CORS |
-| `GET /api/stats` | The last 7, 30 and 365 days, the previous 30 days (`null` until tracked), each with the time without power as `hoursOff` (to 0.1 h) and `minutesOff` (to the minute), the longest and the median outage as `longestMinutes` and `medianMinutes` (`null` without outages), `coverage`, the share of the window with a live reading (0–1, rounded down to four decimals; `null` for a window that starts before `coverageSince`, which the response also gives, or that has no tracked time), up to 26 weekly totals with the same two fields, and `last30ByHour`: the minutes without power in each hour of the day (local time, index 0 is 00:00) over the last 30 days | `max-age=60` | Shared 60/min; CORS |
+| `GET /api/stats` | Statistics for the last 7, 30 and 365 days and the 30 before ([fields below](#stats-fields)) | `max-age=60` | Shared 60/min; CORS |
 | `GET /api/outages` | Every outage, false positives excluded, newest first, as `outages` (each as in `recent`), and `generatedAt` | `no-store` for browsers; 12 s at the edge | Shared 60/min; CORS |
 | `GET /api/outages.csv` | Every outage, false positives excluded | `max-age=300` | Shared 60/min; CORS |
 | `GET /feed.xml` | Atom feed of the 20 most recent outages, false positives excluded | `max-age=300` | Shared 60/min; CORS |
@@ -57,6 +63,16 @@ It words the status as the site does: green for on, red for off, and grey for "N
 - Only the admin API exposes an outage's `source`.
 - `POST /api/contact` takes `{ "token" }`, a Turnstile token solved for the `contact` action, and answers `200` with `{ "email" }`, or `404` with `not_configured`.
 - `POST /api/push/subscription` takes `{ "endpoint", "keys": { "p256dh", "auth" }, "locale" }` from a browser's push subscription and stores exactly those four values, with the time it was first saved; subscribing again with the same `endpoint` replaces the keys and language and keeps that first time. The `endpoint` must be an `https` address on a push service's host (`PUSH_HOSTS` in `worker/routes/push.ts`), or the answer is `400`. So is a `p256dh` that is not a 65-byte uncompressed P-256 point or an `auth` that is not 16 bytes (both base64url), since no alert could ever be encrypted to them. Both answer `{ "ok": true }`; `DELETE` takes `{ "endpoint" }` and answers so whether or not it was stored. Nothing that identifies the visitor is stored beyond the subscription itself.
+
+#### Stats fields
+
+`GET /api/stats` gives the last 7, 30 and 365 days, and the previous 30 days (`null` until tracked). Each window has:
+
+- `hoursOff` (to 0.1 h) and `minutesOff` (to the minute): the time without power.
+- `longestMinutes` and `medianMinutes`: the longest and the median outage, `null` without outages.
+- `coverage`: the share of the window with a live reading, from 0 to 1, rounded down to four decimals. It is `null` for a window that starts before `coverageSince` (also in the response) or that has no tracked time.
+
+The response also has up to 26 weekly totals with `hoursOff` and `minutesOff`, and `last30ByHour`: the minutes without power in each hour of the day over the last 30 days, in local time, with index 0 at 00:00.
 
 ### CSV contract
 
@@ -241,19 +257,23 @@ Two crons run the Worker. Every minute it opens an outage for a silent sensor, t
 
 Visitors can ask their browser for a notification when the power goes off and when it is back. The service worker `templates/sw.js` shows it, and the subscription is stored as described under `POST /api/push/subscription` above.
 
-- **When.** An outage is alerted once it has lasted `ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, so a short dip sends nothing. If it was alerted, its end sends a "back on" alert. If it is instead marked a false positive, by the sensor or an admin, every subscriber gets one calm follow-up ("No outage reported", "The earlier alert … was not confirmed", the status page's own wording) that replaces the "off" alert on screen and never says why. An outage gets one follow-up or the other, never both. While its follow-up is still due, the outage cannot be deleted, since that would leave subscribers with only the "off" alert.
-- **Delivery.** The minute cron puts pages of subscriptions on the `PUSH_QUEUE` queue (`lights-on-push`), and the queue handler sends each page to the push service, retrying transient failures (429, 5xx, network errors, or an error in the Worker itself) up to `PUSH_MAX_ATTEMPTS`. A message that is not delivered within `PUSH_TTL_SECONDS` (`worker/lib/webpush.ts`, one hour) is dropped by the push service, so nobody gets a stale alert hours later. A subscription the push service answers `404` or `410` for is deleted.
-- **Bindings.** `PUSH_QUEUE` and `PUSH_LIMITER` are in `wrangler.toml` (also under `[env.e2e]`) and `wrangler.example.toml`. `PUSH_LIMITER` is the 5/min limit on the subscription writes.
-- **Privacy.** [`privacy.html`](privacy.html) says what a subscription holds and when it is deleted; keep it accurate if that changes.
+An outage is alerted once it has lasted `ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, so a short dip sends nothing. If it was alerted, its end sends a "back on" alert. If it is instead marked a false positive, by the sensor or an admin, every subscriber gets one calm follow-up ("No outage reported", "The earlier alert … was not confirmed", the status page's own wording) that replaces the "off" alert on screen and never says why. An outage gets one follow-up or the other, never both. While its follow-up is still due, the outage cannot be deleted, since that would leave subscribers with only the "off" alert.
+
+The minute cron puts pages of subscriptions on the `PUSH_QUEUE` queue (`lights-on-push`), and the queue handler sends each page to the push service, retrying transient failures (429, 5xx, network errors, or an error in the Worker itself) up to `PUSH_MAX_ATTEMPTS`. A message that is not delivered within `PUSH_TTL_SECONDS` (`worker/lib/webpush.ts`, one hour) is dropped by the push service, so nobody gets a stale alert hours later. A subscription the push service answers `404` or `410` for is deleted.
+
+`PUSH_QUEUE` and `PUSH_LIMITER` are in `wrangler.toml` (also under `[env.e2e]`) and `wrangler.example.toml`. `PUSH_LIMITER` is the 5/min limit on the subscription writes. [`privacy.html`](privacy.html) says what a subscription holds and when it is deleted; keep it accurate if that changes.
 
 ### Owner alerts on Telegram
 
 The owner can get the same alerts privately, in a chat with their own Telegram bot. They are not for residents. The messages are English and, unlike the public alerts, say how an outage was recorded: a silent sensor reads "No reading from home since 14:05. The power may be off.", because it can also mean a lost connection. The copy is `admin.telegram` in `src/admin/copy.ts`.
 
-- **Setup.** Create a bot with [@BotFather](https://t.me/BotFather) and keep its token. Send the bot `/start`, then open `https://api.telegram.org/bot<token>/getUpdates` and read `message.chat.id`. Set both secrets: `npx wrangler secret put TELEGRAM_BOT_TOKEN` and `npx wrangler secret put TELEGRAM_CHAT_ID`.
-- **When.** Sooner than the power alerts above: once an outage has lasted `TELEGRAM_ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, where push waits `ALERT_DELAY_MS`. Telegram keeps its own claims (the `telegram_*_alert_at` columns), so a short outage can send you "off" and "back on" while residents hear nothing, and a sensor outage that turns out to be a lost connection sends you "off" and then the false alarm. Each claim puts one Telegram message on `PUSH_QUEUE`, even with no subscribers. An outage cannot be deleted while either channel awaits its follow-up.
-- **Commands.** `/status` gives the status, the sensor's state and any open outage with how it was recorded; `/pause 3h` pauses outage detection (`30m`, `3h`, `2d`, up to `MAX_PAUSE_MS`), like [`lights-on pause`](#sensor); `/resume` ends a pause. Telegram posts each message to `POST /api/telegram`, which checks `TELEGRAM_WEBHOOK_SECRET`, answers only `TELEGRAM_CHAT_ID`, and replies in the response (`worker/lib/telegram-commands.ts`). To connect it once, generate a value (`openssl rand -hex 32`), set it with `npx wrangler secret put TELEGRAM_WEBHOOK_SECRET`, then call the Bot API's `setWebhook` with `url` set to `<site>/api/telegram`, `secret_token` set to the same value and `allowed_updates` set to `["message"]`, and `setMyCommands` with `status`, `pause` and `resume` so they show in Telegram's menu.
-- **Delivery.** `worker/lib/telegram.ts` sends it with the Bot API's `sendMessage`, retrying a 429, a 5xx or a network error up to `PUSH_MAX_ATTEMPTS`. Any other error (a wrong token or chat ID) is dropped and logged with Telegram's description; logs never contain the token.
+To set it up, create a bot with [@BotFather](https://t.me/BotFather) and keep its token. Send the bot `/start`, then open `https://api.telegram.org/bot<token>/getUpdates` and read `message.chat.id`. Set both secrets: `npx wrangler secret put TELEGRAM_BOT_TOKEN` and `npx wrangler secret put TELEGRAM_CHAT_ID`.
+
+These alerts come sooner than the power alerts above: once an outage has lasted `TELEGRAM_ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, where push waits `ALERT_DELAY_MS`. Telegram keeps its own claims (the `telegram_*_alert_at` columns), so a short outage can send you "off" and "back on" while residents hear nothing, and a sensor outage that turns out to be a lost connection sends you "off" and then the false alarm. Each claim puts one Telegram message on `PUSH_QUEUE`, even with no subscribers. An outage cannot be deleted while either channel awaits its follow-up.
+
+The bot takes three commands. `/status` gives the status, the sensor's state and any open outage with how it was recorded; `/pause 3h` pauses outage detection (`30m`, `3h`, `2d`, up to `MAX_PAUSE_MS`), like [`lights-on pause`](#sensor); `/resume` ends a pause. Telegram posts each message to `POST /api/telegram`, which checks `TELEGRAM_WEBHOOK_SECRET`, answers only `TELEGRAM_CHAT_ID`, and replies in the response (`worker/lib/telegram-commands.ts`). To connect it once, generate a value (`openssl rand -hex 32`), set it with `npx wrangler secret put TELEGRAM_WEBHOOK_SECRET`, then call the Bot API's `setWebhook` with `url` set to `<site>/api/telegram`, `secret_token` set to the same value and `allowed_updates` set to `["message"]`, and `setMyCommands` with `status`, `pause` and `resume` so they show in Telegram's menu.
+
+`worker/lib/telegram.ts` sends each alert with the Bot API's `sendMessage`, retrying a 429, a 5xx or a network error up to `PUSH_MAX_ATTEMPTS`. Any other error (a wrong token or chat ID) is dropped and logged with Telegram's description; logs never contain the token.
 
 ## Extending
 
@@ -271,15 +291,25 @@ The owner can get the same alerts privately, in a chat with their own Telegram b
 | `drizzle/`, `scripts/` | Generated SQL migrations; password hashing, OG card and icon rendering, the MacBook sensor |
 | `test/`, `test/node/`, `e2e/`, `bruno/` | Vitest (the Worker in workerd with D1; Node for pure logic and the build), Playwright, the Bruno API collection |
 
-**Adding an endpoint.** Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/routes/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in `src/admin/copy.ts` (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `limiter`, `authorize`, `cors`, `edgeCache` and `purges`. The cross-site and JSON checks on writes apply to every route.
+### Adding an endpoint
 
-**Adding a language.** Add the code to `site.locales` and `intlLocales`, create `src/i18n/<code>.ts` that `satisfies Messages`, register it in `DICTIONARIES` in `src/i18n/index.ts`, and add its `<head>` copy to `src/i18n/head.ts`. Each dictionary's `lang.switchTo` labels the switch to the next locale, in that language. The build writes the page to `/<code>/` with its own canonical and hreflang links. Add a section to `privacy.html`.
+Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/routes/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in `src/admin/copy.ts` (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `limiter`, `authorize`, `cors`, `edgeCache` and `purges`. The cross-site and JSON checks on writes apply to every route.
 
-**Adding a banner.** `BANNERS` in `src/banners.ts` holds short, dated notices. Append an entry with a new, stable `id` (dismissals are remembered by it), `from` and `until` via `zoned('YYYY-MM-DDTHH:mm')` in the configured zone (`until` is exclusive), the `text` and an optional `link`. Copy is required in the default locale, which the others fall back to. Expired entries stop showing on their own; at most one shows at a time, the first active one not yet dismissed.
+### Adding a language
 
-**Adding an outage source.** Extend `OUTAGE_SOURCES` in `shared/api.ts` (the schema's enum follows) and add its label to `source` in `src/admin/copy.ts`. The enum is checked in TypeScript only, so no migration is needed.
+Add the code to `site.locales` and `intlLocales`, create `src/i18n/<code>.ts` that `satisfies Messages`, register it in `DICTIONARIES` in `src/i18n/index.ts`, and add its `<head>` copy to `src/i18n/head.ts`. Each dictionary's `lang.switchTo` labels the switch to the next locale, in that language. The build writes the page to `/<code>/` with its own canonical and hreflang links. Add a section to `privacy.html`.
 
-**Changing the database.** Follow the migration rules in [AGENTS.md](AGENTS.md#hard-rules): the database changes a few seconds before the code, so each migration must work with both.
+### Adding a banner
+
+`BANNERS` in `src/banners.ts` holds short, dated notices. Append an entry with a new, stable `id` (dismissals are remembered by it), `from` and `until` via `zoned('YYYY-MM-DDTHH:mm')` in the configured zone (`until` is exclusive), the `text` and an optional `link`. Copy is required in the default locale, which the others fall back to. Expired entries stop showing on their own; at most one shows at a time, the first active one not yet dismissed.
+
+### Adding an outage source
+
+Extend `OUTAGE_SOURCES` in `shared/api.ts` (the schema's enum follows) and add its label to `source` in `src/admin/copy.ts`. The enum is checked in TypeScript only, so no migration is needed.
+
+### Changing the database
+
+Follow the migration rules in [AGENTS.md](AGENTS.md#hard-rules): the database changes a few seconds before the code, so each migration must work with both.
 
 ## Local development
 
@@ -303,15 +333,15 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run test:e2e` | Playwright against `wrangler dev --env e2e` with a fresh local database; each run writes `.dev.vars.e2e` from `.dev.vars.example` |
 | `npm run test:api` / `test:api:prod` | Bruno, by hand (below) |
 | `npm run lint` / `lint:fix` / `lint:ci` | Biome: check / fix / check as CI does |
-| `npm run typecheck` | Type-check the app, Worker, tests and Node scripts |
-| `npm run cf-typegen` | Regenerate `worker/worker-configuration.d.ts` after a `wrangler.toml` or `.dev.vars.example` change |
+| `npm run typecheck` | Type-check the app, Worker, tests and Node scripts; generates the Worker binding types first |
+| `npm run cf-typegen` | Generate `worker/worker-configuration.d.ts` (git-ignored) on its own, for an editor that needs it before a typecheck |
 | `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
 | `npm run db:migrate:local` / `db:migrate:remote` | Apply pending migrations locally / to production |
 | `npm run hash-password` | Print an `ADMIN_PASSWORD_HASH` value (input hidden) |
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
-Lefthook runs Biome, the typecheck and `npm test` on commit. `npm install` installs the hooks. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
+Lefthook runs Biome and the typecheck on matching staged files on commit. `npm install` installs the hooks. Unit tests run separately and in CI. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
 
 ### API tests (Bruno)
 
@@ -331,7 +361,7 @@ npm run test:api
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/mooship/lights-on-garsfontein); please open an issue before a larger change. [AGENTS.md](AGENTS.md) holds the rules for changing the code, for people and AI tools alike; meet its [definition of done](AGENTS.md#definition-of-done) before opening a pull request.
+Issues and pull requests are welcome on [GitHub](https://github.com/mooship/lights-on-garsfontein); please open an issue before a larger change. [AGENTS.md](AGENTS.md) has the project's rules: what the site may claim, the palette, spelling and the checks to run. Meet its [definition of done](AGENTS.md#definition-of-done) before opening a pull request.
 
 By contributing, you agree that your contributions are licensed under the MIT licence.
 
@@ -339,4 +369,4 @@ By contributing, you agree that your contributions are licensed under the MIT li
 
 Code: [MIT](LICENSE). Outage data: see [Using the data](#using-the-data).
 
-Built with SolidJS, Vite, Vanilla Extract, Cloudflare Workers, D1, Drizzle ORM, Zod, Cloudflare Turnstile, Vitest, Playwright, Biome and Lefthook. Fonts: Fraunces and Plus Jakarta Sans (SIL Open Font License), via Fontsource. Icons: Lucide (ISC).
+Built with SolidJS, Vite, Vanilla Extract, Cloudflare Workers, D1, Drizzle ORM, Zod, Cloudflare Turnstile, Vitest, Playwright, Biome and Lefthook. Fonts: Public Sans and Barlow Semi Condensed (SIL Open Font License), via Fontsource. Icons: Lucide (ISC).

@@ -18,6 +18,7 @@
     "dev:worker": "wrangler dev",
     "build": "vite build",
     "preview": "npm run build && wrangler dev",
+    "pretypecheck": "npm run cf-typegen",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -41,8 +42,8 @@
     "deploy:ci": "npm run db:migrate:remote && wrangler deploy"
   },
   "dependencies": {
-    "@fontsource-variable/fraunces": "^5.3.0",
-    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@fontsource-variable/public-sans": "^5.3.0",
+    "@fontsource/barlow-semi-condensed": "^5.3.0",
     "drizzle-orm": "^0.45.4",
     "lucide-solid": "^1.57.0",
     "solid-js": "^1.9.17",

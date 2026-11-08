@@ -22,25 +22,25 @@ export const vars = createThemeContract({
     planned: null,
     plannedSoft: null,
     focus: null,
-    shadow: null,
   },
   font: { display: null, body: null },
-  radius: { card: null, pill: null, control: null },
+  radius: { card: null, control: null },
 });
 
 const fonts = { display: 'var(--gg-font-display)', body: 'var(--gg-font-body)' };
 
-const radius = { card: '1.25rem', pill: '999px', control: '0.75rem' };
+// Square, printed-notice corners. Nothing casts a shadow: panels stand apart by surface and a rule.
+const radius = { card: '2px', control: '4px' };
 
 // Light is the default so the page is themed even before the boot script runs.
 createGlobalTheme(':root', vars, {
-  color: { ...PALETTE.light, shadow: '0 1px 2px rgba(60, 45, 20, 0.06), 0 8px 24px rgba(60, 45, 20, 0.06)' },
+  color: PALETTE.light,
   font: fonts,
   radius,
 });
 
 createGlobalTheme(':root.dark', vars, {
-  color: { ...PALETTE.dark, shadow: '0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.25)' },
+  color: PALETTE.dark,
   font: fonts,
   radius,
 });

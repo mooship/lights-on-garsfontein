@@ -13,26 +13,13 @@ export const card = style([
     display: 'flex',
     flexDirection: 'column',
     gap: '0.75rem',
+    // Outranks .gg-card's hairline: the card floats, so a heavier rule stands in for a shadow.
+    selectors: { '&.gg-card': { border: `2px solid ${vars.color.text}` } },
   },
 ]);
 
-export const header = style({ display: 'flex', alignItems: 'center', gap: '0.75rem' });
-
-// Calm blue: information, never the red of an outage or the green of a measured "on".
-export const icon = style({
-  flex: 'none',
-  width: '2.75rem',
-  height: '2.75rem',
-  display: 'grid',
-  placeItems: 'center',
-  borderRadius: vars.radius.pill,
-  background: vars.color.plannedSoft,
-  color: vars.color.planned,
-});
-
 export const heading = style({
-  fontFamily: vars.font.display,
-  fontWeight: 650,
+  fontWeight: 700,
   fontSize: '1.25rem',
   lineHeight: 1.3,
   selectors: { '&:focus': { outline: 'none' } },

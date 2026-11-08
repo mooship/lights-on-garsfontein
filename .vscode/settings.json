@@ -3,7 +3,7 @@
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
     "package.json": "package-lock.json, bun.lock*, pnpm-lock.yaml, yarn.lock, tsconfig*.json, biome.json*, drizzle.config.*, vite.config.*, vitest.config.*, playwright.config.*, lefthook*, wrangler.*, site.config.*, .mcp.json, skills-lock.json, eslint.config.*, .prettier*",
-    "README.md": "AGENTS.md, CLAUDE.md, GEMINI.md, LICENSE*",
+    "README.md": "AGENTS.md, CLAUDE.md, LICENSE*",
     ".gitignore": ".env*, .dev.vars*, .editorconfig, .gitattributes"
   },
   "files.exclude": {

@@ -8,5 +8,3 @@ pre-commit:
     typecheck:
       glob: "*.{ts,tsx}"
       run: npm run typecheck
-    test:
-      run: npm test

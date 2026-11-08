@@ -17,6 +17,7 @@ export const af = {
   banner: { region: 'Kennisgewing', dismiss: 'Maak toe' },
   masthead: {
     eyebrow: 'Wyk 45 · Pretoria',
+    skip: 'Gaan na inhoud',
     notice: 'Onafhanklike diens. Nie verbonde aan of onderskryf deur die Stad Tshwane of Eskom nie.',
   },
   footer: {
@@ -107,6 +108,8 @@ export const af = {
     daysAffected: 'Dae met ’n onderbreking',
     daysOf: (days: number, total: number) => `${days} van ${total}`,
     longest: 'Langste onderbreking',
+    // A figure with nothing to show yet: before records begin, or no outage to measure.
+    notYet: 'Nog nie',
     // The median outage: half were shorter, half longer.
     typically: (duration: string) => `Gewoonlik ${duration}`,
     chartEmpty: 'Nog geen onderbrekings om te wys nie.',
@@ -152,7 +155,7 @@ export const af = {
       install: 'Hoe om kragkennisgewings te kry',
     },
     card: {
-      heading: 'Wil jy op hoogte bly?',
+      heading: 'Kragkennisgewings',
       body: 'Kry ’n kennisgewing wanneer die krag in Uitbreiding 16 afgaan, en wanneer dit weer aan is.',
       scope: 'Daar word by een punt in Uitbreiding 16 gemeet, so sommige strate kan verskil.',
       privacy: 'Wat ons stoor',

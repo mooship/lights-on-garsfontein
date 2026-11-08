@@ -71,7 +71,7 @@ const BRAND = site.brand.short;
 /** The tab title without a live reading: it claims no status. */
 const NEUTRAL_TITLE = site.brand.full;
 
-/** "rgb(179, 58, 43)" for "#B33A2B", as computed styles report a colour. */
+/** "rgb(176, 40, 30)" for "#B0281E", as computed styles report a colour. */
 const rgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Stands for a clock time in a message, for `withTime`. */
@@ -356,6 +356,9 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(site.brand.full);
     await expect(page.locator('.gg-eyebrow')).toHaveText(en.masthead.eyebrow);
+    await expect(page.locator('.gg-notice')).toHaveCSS('border-top-style', 'none');
+    // Panels stand apart by surface and a rule; nothing casts a shadow.
+    for (const card of await page.locator('section.gg-card').all()) await expect(card).toHaveCSS('box-shadow', 'none');
     const scope = page.getByText(en.scope.measured(site.landmark), { exact: true });
     await expect(scope).toBeVisible();
     await expect(scope.locator('xpath=..').locator('details')).toHaveCount(0);
@@ -371,7 +374,10 @@ test.describe('public page', () => {
   test('statistics show durations and say how they are measured', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.gg-trends-body')).toContainText(`0 ${en.units.min}`);
-    await expect(page.getByText(en.trends.chartEmpty)).toBeVisible();
+    const empty = page.getByText(en.trends.chartEmpty);
+    await expect(empty).toBeVisible();
+    await expect(empty).toHaveCSS('border-top-style', 'solid');
+    await expect(empty).toHaveCSS('border-bottom-style', 'none');
     // Too early for a comparison with the previous 30 days.
     await expect(page.getByText(en.trends.change('', '').trim())).toHaveCount(0);
     await page.getByText(en.trends.howTitle).click();
@@ -703,9 +709,8 @@ test.describe('planned outages', () => {
         await page.goto(localePath(locale));
         await expect(page.getByRole('status')).toHaveText(m.status.OFF);
         await expect(badge(page)).toHaveAttribute('data-planned', '');
-        // Calm: no pulsing ring, and the planned tone rather than the outage red.
-        await expect(badge(page).locator('[aria-hidden="true"] span')).toHaveCount(0);
-        await expect(page.getByRole('status')).toHaveCSS('color', rgb(PALETTE.light.planned));
+        // Calm: the planned violet rather than the outage red.
+        await expect(badge(page)).toHaveCSS('background-color', rgb(PALETTE.light.planned));
         // Factual: announced in advance, and when it began.
         const DAY = '@@DAY@@';
         const detail = escapeRegExp(m.status.planned(AT, DAY))
@@ -722,8 +727,7 @@ test.describe('planned outages', () => {
     await page.goto('/en/');
     await expect(page.getByRole('status')).toHaveText(en.status.OFF);
     await expect(badge(page)).not.toHaveAttribute('data-planned');
-    await expect(badge(page).locator('[aria-hidden="true"] span')).toHaveCount(1);
-    await expect(page.getByRole('status')).toHaveCSS('color', rgb(PALETTE.light.off));
+    await expect(badge(page)).toHaveCSS('background-color', rgb(PALETTE.light.off));
     await expect(history(page).getByText(en.history.planned, { exact: true })).toHaveCount(0);
   });
 });
@@ -955,7 +959,7 @@ test.describe('outages by time of day', () => {
     await expect(page.getByRole('heading', { name: en.trends.chartTitle })).toBeVisible();
     await expect(readout(1).filter({ hasText: en.trends.soFar.trim() })).toHaveCount(1);
     await expect(page.getByText(en.trends.thisWeek, { exact: true })).toBeVisible();
-    await page.getByRole('img', { name: en.trends.chartLabel }).focus();
+    await page.getByRole('group', { name: en.trends.chartLabel }).focus();
     await page.keyboard.press('Home');
     // The visible readout, and the announcement for screen readers.
     await expect(readout(3)).toHaveCount(2);
@@ -1036,7 +1040,7 @@ test.describe('outages by time of day', () => {
     await expect(page.getByRole('heading', { name: byHourTitle('en'), exact: true })).toBeVisible();
     const u = en.units;
     await expect(page.getByText(`18:00–19:00: 1 ${u.h} 30 ${u.min} ${en.trends.off}`, { exact: true })).toBeVisible();
-    await page.getByRole('img', { name: en.trends.byHourLabel }).focus();
+    await page.getByRole('group', { name: en.trends.byHourLabel }).focus();
     await page.keyboard.press('ArrowRight');
     // The visible readout, and the announcement a keyboard move makes for screen readers.
     const next = page.getByText(`19:00–20:00: 30 ${u.min} ${en.trends.off}`, { exact: true });
@@ -1129,7 +1133,7 @@ test.describe('outages by time of day', () => {
       await withOutages(page);
       await page.goto('/');
       await expect(page.getByRole('heading', { name: byHourTitle('af'), exact: true })).toBeVisible();
-      await expect(page.getByRole('img', { name: af.trends.byHourLabel })).toBeVisible();
+      await expect(page.getByRole('group', { name: af.trends.byHourLabel })).toBeVisible();
     });
   });
 

@@ -4,17 +4,21 @@
 /* The colours are copies from src/styles/palette.ts, which CSS cannot import. */
 :root {
   color-scheme: light;
-  --bg: #f6f4ef;
-  --text: #1f2120;
-  --muted: #5c5850;
-  --accent: #2d5a27;
+  --bg: #eceeea;
+  --text: #1b1d1f;
+  --muted: #53595e;
+  --border: #b9beb8;
+  --accent: #1e6b3c;
+  --focus: #8f5300;
 }
 :root.dark {
   color-scheme: dark;
-  --bg: #121312;
-  --text: #f0efea;
-  --muted: #a8a69e;
-  --accent: #4caf50;
+  --bg: #141619;
+  --text: #eceeea;
+  --muted: #a2a9a6;
+  --border: #4a5050;
+  --accent: #5cc27e;
+  --focus: #f2b84b;
 }
 * {
   box-sizing: border-box;
@@ -25,6 +29,10 @@ body {
   color: var(--text);
   font-family: var(--gg-font-body);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+p {
+  text-wrap: pretty;
 }
 main {
   max-width: 40rem;
@@ -38,21 +46,36 @@ main {
   hyphens: auto;
 }
 h1,
-h2 {
-  font-family: var(--gg-font-display);
+h2,
+h3,
+h4 {
+  font-weight: 700;
   line-height: 1.2;
+  text-wrap: balance;
 }
-h1 {
+/* One h1 per page: the English half repeats the layout a level down (h2 title, h3 parts, h4). */
+h1,
+.page-title {
   font-size: clamp(1.75rem, 8vw, 2.25rem);
   margin: 1rem 0 0.25rem;
 }
-h2 {
+h2,
+.part {
   font-size: 1.375rem;
   margin-top: 2rem;
 }
 a {
   color: var(--accent);
   text-underline-offset: 0.2em;
+  text-decoration-color: color-mix(in srgb, currentColor 60%, transparent);
+  transition: text-decoration-color 150ms ease;
+}
+a:hover {
+  text-decoration-color: currentColor;
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 /* The links at the top are taps on a phone: 44px tall, like the app's controls. */
 .jump {
@@ -73,16 +96,26 @@ li + li {
 #en {
   margin-top: 3rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--muted);
+  border-top: 1px solid var(--border);
 }
-h3 {
+h3,
+h4 {
   font-size: 1.125rem;
   line-height: 1.3;
   margin: 1.5rem 0 0.25rem;
 }
 h3 + p,
-h3 + ul {
+h3 + ul,
+h4 + p,
+h4 + ul {
   margin-top: 0.25rem;
+}
+.part {
+  margin-bottom: 0.83em;
+}
+.part + p,
+.part + ul {
+  margin-top: 1em;
 }
 /* "Show email address" (src/privacy.ts); hidden until the script runs. */
 .contact > p {
@@ -92,7 +125,7 @@ h3 + ul {
   min-height: 44px;
   padding: 0.5rem 1rem;
   border: 1px solid var(--accent);
-  border-radius: 0.5rem;
+  border-radius: 4px;
   background: transparent;
   color: var(--accent);
   font: inherit;
@@ -100,11 +133,6 @@ h3 + ul {
 }
 .contact-reveal:hover {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-.contact-reveal:focus-visible,
-.contact a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 .contact-reveal[aria-disabled="true"] {
   cursor: progress;

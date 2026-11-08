@@ -13,11 +13,11 @@ import { FONT_FILES } from './src/styles/fonts.ts';
 const WORKER = 'http://localhost:8787';
 
 /**
- * The Fontsource woff2 files are bundled into /assets/ with a hash. This preloads the body
- * font on index.html so font-display: optional can use it on first paint.
+ * The Fontsource woff2 files are bundled into /assets/ with a hash. This preloads both on
+ * index.html so font-display: optional can use them on first paint.
  */
 function hashedFonts(): Plugin {
-  const name = basename(FONT_FILES.body);
+  const names = Object.values(FONT_FILES).map((file) => basename(file));
   return {
     name: 'hashed-fonts',
     apply: 'build',
@@ -25,15 +25,15 @@ function hashedFonts(): Plugin {
       order: 'post',
       handler(_html, { path, bundle }) {
         if (path !== '/index.html') return;
-        const font = Object.values(bundle ?? {}).find((file) => file.type === 'asset' && file.names.includes(name));
-        if (!font) throw new Error(`hashed-fonts: ${name} was not emitted`);
-        return [
-          {
+        return names.map((name) => {
+          const font = Object.values(bundle ?? {}).find((file) => file.type === 'asset' && file.names.includes(name));
+          if (!font) throw new Error(`hashed-fonts: ${name} was not emitted`);
+          return {
             tag: 'link',
             attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: true, href: `/${font.fileName}` },
-            injectTo: 'head',
-          },
-        ];
+            injectTo: 'head' as const,
+          };
+        });
       },
     },
   };

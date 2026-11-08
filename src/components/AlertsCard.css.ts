@@ -18,23 +18,22 @@ export const floating = style({
   },
 });
 
-// The confirmation after the bell or the card changes the alerts: a small pill that fades away. It
-// has a card's surface (the card itself takes .gg-card) in a pill's shape.
+// The confirmation after the bell or the card changes the alerts: a small notice that fades away, on a
+// card's surface (the card itself takes .gg-card). A 2px rule, not a shadow, lifts both off the page.
 export const notice = style([
   floating,
   {
     background: vars.color.card,
-    border: `1px solid ${vars.color.border}`,
-    boxShadow: vars.color.shadow,
+    border: `2px solid ${vars.color.text}`,
     width: 'fit-content',
     padding: '0.625rem 1rem',
-    borderRadius: vars.radius.pill,
+    borderRadius: vars.radius.card,
     fontSize: '0.9375rem',
     fontWeight: 600,
   },
 ]);
 
-// While alerts are on the bell takes the card's blue; the attribute also outranks .gg-icon-button.
+// While alerts are on the bell takes the planned violet; the attribute also outranks .gg-icon-button.
 export const bell = style({
   selectors: {
     '&[aria-pressed="true"]': {

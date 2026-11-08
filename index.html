@@ -38,8 +38,8 @@
     <link rel="canonical" href="%page.url%" />
     %page.alternates%
     <!-- PALETTE.light.bg and PALETTE.dark.bg (src/styles/palette.ts); src/lib/theme.ts keeps them in step with the theme. -->
-    <meta name="theme-color" content="#F6F4EF" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#121312" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ECEEEA" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141619" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -99,6 +99,7 @@
            (zero layout shift). The data-i18n* elements are filled from src/i18n in every language at
            build time (staticI18n in vite.config.ts). -->
       <div class="gg-shell">
+        <a class="gg-skip" href="#main" data-i18n="masthead.skip"></a>
         <header class="gg-masthead">
           <p class="gg-eyebrow" data-i18n="masthead.eyebrow"></p>
           <div class="gg-masthead-actions">
@@ -109,11 +110,10 @@
           <h1 class="gg-title">%site.brand.full%</h1>
         </header>
         <p class="gg-notice" data-i18n="masthead.notice"></p>
-        <main class="gg-main">
+        <main id="main" class="gg-main">
           <section class="gg-card gg-status-card">
             <p class="gg-sr-only" data-i18n="status.loading"></p>
-            <div class="gg-skel-row" aria-hidden="true">
-              <span class="gg-skel gg-skel-badge"></span>
+            <div class="gg-band gg-skel-row" aria-hidden="true">
               <span class="gg-skel-stack">
                 <span class="gg-skel gg-skel-heading gg-w-60"></span>
                 <span class="gg-skel gg-skel-text gg-w-30"></span>

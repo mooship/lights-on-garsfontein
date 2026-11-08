@@ -40,39 +40,38 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
 
   return (
     <div
-      class={`${css.root} ${motion.enter}`}
+      class={`gg-band ${css.band[look()]} ${motion.enter}`}
       data-status={state()}
       data-planned={look() === 'PLANNED' ? '' : undefined}
     >
-      {/* Keyed, so a new state brings a new icon and headline text to animate. */}
-      <Show when={look()} keyed>
-        {(l) => (
-          <div class={`${css.icon[l]} ${mounted ? motion.changedIcon : ''}`} aria-hidden="true">
-            <Switch fallback={<Zap size={30} stroke-width={2.25} />}>
-              <Match when={l === 'PLANNED'}>
-                <CalendarClock size={30} stroke-width={2.25} />
-              </Match>
-              <Match when={l === 'OFF'}>
-                <ZapOff size={30} stroke-width={2.25} />
-                {/* The only motion that repeats: an outage nobody announced. */}
-                <span class={css.ring} />
-              </Match>
-            </Switch>
-          </div>
-        )}
-      </Show>
-      <div>
+      <div class={css.head}>
+        {/* Keyed, so a new state brings a new icon and headline text to animate. The icon is a second
+            cue besides the colour: a bolt, a crossed-out bolt or a calendar for a planned outage. */}
+        <Show when={look()} keyed>
+          {(l) => (
+            <span class={`${css.icon} ${mounted ? motion.changedIcon : ''}`} aria-hidden="true">
+              <Switch fallback={<Zap size={24} stroke-width={2.5} />}>
+                <Match when={l === 'PLANNED'}>
+                  <CalendarClock size={24} stroke-width={2.5} />
+                </Match>
+                <Match when={l === 'OFF'}>
+                  <ZapOff size={24} stroke-width={2.5} />
+                </Match>
+              </Switch>
+            </span>
+          )}
+        </Show>
         {/* Only the headline is live, so the ticking duration is never re-announced. It stays in place
             across a change, as a live region added afresh is not announced. */}
-        <p class={`${css.headline} ${css.tone[look()]}`} role="status">
+        <p class={`${css.headline} ${look() === 'NONE' ? css.headlineNone : ''}`} role="status">
           <Show when={state()} keyed>
             {(s) => <span class={mounted ? motion.changedText : undefined}>{t().status[s]}</span>}
           </Show>
         </p>
-        <p class={css.detail} data-testid="badge-detail">
-          {detail()}
-        </p>
       </div>
+      <p class={css.detail} data-testid="badge-detail">
+        {detail()}
+      </p>
     </div>
   );
 };

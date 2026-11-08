@@ -13,33 +13,40 @@ export const subtitle = style({
   color: vars.color.muted,
 });
 
-export const tiles = style({
+// A ruled table of four lines, like a meter slip: a rule under the last one closes it.
+export const figures = style({ borderBottom: `1px solid ${vars.color.border}` });
+
+export const figure = style({
+  minHeight: '3.5rem',
+  padding: '0.5rem 0',
+  borderTop: `1px solid ${vars.color.border}`,
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: '0.5rem',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gridTemplateAreas: '"label value" "delta value"',
+  alignItems: 'center',
+  columnGap: '1rem',
 });
 
-export const tile = style({
-  minHeight: '5.75rem',
-  padding: '0.75rem',
-  borderRadius: vars.radius.control,
-  background: vars.color.bg,
-  display: 'flex',
-  flexDirection: 'column',
+export const figureLabel = style({ gridArea: 'label', fontSize: '0.875rem', fontWeight: 600, lineHeight: 1.25 });
+
+export const figureValue = style({
+  gridArea: 'value',
+  textAlign: 'right',
+  fontFamily: vars.font.display,
+  fontSize: '1.75rem',
+  fontWeight: 600,
+  lineHeight: 1.1,
+  fontVariantNumeric: 'tabular-nums',
 });
-
-export const tileLabel = style({ fontSize: '0.8125rem', fontWeight: 600, color: vars.color.muted, lineHeight: 1.2 });
-
-// Pushed down with its delta, so the values in a row line up when one label wraps.
-export const tileValue = style({ marginTop: 'auto', fontSize: '1.625rem', fontWeight: 700, lineHeight: 1.1 });
 
 // The units in a duration ("u", "min"), smaller than its numbers.
-export const unit = style({ fontSize: '0.6em', fontWeight: 600 });
+export const unit = style({ fontSize: '0.65em' });
 
-/** The count of planned outages under the outages tile. */
+/** The count of planned outages under the outages line. */
 export const plannedNote = style({ color: vars.color.planned });
 
-export const tileDelta = style({
+export const figureDelta = style({
+  gridArea: 'delta',
   display: 'flex',
   alignItems: 'center',
   gap: '0.25rem',
@@ -129,13 +136,13 @@ export const th = style({
   textAlign: 'left',
   fontWeight: 600,
   color: vars.color.muted,
-  padding: '0.375rem 0',
+  padding: '0.5rem 0',
   borderBottom: `1px solid ${vars.color.border}`,
   selectors: { '&:not(:first-child)': { textAlign: 'right' } },
 });
 
 export const td = style({
-  padding: '0.375rem 0',
+  padding: '0.5rem 0',
   borderBottom: `1px solid ${vars.color.border}`,
   selectors: { '&:not(:first-child)': { textAlign: 'right' } },
 });
@@ -158,8 +165,7 @@ export const chartEmpty = style({
   placeItems: 'center',
   padding: '1rem',
   textAlign: 'center',
-  borderRadius: vars.radius.control,
-  border: `1px dashed ${vars.color.border}`,
+  borderTop: `1px solid ${vars.color.border}`,
   color: vars.color.muted,
   fontSize: '0.9375rem',
 });
