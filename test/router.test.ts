@@ -24,6 +24,17 @@ describe('edge cache', () => {
     expect(await (await get(() => json({ n: 2 }))).json()).toEqual({ n: 1 });
   });
 
+  it('never lets a copy stored without its own Cache-Control reach a browser as cacheable', async () => {
+    const get = () =>
+      run({ handler: () => new Response('no header'), edgeCache: 60 }, new Request(`${ORIGIN}/edge-cache-bare-test`));
+    expect((await get()).headers.get('Cache-Control')).toBeNull();
+
+    const hit = await get();
+
+    expect(await hit.text()).toBe('no header');
+    expect(hit.headers.get('Cache-Control')).toBe('no-store');
+  });
+
   it('answers a miss without waiting for the copy to be stored', async () => {
     const stored: Promise<unknown>[] = [];
     const ctx = createExecutionContext();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fromBase64Url, toBase64 } from '../shared/base64url';
 import { hashPassword, randomToken, safeEqual, sha256Hex, verifyPassword } from '../worker/lib/crypto';
 
 describe('crypto helpers', () => {
@@ -15,6 +16,17 @@ describe('crypto helpers', () => {
     expect(await verifyPassword('x', '')).toBe(false);
     expect(await verifyPassword('x', 'bcrypt$10$abc$def')).toBe(false);
     expect(await verifyPassword('x', 'pbkdf2_sha256$999999999$YQ==$YQ==')).toBe(false);
+  });
+
+  it('rejects a stored digest of another length, even when it starts with the right one', async () => {
+    const stored = await hashPassword('correct horse battery');
+    const [scheme, iterations, salt, digest = ''] = stored.split('$');
+    const withTrailingByte = (bytes: Uint8Array) => toBase64(new Uint8Array([...bytes, 0]));
+
+    const tampered = [scheme, iterations, salt, withTrailingByte(fromBase64Url(digest))].join('$');
+
+    expect(await verifyPassword('correct horse battery', tampered)).toBe(false);
+    expect(await verifyPassword('correct horse battery', stored)).toBe(true);
   });
 
   it('compares strings safely', async () => {

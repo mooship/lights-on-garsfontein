@@ -3,8 +3,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Istanbul, not V8: V8 coverage does not work inside workerd. Run on demand (npm run test:coverage).
-    coverage: { provider: 'istanbul', include: ['worker/**', 'shared/**'] },
+    // Istanbul, not V8: V8 coverage does not work inside workerd. Both projects count towards one report.
+    coverage: {
+      provider: 'istanbul',
+      include: ['worker/**', 'shared/**'],
+      // The rest is defensive code that nothing can reach, such as a `?? 0` behind an index that is always in range.
+      thresholds: { statements: 95, branches: 95, functions: 100, lines: 100 },
+    },
     projects: [
       {
         // The Worker, in workerd with D1 (test/*.test.ts).

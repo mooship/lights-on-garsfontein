@@ -329,7 +329,7 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run dev` / `dev:worker` | Vite dev server / local Worker |
 | `npm run build` / `preview` | Build to `dist/` / build and serve locally |
 | `npm test` / `test:watch` | Vitest, once or in watch mode: the `worker` project (workerd with D1) and the `node` project (`test/node/`); `CHECK_DIST=1` also checks `dist/` |
-| `npm run test:coverage` | Istanbul coverage for the Worker |
+| `npm run test:coverage` | Both Vitest projects with Istanbul coverage; fails below 95% for statements, branches, functions or lines (`thresholds` in `vitest.config.ts`) |
 | `npm run test:e2e` | Playwright against `wrangler dev --env e2e` with a fresh local database; each run writes `.dev.vars.e2e` from `.dev.vars.example` |
 | `npm run test:api` / `test:api:prod` | Bruno, by hand (below) |
 | `npm run lint` / `lint:fix` / `lint:ci` | Biome: check / fix / check as CI does |
@@ -341,7 +341,7 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
-Lefthook runs Biome and the typecheck on matching staged files on commit. `npm install` installs the hooks. Unit tests run separately and in CI. CI runs lint, typecheck, build, both Vitest projects (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
+On commit, Lefthook formats and lints the matching staged files with Biome (writing the fixes) and type-checks them; it never runs tests. `npm install` installs the hooks. Run the tests yourself; CI runs them too. CI runs lint, typecheck, build, both Vitest projects under the coverage gate (with `dist/` checks) and e2e, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file.
 
 ### API tests (Bruno)
 

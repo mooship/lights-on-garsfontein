@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ERROR } from '../shared/errors';
 import { CONTACT_PATH } from '../shared/paths';
-import { MAX_BODY_BYTES, parseBody, rateLimitKey, refuseCrossSite } from '../worker/lib/http';
+import { errorName, errors, MAX_BODY_BYTES, parseBody, rateLimitKey, refuseCrossSite } from '../worker/lib/http';
 import { ORIGIN } from './helpers';
 
 describe('rateLimitKey', () => {
@@ -11,6 +11,26 @@ describe('rateLimitKey', () => {
     expect(rateLimitKey('2001:db8:abcd:12:1:2:3:4')).toBe('2001:db8:abcd:12::/64');
     expect(rateLimitKey('2001:DB8:ABCD:0012::9')).toBe('2001:db8:abcd:12::/64');
     expect(rateLimitKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+  });
+
+  it('fills in a prefix that is entirely compressed away', () => {
+    expect(rateLimitKey('::1')).toBe('0:0:0:0::/64');
+  });
+});
+
+describe('errors', () => {
+  it('answers a bad request with the generic code unless told another', async () => {
+    const res = errors.badRequest();
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: ERROR.badRequest });
+  });
+});
+
+describe('errorName', () => {
+  it('gives the name of an error, and the type of anything else, never a message', () => {
+    expect(errorName(new TypeError('quotes https://secret.example/token'))).toBe('TypeError');
+    expect(errorName('quotes https://secret.example/token')).toBe('string');
   });
 });
 
@@ -52,6 +72,28 @@ describe('parseBody', () => {
   it('reads a body up to MAX_BODY_BYTES, with or without a Content-Length', async () => {
     expect(await parse(atSize(MAX_BODY_BYTES))).toEqual({ data: { text: expect.any(String) } });
     expect(await parse(chunked(atSize(MAX_BODY_BYTES)))).toEqual({ data: { text: expect.any(String) } });
+  });
+
+  it('reads a missing body as empty, which is not JSON', async () => {
+    const parsed = await parseBody(new Request(`${ORIGIN}${CONTACT_PATH}`, { method: 'POST' }), schema);
+
+    if (!('response' in parsed)) throw new Error('expected a refusal');
+    expect(parsed.response.status).toBe(400);
+    expect(await parsed.response.json()).toEqual({ error: ERROR.invalidJson });
+  });
+
+  it('refuses a body whose Content-Length is over the limit without reading it', async () => {
+    const request = new Request(`${ORIGIN}${CONTACT_PATH}`, {
+      method: 'POST',
+      headers: { 'Content-Length': String(MAX_BODY_BYTES + 1) },
+      body: '{"text":"short"}',
+    });
+
+    const parsed = await parseBody(request, schema);
+
+    if (!('response' in parsed)) throw new Error('expected a refusal');
+    expect(parsed.response.status).toBe(413);
+    expect(request.bodyUsed).toBe(false);
   });
 
   it('refuses a larger body with 413, with or without a Content-Length', async () => {

@@ -18,7 +18,15 @@ import {
 } from '../worker/lib/alerts';
 import { deliverAlertPage } from '../worker/lib/deliver';
 import { PUSH_TTL_SECONDS } from '../worker/lib/webpush';
-import { expireTimeouts, insertOutage, insertSubscription, mockPushService, PUSH_TEST_HOST, runCron } from './helpers';
+import {
+  d1FailingOn,
+  expireTimeouts,
+  insertOutage,
+  insertSubscription,
+  mockPushService,
+  PUSH_TEST_HOST,
+  runCron,
+} from './helpers';
 
 const { af, en } = DICTIONARIES;
 
@@ -56,6 +64,10 @@ describe('alertMessage', () => {
 
     expect(alertMessage('on', short, 'en').body).toBe(en.push.on.body('14:09', '7 min'));
     expect(alertMessage('on', whole, 'en').body).toBe(en.push.on.body('16:02', '2 h'));
+  });
+
+  it('refuses to word a back-on alert for an outage that has not ended', () => {
+    expect(() => alertMessage('on', off, 'en')).toThrow('An on alert needs an outage that has ended');
   });
 
   it('counts a long outage in hours, not days', () => {
@@ -318,6 +330,19 @@ describe('a failed enqueue', () => {
     expect(await claimAlerts(db(), NOW)).toEqual([{ kind, outageId: id }]);
   });
 
+  it('releases the claim, and queues nothing, when the subscriptions cannot be read', async () => {
+    const id = await insertOutage({ startTime: ago(DUE_MS) });
+    const claims = await claimAlerts(db(), NOW);
+    const { queue, sendBatch } = stubQueue();
+    const unreadable = createDb(d1FailingOn(/push_subscriptions/));
+
+    await expect(enqueueAlerts(unreadable, queue, claims, NOW)).rejects.toThrow('D1 is down');
+
+    expect(sendBatch).not.toHaveBeenCalled();
+    expect((await alertColumns(id))?.off_alert_at).toBeNull();
+    expect(await claimAlerts(db(), NOW)).toEqual([{ kind: 'off', outageId: id }]);
+  });
+
   it('keeps a claim once some of its pages are queued', async () => {
     const id = await insertOutage({ startTime: ago(DUE_MS) });
     await seedSubscriptions(4001);
@@ -464,6 +489,24 @@ describe('deliverAlertPage', () => {
     expect(send.mock.calls[0]?.[0].ids).toEqual([id]);
   });
 
+  it('retries a subscription whose endpoint cannot be read, naming no host', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('a');
+    await env.DB.prepare('UPDATE push_subscriptions SET endpoint = ? WHERE id = ?').bind('not a url', id).run();
+    const fetchSpy = mockPushService(() => 201);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { send, env: testEnv } = stubPushQueue();
+
+    await deliverAlertPage(pageFor(outage, [id]), testEnv, NOW);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0].ids).toEqual([id]);
+    const logged = warn.mock.calls.flat().join(' ');
+    expect(logged).toContain('invalid endpoint');
+    expect(logged).toContain('TypeError');
+  });
+
   it('retries a push service that does not answer in time', async () => {
     const outage = await openOutage();
     const id = await insertSubscription('a');
@@ -539,6 +582,24 @@ describe('deliverAlertPage', () => {
     const logged = String(warn.mock.calls[0]?.[0]);
     expect(logged).toContain(PUSH_TEST_HOST);
     expect(logged).not.toContain('secret-path');
+  });
+
+  it('logs, and does not throw, when the queue refuses the retry', async () => {
+    const outage = await openOutage();
+    const id = await insertSubscription('secret-path');
+    mockPushService(() => 503);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const send = vi.fn(async (_body: AlertPage, _options?: QueueSendOptions) => {
+      throw new Error('queue down');
+    });
+    const testEnv = { ...env, PUSH_QUEUE: { send } as unknown as Queue<AlertPage> };
+
+    await expect(deliverAlertPage(pageFor(outage, [id]), testEnv, NOW)).resolves.toBeUndefined();
+
+    expect(send).toHaveBeenCalledOnce();
+    const logged = warn.mock.calls.flat().join(' ');
+    expect(logged).toContain('Could not re-queue 1 push sends: Error');
+    expect(logged).not.toContain('queue down');
   });
 
   it('does not warn about giving up when every send succeeded or is gone', async () => {
@@ -715,18 +776,7 @@ describe('the queue handler', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const send = vi.fn(async (_body: AlertPage, _options?: QueueSendOptions) => {});
     // D1 fails only the delete of the gone subscription.
-    const DB = new Proxy(env.DB, {
-      get(target, property) {
-        if (property === 'prepare') {
-          return (query: string) => {
-            if (/^delete/i.test(query)) throw new Error('D1 is down');
-            return target.prepare(query);
-          };
-        }
-        const value = Reflect.get(target, property);
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-    });
+    const DB = d1FailingOn(/^delete/i);
     const body: AlertPage = {
       kind: 'off',
       outageId: outage,
