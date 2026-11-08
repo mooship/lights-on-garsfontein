@@ -29,11 +29,13 @@ module.exports = {
       },
     },
     assert: {
+      // The other three score 100 on every page and do not vary between runs. Performance sits at 99 to 100 on CI but is
+      // only held to 95, because total blocking time follows the runner CPU and a hard 100 would fail on noise.
       assertions: {
-        'categories:performance': ['warn', { minScore: 0.95, aggregationMethod: 'median' }],
-        'categories:accessibility': ['warn', { minScore: 1, aggregationMethod: 'median' }],
-        'categories:best-practices': ['warn', { minScore: 1, aggregationMethod: 'median' }],
-        'categories:seo': ['warn', { minScore: 1, aggregationMethod: 'median' }],
+        'categories:performance': ['error', { minScore: 0.95, aggregationMethod: 'median' }],
+        'categories:accessibility': ['error', { minScore: 1, aggregationMethod: 'median' }],
+        'categories:best-practices': ['error', { minScore: 1, aggregationMethod: 'median' }],
+        'categories:seo': ['error', { minScore: 1, aggregationMethod: 'median' }],
       },
     },
     upload: { target: 'filesystem', outputDir: '.lighthouseci' },
