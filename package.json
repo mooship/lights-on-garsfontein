@@ -18,6 +18,7 @@
     "dev:worker": "wrangler dev",
     "build": "vite build",
     "preview": "npm run build && wrangler dev",
+    "pretypecheck": "npm run cf-typegen",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

@@ -333,8 +333,8 @@ For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm 
 | `npm run test:e2e` | Playwright against `wrangler dev --env e2e` with a fresh local database; each run writes `.dev.vars.e2e` from `.dev.vars.example` |
 | `npm run test:api` / `test:api:prod` | Bruno, by hand (below) |
 | `npm run lint` / `lint:fix` / `lint:ci` | Biome: check / fix / check as CI does |
-| `npm run typecheck` | Type-check the app, Worker, tests and Node scripts |
-| `npm run cf-typegen` | Regenerate `worker/worker-configuration.d.ts` after a `wrangler.toml` or `.dev.vars.example` change |
+| `npm run typecheck` | Type-check the app, Worker, tests and Node scripts; generates the Worker binding types first |
+| `npm run cf-typegen` | Generate `worker/worker-configuration.d.ts` (git-ignored) on its own, for an editor that needs it before a typecheck |
 | `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
 | `npm run db:migrate:local` / `db:migrate:remote` | Apply pending migrations locally / to production |
 | `npm run hash-password` | Print an `ADMIN_PASSWORD_HASH` value (input hidden) |
