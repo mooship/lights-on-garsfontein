@@ -27,6 +27,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "lighthouse": "lhci autorun --config=.github/lighthouserc.cjs",
     "test:api": "cd bruno && bru run --env local --disable-cookies",
     "test:api:prod": "cd bruno && bru run public --env production",
     "db:generate": "drizzle-kit generate",
@@ -52,6 +53,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@cloudflare/vitest-plugin": "^1.4.11",
+    "@lhci/cli": "0.16.0",
     "@playwright/test": "^1.64.1",
     "@types/node": "^24.19.2",
     "@usebruno/cli": "^4.2.1",
