@@ -20,8 +20,11 @@ The full table, the local setup and what CI runs are in [README, Local developme
 - `npm test`: both Vitest projects, `worker` (workerd with real D1, `test/*.test.ts`) and `node` (`test/node/`). `CHECK_DIST=1` also checks `dist/`, so build first.
 - `npm run test:coverage`: the same two projects with Istanbul coverage; it fails below 95% on any of statements, branches, functions and lines (`thresholds` in `vitest.config.ts`). CI runs this instead of plain `npm test`.
 - `npm run test:e2e`: Playwright against `wrangler dev --env e2e` with a fresh local database.
+- `npm run lighthouse`: Lighthouse CI (mobile profile, median of three runs) on `/`, `/en/` and `/privacy`, against the built Worker started as e2e starts it, so build first. Accessibility, best practices and SEO must be 100 and performance at least 95 (`.github/lighthouserc.cjs`). CI measured 99 to 100 for performance; a busy laptop scores lower and noisier, so judge a failure by the CI run, whose reports are uploaded as the `lighthouse-reports` artifact. Do not lower a threshold or skip an audit to get green.
 - `npm run lint`, `npm run lint:fix` and `npm run lint:ci`: Biome, check, write and check as CI does. Biome is the formatter too, so there is no separate format command: `lint:fix` formats and lints.
 - `npm run db:generate`: create a migration after changing `worker/db/schema.ts`.
+
+Node 24.22.1 or newer (24 and 26 are supported; `.node-version` says 24) and npm 11 or newer; `packageManager` pins npm 11.19.1.
 
 Lefthook runs on commit: `biome check --write` on the staged files (format and lint, with the fixes staged) and the typecheck on staged TypeScript. It never runs tests, so run them yourself.
 
@@ -38,6 +41,18 @@ Lefthook runs on commit: `biome check --write` on the staged files (format and l
 ### Commit messages
 
 Summaries follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>[optional scope][!]: <description>`. Use a recognised type (`feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci` or `chore`) and a short, imperative summary in lower case with no full stop (for example "fix: stop horizontal scroll on the privacy page on phones", or Dependabot's "chore(deps): …"). Mark breaking changes with `!` and explain them in the body or a `BREAKING CHANGE:` footer. Commit each finished task (the hooks run). Push only when asked. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
+
+### Dependencies and lockfiles
+
+`package-lock.json` is the only npm lockfile (`skills-lock.json` belongs to agent skills, not npm).
+
+- One npm major everywhere. `packageManager` in `package.json` pins npm 11.19.1 for Cloudflare Workers Builds, every CI job runs `npm install --global npm@11` before `npm ci`, and the lockfile is written by npm 11. If npm 10 accepts the lockfile and npm 11 does not, or the reverse, the environment is wrong, not the pull request.
+- After any `package.json` change, run a real `npm install` and commit `package.json` and `package-lock.json` together. Do not use `--package-lock-only`: it keeps stale nested entries when a range or an override in `overrides` changes. If `npm ls` then prints `invalid` or `missing`, delete the stale nested entries from the lockfile and install again; never edit versions by hand.
+- Verify with a real `npm ci --ignore-scripts` in a clean clone, not `--dry-run`, which has passed on a lockfile that then failed to install. Check that `@typescript/typescript-linux-x64` is in the lockfile, since CI and Cloudflare run Linux.
+- Pin a prerelease exactly. A caret on one (such as `^7.1.0-beta`) resolves to nightly builds, and a prerelease does not satisfy a plain peer range such as `>=2.9`.
+- Dependabot owns its own lockfile changes. Fix one only when a real `npm ci` fails under npm 11, and push the fix to its branch.
+- Run the project's binaries with `npm run` or `npx --no-install <tool>`, so a missing local binary cannot fetch an unrelated package of the same name.
+- Do not install in a working tree someone else is using; use a throwaway clone.
 
 ### Constants
 
@@ -71,7 +86,8 @@ Write docs, copy and comments the way a person would. No em dashes: use a comma,
 ## Definition of done
 
 - Tests added or updated first, and they fail without the change.
-- `npm run lint:ci`, `npm run typecheck`, `npm run build`, `CHECK_DIST=1 npm run test:coverage` and `npm run test:e2e` all pass, in that order. The coverage run is both Vitest projects and fails below 95% on statements, branches, functions and lines; it replaces plain `npm test`. A change to docs only needs `npm run lint:ci`.
+- `npm run lint:ci`, `npm run typecheck`, `npm run build`, `CHECK_DIST=1 npm run test:coverage` and `npm run test:e2e` all pass, in that order. A change to a page, the head, styles, fonts or scripts also needs `npm run lighthouse` (after the build) to pass; CI runs it as its own job. The coverage run is both Vitest projects and fails below 95% on statements, branches, functions and lines; it replaces plain `npm test`. A change to docs only needs `npm run lint:ci`.
+- A dependency or `package.json` change follows [Dependencies and lockfiles](#dependencies-and-lockfiles): a real `npm install`, both files committed together, and a real `npm ci --ignore-scripts` in a clean clone.
 - Both languages updated; zero layout shift and no horizontal scroll at 320px still hold.
 - README updated when behaviour, configuration or the public API changes.
 - Say in the hand-over which checks were skipped, and why.
