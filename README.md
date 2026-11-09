@@ -206,7 +206,7 @@ The Mac sends how long it has been on the charger as `poweredFor`, so if the Wi-
 
 ## Run it for your area
 
-You need Node 24.22.1 or newer (Node 24 is tested), npm 11 or newer, a Cloudflare account and, optionally, a domain on Cloudflare. `.node-version` pins Node 24 and `packageManager` in `package.json` pins npm 11.19.1, so fnm, Corepack and Cloudflare Workers Builds pick them up on their own.
+You need Node 24 or newer, npm 11 or newer, a Cloudflare account and, optionally, a domain on Cloudflare. `.node-version` selects Node 24 and `packageManager` in `package.json` pins npm 11.19.1 for Corepack and Cloudflare Workers Builds.
 
 1. **Fork and clone**, then `npm install`.
 2. **Edit `site.config.ts`**, the deployment's identity:
