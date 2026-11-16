@@ -47,6 +47,7 @@ Summaries follow [Conventional Commits 1.0.0](https://www.conventionalcommits.or
 `package-lock.json` is the only npm lockfile.
 
 - Never install or upgrade to a package version published less than 7 days ago. `.npmrc` sets `min-release-age=7` and Dependabot has a 7-day cooldown; do not work around either. A fix that exists only in a newer release goes to the owner first.
+- A release under 7 days old (an urgent security fix, say) needs the owner's approval in the conversation first; an agent never decides this alone. With approval, install it with `npm install <package>@<version> --min-release-age=0`, or exempt one package with `--min-release-age-exclude=<package>`, and leave `.npmrc` alone.
 
 - The lockfile uses npm 11. Node 24 and npm 11 are the minimums. `packageManager` pins npm 11.19.1 for Corepack and Cloudflare Workers Builds, and CI installs that same version.
 - Commit `package.json` and `package-lock.json` together. After a range or an `overrides` change, `--package-lock-only` can keep stale nested entries, so check `npm ls` for `invalid` or `missing` lines; delete the stale entries from the lockfile and regenerate, never edit versions by hand.
