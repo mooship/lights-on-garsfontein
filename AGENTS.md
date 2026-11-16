@@ -40,11 +40,13 @@ Lefthook runs on commit: `biome check --write` on the staged files (format and l
 
 ### Commit messages
 
-Summaries follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>[optional scope][!]: <description>`. Use a recognised type (`feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci` or `chore`) and a short, imperative summary in lower case with no full stop (for example "fix: stop horizontal scroll on the privacy page on phones", or Dependabot's "chore(deps): …"). Mark breaking changes with `!` and explain them in the body or a `BREAKING CHANGE:` footer. Commit each finished task (the hooks run). Push only when asked. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
+Summaries follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>[optional scope][!]: <description>`. Use a recognised type (`feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci` or `chore`) and a short, imperative summary in lower case with no full stop (for example "fix: stop horizontal scroll on the privacy page on phones", or Dependabot's "chore(deps): …"). Mark breaking changes with `!` and explain them in the body or a `BREAKING CHANGE:` footer. Commit each finished task (the hooks run); "Safety" says when to push. Never skip hooks (`--no-verify`) or leave `test.only` or `skip` behind.
 
 ### Dependencies and lockfiles
 
-`package-lock.json` is the only npm lockfile (`skills-lock.json` belongs to agent skills, not npm).
+`package-lock.json` is the only npm lockfile.
+
+- Never install or upgrade to a package version published less than 7 days ago. `.npmrc` sets `min-release-age=7` and Dependabot has a 7-day cooldown; do not work around either. A fix that exists only in a newer release goes to the owner first.
 
 - The lockfile uses npm 11. Node 24 and npm 11 are the minimums. `packageManager` pins npm 11.19.1 for Corepack and Cloudflare Workers Builds, and CI installs that same version.
 - Commit `package.json` and `package-lock.json` together. After a range or an `overrides` change, `--package-lock-only` can keep stale nested entries, so check `npm ls` for `invalid` or `missing` lines; delete the stale entries from the lockfile and regenerate, never edit versions by hand.
@@ -90,14 +92,33 @@ Write docs, copy and comments the way a person would. No em dashes: use a comma,
 - A dependency or `package.json` change follows [Dependencies and lockfiles](#dependencies-and-lockfiles): both files committed together, and a real `npm ci --ignore-scripts` under npm 11 in a clean clone.
 - Both languages updated; zero layout shift and no horizontal scroll at 320px still hold.
 - README updated when behaviour, configuration or the public API changes.
-- Say in the hand-over which checks were skipped, and why.
+- A change to what the site shows is also looked at with the `visual-check` skill (phone, tablet and desktop, both languages), and a change to behaviour or layout gets a `fresh-eyes-review` before it is pushed. Browser tests are written and healed with the `playwright-tests` skill.
+
+## Hand-off
+
+Finish with one report, each part filled or "none": **Checks** (each command and its result, skipped ones named with the reason), **Seen** (what you looked at and what looked wrong, or "no visible effect"), **Deviations** (what differs from the request, and why), **Follow-ups** (real work you noticed but did not do).
 
 ## Safety
 
-- **Deploys.** Cloudflare Workers Builds deploys `main` (`npm run build`, then `npm run deploy:ci`, which migrates the production database seconds before the new code is live), so a merge to `main` is a production release. Do not run `npm run deploy`, `deploy:ci`, `db:migrate:remote` or any other remote Cloudflare command by hand unless the owner asks. `[env.e2e]` is for the test suite only: never deploy it.
+- **Shipping.** Work goes straight to `main`: commit each finished task, and push once the checks in "Definition of done" pass; no pull request is needed. Use a branch and a pull request instead for a migration, a security or rate-limit change, or anything you want a second look at before it is live. The repository ruleset lets the owner's account bypass its pull request and status-check rules, so a direct push reports "Bypassed rule violations"; that is expected.
+- **Deploys.** Cloudflare Workers Builds deploys `main` (`npm run build`, then `npm run deploy:ci`, which migrates the production database seconds before the new code is live), so a push to `main` is a production release. Do not run `npm run deploy`, `deploy:ci`, `db:migrate:remote` or any other remote Cloudflare command by hand unless the owner asks. `[env.e2e]` is for the test suite only: never deploy it.
 - **Ask first** before adding a dependency, changing a migration that has shipped, or touching the secrets, the rate limits or the Turnstile settings.
 - **Secrets** live in Wrangler secrets or `.dev.vars` (git-ignored), never in the repo. Never open, print or paste `.env`, `.dev.vars` or secret values; only `.dev.vars.example` and its copy `.dev.vars.e2e` may be read. The contact email is the `CONTACT_EMAIL` secret.
 - **Privacy.** Store no IP addresses or other data that identifies a visitor; rate limiting happens in Cloudflare, not in D1. Never publish the measuring home's address: public copy names only `site.landmark`. Keep `privacy.html` (both languages) accurate whenever data handling changes.
+
+## Sub-agents
+
+Where the tool has sub-agents, use them for wide searches, independent changes in separate modules, tests written next to the code they cover, long verification runs, and a `fresh-eyes-review` of a diff before it is pushed. Do a small, strictly sequential task yourself. The delegating agent checks the result.
+
+- Run at most three at the same time, and at most two that write; prefer one or two. Never start another while at the limit; queue the work.
+- Brief each agent like a colleague who has not seen the conversation: the goal, the files and sections of `AGENTS.md` to read, what is ruled out, what to report back (the "Hand-off" headings), and the rules that matter for the task (for prose, "Style and writing"). Never paste text from outside the project into a brief.
+- When a tool or the harness blocks or refuses a command, stop. Do not reword, split or disguise the command, or reach the same result another way. Report what was blocked and what you wanted to run under Deviations. Put this in every brief.
+- Every agent stops each dev server, `wrangler` instance, browser and other process it starts, and confirms with a port check that none is left before it reports. Use a different port for each server. Put this in every brief.
+- Name the model tier for every agent; never inherit it silently. Use the cheapest tier that fits (small and fast for mechanical work that is easy to check, default for a well-specified task, most capable for work that is hard to get right) and escalate on failure.
+
+## Tooling
+
+Use a command-line tool where one does the job, and commit no MCP server configuration: `gh` for GitHub, `npx --no-install wrangler` (local runs, logs, D1) or the `cf` CLI where it is installed (zones, DNS and other account resources; `cf cli search <words>` finds a command) for Cloudflare, and `npx --no-install playwright cli` for the browser (see the `playwright-tests` skill). No Cloudflare skills are vendored; `--help` and developers.cloudflare.com are the reference. Run project binaries through `npm run` or `npx --no-install`.
 
 ## Map
 

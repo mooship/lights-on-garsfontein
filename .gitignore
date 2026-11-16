@@ -19,7 +19,8 @@ playwright-report/
 blob-report/
 .lighthouseci/
 playwright/.cache/
-.playwright-mcp/
+.playwright-cli/
+.tmp-visual/
 
 # Logs
 *.log
