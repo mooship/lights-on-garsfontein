@@ -57,6 +57,7 @@ import {
   pollNow,
   readLayoutShift,
   returningVisitor,
+  runClockSettled,
   scrollsSideways,
   test,
   trackLayoutShift,
@@ -491,6 +492,8 @@ test.describe('public page', () => {
     });
     await page.goto('/en/');
     await expect(badge(page)).toHaveText(en.status.ON);
+    // Loaded before the clock moves, so the figures' first arrival is not taken for a change later.
+    await expect(page.getByText(en.trends.withoutPower, { exact: true })).toBeVisible();
     // The power going off often takes the reader's own connection with it.
     await page.unroute(`**${STATUS_PATH}`);
     await page.route(`**${STATUS_PATH}`, (route) => route.abort());
@@ -513,7 +516,9 @@ test.describe('public page', () => {
         w.__mutations += records.length;
       }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true });
     });
-    await page.clock.runFor(STATS_POLL_MS + MINUTE_MS);
+    const refreshed = page.waitForResponse((response) => response.url().endsWith(STATS_PATH));
+    await runClockSettled(page, STATS_POLL_MS + MINUTE_MS);
+    await refreshed;
     expect(await page.evaluate(() => (window as unknown as { __mutations: number }).__mutations)).toBe(0);
   });
 
@@ -982,7 +987,10 @@ test.describe('outages by time of day', () => {
         weeks: [first, { ...current, hoursOff: 0, minutesOff: 0, outages: 0 }],
       };
     });
+    // The route's callback sets firstDay, so wait for the response it served.
+    const served = page.waitForResponse(`**${STATS_PATH}`);
     await page.goto('/en/');
+    await served;
     const partial = en.trends.partial(calendarDay(firstDay)).trim();
     await expect(
       page.locator('p', { hasText: `${en.trends.off} · ${en.trends.outageCount(3)}` }).filter({ hasText: partial }),

@@ -1,7 +1,8 @@
-import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
+import { type APIRequestContext, test as base, expect, type Page, type Request } from '@playwright/test';
 import { type AdminOutagesResponse, DAY_MS, MINUTE_MS, OUTAGE_ACTION } from '../shared/api';
 import { ADMIN_OUTAGES_PATH } from '../shared/paths';
 import type { Locale } from '../site.config';
+import { REQUEST_TIMEOUT_MS } from '../src/lib/api';
 import { POLL_MS } from '../src/lib/poll';
 import { STORAGE_KEYS } from '../src/lib/storage';
 import { exampleVar } from './dev-vars';
@@ -32,6 +33,33 @@ async function deleteOutages(request: APIRequestContext): Promise<void> {
 
 /** Lets a poll's interval pass, so the page asks again; the test installs the clock before loading the page. */
 export const pollNow = (page: Page) => page.clock.fastForward(POLL_MS);
+
+const pending = new WeakMap<Page, Set<Request>>();
+
+/** The requests `page` has sent that have had neither an answer nor a failure; tracked from the first call. */
+function pendingRequests(page: Page): Set<Request> {
+  const existing = pending.get(page);
+  if (existing) return existing;
+  const requests = new Set<Request>();
+  page.on('request', (request) => requests.add(request));
+  page.on('requestfinished', (request) => requests.delete(request));
+  page.on('requestfailed', (request) => requests.delete(request));
+  pending.set(page, requests);
+  return requests;
+}
+
+/** Runs the page clock forward by `ms`, in steps that let the page's requests finish in between. */
+export async function runClockSettled(page: Page, ms: number): Promise<void> {
+  const requests = pendingRequests(page);
+  // The page's request timeout runs on this clock: one jump past it times out a request whose reply is
+  // still on its way, and the page then shows the failure. Steps under the timeout cannot.
+  const step = REQUEST_TIMEOUT_MS / 2;
+  for (let elapsed = 0; elapsed < ms; elapsed += step) {
+    await expect.poll(() => requests.size).toBe(0);
+    await page.clock.runFor(Math.min(step, ms - elapsed));
+  }
+  await expect.poll(() => requests.size).toBe(0);
+}
 
 /** Serves the real response from `path`, changed by `change`. */
 export const patchJson = <T>(page: Page, path: string, change: (body: T) => T) =>
@@ -89,6 +117,8 @@ export const test = base.extend<{ appLocale: Locale; resetOutages: undefined }>(
   ],
   appLocale: ['en', { option: true }],
   page: async ({ page, appLocale }, use) => {
+    // From the start, so runClockSettled knows of requests sent before it is called.
+    pendingRequests(page);
     await withLocale(page, appLocale);
     await use(page);
   },
