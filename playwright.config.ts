@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { STATUS_PATH } from './shared/paths';
 
-const PORT = 8788;
+const PORT = Number(process.env.E2E_PORT ?? 8788);
 // A throwaway local D1 so every run starts empty.
 const STATE = '.wrangler/e2e-state';
 

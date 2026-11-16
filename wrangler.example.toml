@@ -94,6 +94,9 @@ max_retries = 0
 # The same as MINUTE_CRON and HOURLY_CRON in worker/crons.ts; change them together.
 crons = ["* * * * *", "0 * * * *"]
 
+[placement]
+mode = "smart"
+
 [observability]
 enabled = true
 head_sampling_rate = 1
