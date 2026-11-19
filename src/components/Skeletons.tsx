@@ -49,6 +49,7 @@ export const TrendsCardSkeleton: Component = () => (
   </>
 );
 
+/** The outage list while loading; the card frame and its .gg-history-body are in App.tsx and index.html. */
 export const HistorySkeleton: Component = () => (
   <div class="gg-skel-list" aria-hidden="true">
     <For each={[1, 2, 3, 4, 5]}>{() => <span class="gg-skel gg-skel-item" />}</For>
