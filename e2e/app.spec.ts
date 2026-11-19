@@ -919,6 +919,53 @@ test.describe('narrow screens', () => {
   }
 });
 
+test.describe('wide screens', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  for (const locale of LOCALES) {
+    test(`the statistics sit beside the status and the history (${locale})`, async ({ page }) => {
+      await withLocale(page, locale);
+      await page.goto(localePath(locale));
+      // The ids exist only in the app; the loading shell has the same headings without them.
+      await expect(page.locator('#history-heading')).toBeVisible();
+      await expect(page.locator('#trends-heading')).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const { status, history, trends } = await page.evaluate(() => {
+        const rect = (selector: string) => {
+          const { x, y, width, height } = (document.querySelector(selector) as Element).getBoundingClientRect();
+          return { x, y, width, height };
+        };
+        return {
+          status: rect('.gg-status-card'),
+          history: rect('section:has(#history-heading)'),
+          trends: rect('section:has(#trends-heading)'),
+        };
+      });
+      expect(history.x).toBe(status.x);
+      expect(history.y).toBeGreaterThan(status.y + status.height);
+      expect(trends.x).toBeGreaterThan(status.x + status.width);
+      expect(trends.y).toBe(status.y);
+      expect(await scrollsSideways(page)).toBe(false);
+    });
+
+    test(`has zero cumulative layout shift while loading in two columns (${locale})`, async ({ page }) => {
+      await withLocale(page, locale);
+      await trackLayoutShift(page);
+      await page.goto(localePath(locale));
+      await expect(page.locator('#trends-heading')).toBeVisible();
+      expect(await readLayoutShift(page)).toBe(0);
+    });
+  }
+
+  test('/admin keeps its single column, in the loading shell too', async ({ page }) => {
+    await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
+    await page.goto(ADMIN_PAGE_PATH);
+    const main = page.locator('.gg-main');
+    await expect(main).toHaveCSS('display', 'flex');
+    expect((await page.locator('.gg-shell').boundingBox())?.width).toBeLessThanOrEqual(544);
+  });
+});
+
 test.describe('outages by time of day', () => {
   const OUTAGES_30 = 4;
   /** The time-of-day chart's title for statistics from `withOutages`, which cover a full 30 days. */
