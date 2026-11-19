@@ -2,6 +2,10 @@ import { globalKeyframes, globalStyle } from '@vanilla-extract/css';
 import { RECENT_LIMIT } from '../../shared/api';
 import { vars } from './theme.css';
 
+// Two columns of 32.5rem: each card is at least as wide as the one-column card, whose text wrapping the
+// reserved heights (.gg-trends-body, .gg-history-body) were measured for.
+const WIDE = 'screen and (min-width: 68rem)';
+
 // Layout classes use stable global names (gg-*) because the static loading
 // skeleton in index.html renders them before any JavaScript runs. Keeping the
 // skeleton and the hydrated app on the same boxes is what keeps CLS at zero.
@@ -64,6 +68,32 @@ globalStyle('.gg-shell', {
 });
 
 globalStyle('.gg-main', { display: 'flex', flexDirection: 'column', gap: '1rem' });
+
+// From WIDE the public page lays its cards in two columns: the status and the history on the left, the
+// statistics on the right. Only the public page: the admin page shares .gg-shell and .gg-main, and has no
+// status card. The cards are placed by position, so their order in PublicView (src/App.tsx) and in the
+// shell (index.html) must stay status, history, statistics; both list them so, which is why one rule set
+// serves both (zero layout shift). The statistics span both rows and the second row takes the spare
+// height, so the status card keeps its own. Whatever follows the three cards (the alerts live region,
+// the banner) takes a full row.
+const PUBLIC_SHELL = '.gg-shell:has(> .gg-main > .gg-status-card)';
+const PUBLIC_MAIN = '.gg-main:has(> .gg-status-card)';
+
+globalStyle(PUBLIC_SHELL, { '@media': { [WIDE]: { maxWidth: '68rem' } } });
+globalStyle(PUBLIC_MAIN, {
+  '@media': {
+    [WIDE]: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gridTemplateRows: 'auto 1fr',
+      alignItems: 'start',
+    },
+  },
+});
+globalStyle(`${PUBLIC_MAIN} > :nth-child(1)`, { '@media': { [WIDE]: { gridColumn: 1, gridRow: 1 } } });
+globalStyle(`${PUBLIC_MAIN} > :nth-child(2)`, { '@media': { [WIDE]: { gridColumn: 1, gridRow: 2 } } });
+globalStyle(`${PUBLIC_MAIN} > :nth-child(3)`, { '@media': { [WIDE]: { gridColumn: 2, gridRow: '1 / span 2' } } });
+globalStyle(`${PUBLIC_MAIN} > :nth-child(n + 4)`, { '@media': { [WIDE]: { gridColumn: '1 / -1' } } });
 
 // Focused only from script (tabindex=-1, after the banner closes), so it needs no ring.
 globalStyle('.gg-main:focus', { outline: 'none' });
@@ -161,7 +191,7 @@ globalStyle('.gg-trends-body', {
   },
 });
 
-// The history card sits above the statistics, so its loaded height must not depend on how many outages
+// The history card sits above the statistics in one column, so its loaded height must not depend on how many outages
 // there are: RECENT_LIMIT rows of 3.5rem (`row` in OutageHistory.css.ts; its 1px rule sits inside that
 // height), then the show-all button (0.75rem + 2.75rem: `more` in OutageHistory.css.ts and `button.ghost`
 // in src/styles/ui.css.ts) that appears only when the list is full. The 4px is slack for a multi-day row

@@ -919,6 +919,32 @@ test.describe('narrow screens', () => {
   }
 });
 
+test.describe('wide screens', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  for (const locale of LOCALES) {
+    test(`the statistics sit beside the status and the history (${locale})`, async ({ page }) => {
+      await withLocale(page, locale);
+      await page.goto(localePath(locale));
+      await expect(page.getByRole('heading', { name: DICTIONARIES[locale].trends.title, exact: true })).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const box = async (selector: string) => {
+        const found = await page.locator(selector).boundingBox();
+        if (!found) throw new Error(`${selector} has no box`);
+        return found;
+      };
+      const status = await box('.gg-status-card');
+      const history = await box('section:has(#history-heading)');
+      const trends = await box('section:has(#trends-heading)');
+      expect(history.x).toBe(status.x);
+      expect(history.y).toBeGreaterThan(status.y + status.height);
+      expect(trends.x).toBeGreaterThan(status.x + status.width);
+      expect(trends.y).toBe(status.y);
+      expect(await scrollsSideways(page)).toBe(false);
+    });
+  }
+});
+
 test.describe('outages by time of day', () => {
   const OUTAGES_30 = 4;
   /** The time-of-day chart's title for statistics from `withOutages`, which cover a full 30 days. */
