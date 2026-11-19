@@ -46,6 +46,11 @@ describe.runIf(process.env.CI || process.env.CHECK_DIST)('the built site', () =>
     }
   });
 
+  it('marks only the admin copy of the shell, which the public wide layout skips', () => {
+    expect(read('admin.html')).toContain('<html data-page="admin" ');
+    for (const { file } of LOCALE_PAGES) expect(read(file), file).not.toContain('data-page');
+  });
+
   it('serves a /sw.js that clears old caches, shows pushes and never answers requests', () => {
     const sw = read('sw.js');
     expect(sw).toContain('caches.delete');

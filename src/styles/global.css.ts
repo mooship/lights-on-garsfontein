@@ -2,9 +2,10 @@ import { globalKeyframes, globalStyle } from '@vanilla-extract/css';
 import { RECENT_LIMIT } from '../../shared/api';
 import { vars } from './theme.css';
 
-// Two columns of 32.5rem: each card is at least as wide as the one-column card, whose text wrapping the
-// reserved heights (.gg-trends-body, .gg-history-body) were measured for.
-const WIDE = 'screen and (min-width: 68rem)';
+// Two columns of 32.5rem, about as wide as the one-column card, so the text wrapping that the reserved
+// heights (.gg-trends-body, .gg-history-body) were measured for holds.
+const WIDE_REM = 68;
+const WIDE = `screen and (min-width: ${WIDE_REM}rem)`;
 
 // Layout classes use stable global names (gg-*) because the static loading
 // skeleton in index.html renders them before any JavaScript runs. Keeping the
@@ -70,16 +71,16 @@ globalStyle('.gg-shell', {
 globalStyle('.gg-main', { display: 'flex', flexDirection: 'column', gap: '1rem' });
 
 // From WIDE the public page lays its cards in two columns: the status and the history on the left, the
-// statistics on the right. Only the public page: the admin page shares .gg-shell and .gg-main, and has no
-// status card. The cards are placed by position, so their order in PublicView (src/App.tsx) and in the
+// statistics on the right. Not the admin page, which shares .gg-shell and .gg-main: its app has no status
+// card, and the build marks its copy of the shell with data-page (vite.config.ts, locale-pages). The cards are placed by position, so their order in PublicView (src/App.tsx) and in the
 // shell (index.html) must stay status, history, statistics; both list them so, which is why one rule set
 // serves both (zero layout shift). The statistics span both rows and the second row takes the spare
 // height, so the status card keeps its own. Whatever follows the three cards (the alerts live region,
 // the banner) takes a full row.
-const PUBLIC_SHELL = '.gg-shell:has(> .gg-main > .gg-status-card)';
-const PUBLIC_MAIN = '.gg-main:has(> .gg-status-card)';
+const PUBLIC_SHELL = 'html:not([data-page="admin"]) .gg-shell:has(> .gg-main > .gg-status-card)';
+const PUBLIC_MAIN = 'html:not([data-page="admin"]) .gg-main:has(> .gg-status-card)';
 
-globalStyle(PUBLIC_SHELL, { '@media': { [WIDE]: { maxWidth: '68rem' } } });
+globalStyle(PUBLIC_SHELL, { '@media': { [WIDE]: { maxWidth: `${WIDE_REM}rem` } } });
 globalStyle(PUBLIC_MAIN, {
   '@media': {
     [WIDE]: {

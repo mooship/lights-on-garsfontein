@@ -140,8 +140,13 @@ function localePages(): Plugin {
           if (locale === DEFAULT_LOCALE) {
             index.source = source;
             // Unknown paths get 404.html, so the admin page needs a file of its own; the boot script
-            // makes it English.
-            this.emitFile({ type: 'asset', fileName: `${ADMIN_PAGE_PATH.slice(1)}.html`, source });
+            // makes it English. data-page keeps the public page's wide layout (src/styles/global.css.ts) off
+            // the copy of its shell, which the admin app replaces once it loads.
+            this.emitFile({
+              type: 'asset',
+              fileName: `${ADMIN_PAGE_PATH.slice(1)}.html`,
+              source: source.replace('<html ', '<html data-page="admin" '),
+            });
           } else this.emitFile({ type: 'asset', fileName: `${localePath(locale).slice(1)}index.html`, source });
         }
       },
