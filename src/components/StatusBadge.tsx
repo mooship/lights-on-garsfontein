@@ -50,12 +50,12 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
         <Show when={look()} keyed>
           {(l) => (
             <span class={`${css.icon} ${mounted ? motion.changedIcon : ''}`} aria-hidden="true">
-              <Switch fallback={<Zap size={24} stroke-width={2.5} />}>
+              <Switch fallback={<Zap size={32} stroke-width={2.5} />}>
                 <Match when={l === 'PLANNED'}>
-                  <CalendarClock size={24} stroke-width={2.5} />
+                  <CalendarClock size={32} stroke-width={2.5} />
                 </Match>
                 <Match when={l === 'OFF'}>
-                  <ZapOff size={24} stroke-width={2.5} />
+                  <ZapOff size={32} stroke-width={2.5} />
                 </Match>
               </Switch>
             </span>
@@ -63,7 +63,7 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
         </Show>
         {/* Only the headline is live, so the ticking duration is never re-announced. It stays in place
             across a change, as a live region added afresh is not announced. */}
-        <p class={`${css.headline} ${look() === 'NONE' ? css.headlineNone : ''}`} role="status">
+        <p class={css.headline} role="status">
           <Show when={state()} keyed>
             {(s) => <span class={mounted ? motion.changedText : undefined}>{t().status[s]}</span>}
           </Show>

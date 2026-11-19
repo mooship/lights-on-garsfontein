@@ -13,7 +13,7 @@ It is one measuring point, so some streets can differ: parts of the network can 
 
 A resident of Garsfontein Extension 16 runs it. It is not affiliated with, endorsed by or speaking for the City of Tshwane or Eskom.
 
-The site shows the status as last recorded and for how long, statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart, and recent outages, with planned outages tagged. "Show all outages" pages through the rest.
+The site shows the status as last recorded and for how long, the recent outages, with planned outages tagged ("Show all outages" pages through the rest), and then statistics for the last 30 days (compared with the 30 before, once tracked) with a weekly chart.
 
 Without a reporting sensor, the status reads "No outage reported" rather than claiming the power is on.
 

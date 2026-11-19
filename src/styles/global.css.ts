@@ -1,4 +1,5 @@
 import { globalKeyframes, globalStyle } from '@vanilla-extract/css';
+import { RECENT_LIMIT } from '../../shared/api';
 import { vars } from './theme.css';
 
 // Layout classes use stable global names (gg-*) because the static loading
@@ -112,13 +113,14 @@ globalStyle('.gg-card', {
 // The status band heads the status card, edge to edge across it, in the state's colour
 // (src/components/StatusBadge.css.ts). The loading row (.gg-skel-row) takes the same box, so every state
 // keeps the shell's height: an ON or OFF headline wrapped to two lines on a phone with the duration under
-// it (2 × 2rem × 1.15 + 0.25rem + 1.5rem = 6.35rem), or a NONE headline of up to three lines, fits.
+// it (2 × 2.25rem × 1.15 + 0.25rem + 1.5rem = 6.925rem, so 7rem), or a NONE headline of up to three lines
+// (3 × 2rem × 1.15 = 6.9rem), fits. Padding is 1.5rem above and below: 3rem in all.
 globalStyle('.gg-band', {
   margin: '-1rem -1rem 0',
-  padding: '1rem',
+  padding: '1.5rem 1rem',
   borderTopWidth: '3px',
   borderTopStyle: 'solid',
-  minHeight: 'calc(6.35rem + 2rem + 3px)',
+  minHeight: 'calc(7rem + 3rem + 3px)',
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'center',
@@ -157,6 +159,15 @@ globalStyle('.gg-trends-body', {
     'screen and (min-width: 21.25rem)': { minHeight: '50.96875rem' },
     'screen and (min-width: 33.75rem)': { minHeight: '48.46875rem' },
   },
+});
+
+// The history card sits above the statistics, so its loaded height must not depend on how many outages
+// there are: RECENT_LIMIT rows of 3.5rem (`row` in OutageHistory.css.ts; its 1px rule sits inside that
+// height), then the show-all button (0.75rem + 2.75rem: `more` in OutageHistory.css.ts and `button.ghost`
+// in src/styles/ui.css.ts) that appears only when the list is full. The 4px is slack for a multi-day row
+// whose times wrap to a third line on a 320px screen (about 3.7rem). The loading skeleton is shorter.
+globalStyle('.gg-history-body', {
+  minHeight: `calc(${RECENT_LIMIT} * 3.5rem + 4px + 3.5rem)`,
 });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });

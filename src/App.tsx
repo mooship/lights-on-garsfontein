@@ -197,6 +197,24 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
         </Switch>
       </section>
 
+      <section class="gg-card" aria-labelledby="history-heading">
+        <h2 id="history-heading" class="gg-card-title">
+          {allOutages() ? t().history.allTitle : t().history.title}
+        </h2>
+        <div class="gg-history-body">
+          <Show
+            when={data()}
+            fallback={
+              status.error() !== undefined ? <p class="gg-status-note">{t().history.failed}</p> : <HistorySkeleton />
+            }
+          >
+            {(s) => (
+              <OutageHistory recent={s().recent} now={now()} expanded={allOutages()} onExpandedChange={setAllOutages} />
+            )}
+          </Show>
+        </div>
+      </section>
+
       <section class="gg-card" aria-labelledby="trends-heading">
         <Switch>
           <Match when={stats.data()}>
@@ -212,7 +230,7 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             )}
           </Match>
           <Match when={stats.error() !== undefined}>
-            {/* The body keeps the card's reserved height, so the cards below stay put. */}
+            {/* The body keeps the card's reserved height, so what follows stays put. */}
             <div class="gg-trends-body">
               <h2 id="trends-heading" class="gg-card-title">
                 {t().trends.title}
@@ -225,22 +243,6 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
             <TrendsCardSkeleton />
           </Match>
         </Switch>
-      </section>
-
-      <section class="gg-card" aria-labelledby="history-heading">
-        <h2 id="history-heading" class="gg-card-title">
-          {allOutages() ? t().history.allTitle : t().history.title}
-        </h2>
-        <Show
-          when={data()}
-          fallback={
-            status.error() !== undefined ? <p class="gg-status-note">{t().history.failed}</p> : <HistorySkeleton />
-          }
-        >
-          {(s) => (
-            <OutageHistory recent={s().recent} now={now()} expanded={allOutages()} onExpandedChange={setAllOutages} />
-          )}
-        </Show>
       </section>
 
       <AlertsCard ready={data() !== undefined} />
