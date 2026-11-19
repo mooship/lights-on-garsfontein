@@ -12,27 +12,32 @@ export const band = styleVariants({
   NONE: { background: vars.color.card, color: vars.color.text, borderTopColor: vars.color.text },
 });
 
-export const head = style({ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' });
+// The headline is the answer the page exists to give, so it is the largest type on it. Its size is set
+// here and inherited, so the icon can be one line tall (1.15em) whatever the width.
+export const head = style({
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '0.75rem',
+  fontSize: '2.25rem',
+  // The longer, neutral headline is smaller so it fits in three lines on a phone.
+  selectors: { '[data-status="NONE"] &': { fontSize: '1.75rem' } },
+});
 
-// On the headline's first line: 2rem × 1.15 tall, so the icon centres on it.
+// On the headline's first line, so the icon centres on it.
 export const icon = style({
   flex: 'none',
   display: 'grid',
   placeItems: 'center',
-  height: '2.3rem',
-  selectors: { '[data-status="NONE"] &': { height: '1.725rem' } },
+  height: '1.15em',
 });
 
 export const headline = style({
   fontFamily: vars.font.display,
-  fontSize: '2rem',
+  fontSize: 'inherit',
   lineHeight: 1.15,
   fontWeight: 600,
   textWrap: 'balance',
 });
-
-// The longer, neutral headline is smaller so it fits in three lines on a phone.
-export const headlineNone = style({ fontSize: '1.5rem' });
 
 export const detail = style({
   marginTop: '0.25rem',
