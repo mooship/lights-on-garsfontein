@@ -282,6 +282,8 @@ const BarChart: Component<BarChartProps> = (props) => {
 };
 
 export const Trends: Component<TrendsProps> = (props) => {
+  const [patternsOpened, setPatternsOpened] = createSignal(false);
+  const [figuresOpened, setFiguresOpened] = createSignal(false);
   const since = () => Date.parse(props.stats.trackingSince);
   // A memo, so the figures that read it rebuild only when it flips, not on every minute's tick.
   const started = createMemo(() => props.now >= since());
@@ -352,91 +354,101 @@ export const Trends: Component<TrendsProps> = (props) => {
             note={s().outages > 1 ? t().trends.typically(outageDuration(s().medianMinutes ?? 0)) : undefined}
           />
         </div>
-        <Show when={anyOutage()} fallback={<p class={`${css.chartEmpty} ${motion.enter}`}>{t().trends.chartEmpty}</p>}>
-          <BarChart
-            title={t().trends.chartTitle}
-            label={t().trends.chartLabel}
-            bars={weekBars()}
-            initial={props.stats.weeks.findLastIndex(hadOutage)}
-            xLabels={[
-              props.stats.weeks.length > 1 && props.stats.weeks[0]
-                ? formatCalendarDay(place(0).from ?? props.stats.weeks[0].weekStart)
-                : '',
-              t().trends.thisWeek,
-            ]}
-          />
-          <BarChart
-            title={byHourTitle()}
-            label={t().trends.byHourLabel}
-            bars={hourBars()}
-            initial={peakHour(props.stats.last30ByHour)}
-            xLabels={[hourLabel(0), hourLabel(23)]}
-            empty={t().trends.byHourEmpty}
-          />
-        </Show>
       </div>
-      <details class="gg-trends-details">
+      <details class="gg-trends-details" onToggle={(event) => event.currentTarget.open && setPatternsOpened(true)}>
+        <summary>{t().trends.patternsTitle}</summary>
+        <Show when={patternsOpened()}>
+          <Show
+            when={anyOutage()}
+            fallback={<p class={`${css.chartEmpty} ${motion.enter}`}>{t().trends.chartEmpty}</p>}
+          >
+            <BarChart
+              title={t().trends.chartTitle}
+              label={t().trends.chartLabel}
+              bars={weekBars()}
+              initial={props.stats.weeks.findLastIndex(hadOutage)}
+              xLabels={[
+                props.stats.weeks.length > 1 && props.stats.weeks[0]
+                  ? formatCalendarDay(place(0).from ?? props.stats.weeks[0].weekStart)
+                  : '',
+                t().trends.thisWeek,
+              ]}
+            />
+            <BarChart
+              title={byHourTitle()}
+              label={t().trends.byHourLabel}
+              bars={hourBars()}
+              initial={peakHour(props.stats.last30ByHour)}
+              xLabels={[hourLabel(0), hourLabel(23)]}
+              empty={t().trends.byHourEmpty}
+            />
+          </Show>
+        </Show>
+      </details>
+      <details class="gg-trends-details" onToggle={(event) => event.currentTarget.open && setFiguresOpened(true)}>
         <summary>{t().trends.tableLabel}</summary>
-        <table class={css.table}>
-          <caption class={css.caption}>{t().trends.chartTitle}</caption>
-          <thead>
-            <tr>
-              <th class={css.th} scope="col">
-                {t().trends.weekCol}
-              </th>
-              <th class={css.th} scope="col">
-                {t().trends.hoursCol}
-              </th>
-              <th class={css.th} scope="col">
-                {t().trends.outagesCol}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* By position, so a refresh with the same figures leaves the rows as they are. */}
-            <Index each={props.stats.weeks.map((w, i) => ({ w, note: weekNote(place(i)) })).reverse()}>
-              {(row) => (
-                <tr>
-                  <td class={css.td}>
-                    {formatCalendarDay(row().w.weekStart)}
-                    {row().note}
-                  </td>
-                  <td class={css.td}>{formatHours(row().w.hoursOff)}</td>
-                  <td class={css.td}>{row().w.outages}</td>
-                </tr>
-              )}
-            </Index>
-          </tbody>
-        </table>
-        {/* The time-of-day chart's figures, which its readout gives only one hour at a time. */}
-        <Show when={peakHour(props.stats.last30ByHour) >= 0}>
+        <Show when={figuresOpened()}>
           <table class={css.table}>
-            <caption class={css.caption}>{byHourTitle()}</caption>
+            <caption class={css.caption}>{t().trends.chartTitle}</caption>
             <thead>
               <tr>
                 <th class={css.th} scope="col">
-                  {t().trends.hourCol}
+                  {t().trends.weekCol}
                 </th>
                 <th class={css.th} scope="col">
-                  {t().trends.withoutPower}
+                  {t().trends.hoursCol}
+                </th>
+                <th class={css.th} scope="col">
+                  {t().trends.outagesCol}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <Index each={props.stats.last30ByHour}>
-                {(minutes, hour) => (
+              {/* By position, so a refresh with the same figures leaves the rows as they are. */}
+              <Index each={props.stats.weeks.map((w, i) => ({ w, note: weekNote(place(i)) })).reverse()}>
+                {(row) => (
                   <tr>
-                    <td class={css.td}>{hourRange(hour)}</td>
-                    <td class={css.td}>{minutesText(minutes())}</td>
+                    <td class={css.td}>
+                      {formatCalendarDay(row().w.weekStart)}
+                      {row().note}
+                    </td>
+                    <td class={css.td}>{formatHours(row().w.hoursOff)}</td>
+                    <td class={css.td}>{row().w.outages}</td>
                   </tr>
                 )}
               </Index>
             </tbody>
           </table>
+          {/* The time-of-day chart's figures, which its readout gives only one hour at a time. */}
+          <Show when={peakHour(props.stats.last30ByHour) >= 0}>
+            <table class={css.table}>
+              <caption class={css.caption}>{byHourTitle()}</caption>
+              <thead>
+                <tr>
+                  <th class={css.th} scope="col">
+                    {t().trends.hourCol}
+                  </th>
+                  <th class={css.th} scope="col">
+                    {t().trends.withoutPower}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <Index each={props.stats.last30ByHour}>
+                  {(minutes, hour) => (
+                    <tr>
+                      <td class={css.td}>{hourRange(hour)}</td>
+                      <td class={css.td}>{minutesText(minutes())}</td>
+                    </tr>
+                  )}
+                </Index>
+              </tbody>
+            </table>
+          </Show>
+          <a class={css.download} href={CSV_PATH} download={CSV_FILE_NAME}>
+            <Download size={14} aria-hidden="true" /> {t().trends.download}
+          </a>
         </Show>
-        <a class={css.download} href={CSV_PATH} download={CSV_FILE_NAME}>
-          <Download size={14} aria-hidden="true" /> {t().trends.download}
-        </a>
       </details>
       <HowWeMeasure />
     </>

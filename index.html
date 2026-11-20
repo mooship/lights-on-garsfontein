@@ -127,17 +127,14 @@
               <span class="gg-skel gg-skel-text gg-w-30"></span>
             </div>
             <p class="gg-safety"><span data-i18n="safety.live"></span> <a href="%site.faultReporting.url%" data-i18n="safety.report"></a>.</p>
+            <div class="gg-status-actions">
+              <button type="button" class="gg-status-alert" data-i18n="alerts.bell.actionOff" disabled></button>
+            </div>
           </section>
           <section class="gg-card">
             <h2 class="gg-card-title" data-i18n="history.title"></h2>
             <div class="gg-history-body">
               <div class="gg-skel-list" aria-hidden="true">
-                <div class="gg-skel-group">
-                  <span class="gg-skel gg-skel-day"></span><span class="gg-skel gg-skel-item"></span>
-                </div>
-                <div class="gg-skel-group">
-                  <span class="gg-skel gg-skel-day"></span><span class="gg-skel gg-skel-item"></span>
-                </div>
                 <div class="gg-skel-group">
                   <span class="gg-skel gg-skel-day"></span><span class="gg-skel gg-skel-item"></span>
                 </div>
@@ -161,10 +158,15 @@
                   <span class="gg-skel gg-skel-tile"></span>
                   <span class="gg-skel gg-skel-tile"></span>
                 </div>
+              </div>
+            </div>
+            <details class="gg-trends-details">
+              <summary data-i18n="trends.patternsTitle"></summary>
+              <div class="gg-skel-stack" aria-hidden="true">
                 <span class="gg-skel gg-skel-chart"></span>
                 <span class="gg-skel gg-skel-chart"></span>
               </div>
-            </div>
+            </details>
             <details class="gg-trends-details">
               <summary data-i18n="trends.tableLabel"></summary>
             </details>

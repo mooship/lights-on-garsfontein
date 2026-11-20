@@ -70,6 +70,7 @@ import {
 // dictionaries reach the page at all.
 
 const BRAND = site.brand.short;
+const RECENT_PREVIEW_LIMIT = 3;
 /** The tab title without a live reading: it claims no status. */
 const NEUTRAL_TITLE = site.brand.full;
 
@@ -84,6 +85,8 @@ const withTime = (text: string) => new RegExp(`^${escapeRegExp(text).replaceAll(
 const badge = (page: Page) => page.locator('[data-status]').getByRole('status');
 /** The warning that the status shown may be out of date: a status line, as it does not need to interrupt. */
 const staleWarning = (page: Page) => page.getByRole('status').filter({ hasText: withTime(en.status.stale(AT)) });
+const openPatterns = (page: Page, locale: Locale = 'en') =>
+  page.getByText(DICTIONARIES[locale].trends.patternsTitle, { exact: true }).click();
 /** The tab title during an outage: "OFF 5m · <brand>". */
 const outageTitle = (state: string) => new RegExp(`^${state} \\d+${en.units.m} · ${escapeRegExp(BRAND)}$`);
 
@@ -377,6 +380,8 @@ test.describe('public page', () => {
     await page.goto('/');
     await expect(page.locator('.gg-trends-body')).toContainText(`0 ${en.units.min}`);
     const empty = page.getByText(en.trends.chartEmpty);
+    await expect(empty).toBeHidden();
+    await openPatterns(page);
     await expect(empty).toBeVisible();
     await expect(empty).toHaveCSS('border-top-style', 'solid');
     await expect(empty).toHaveCSS('border-bottom-style', 'none');
@@ -452,23 +457,43 @@ test.describe('public page', () => {
   }
 
   test('says so when the server fails on first load', async ({ page }) => {
+    await trackLayoutShift(page);
     await page.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
     await page.goto('/');
     await expect(page.getByRole('alert')).toHaveText(en.status.unreachable);
+    await expect(page.getByRole('alert')).not.toHaveCSS('color', rgb(PALETTE.light.off));
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    expect(
+      await page.evaluate(() => {
+        const w = window as unknown as { __readCls: () => number };
+        return w.__readCls();
+      }),
+    ).toBe(0);
+    const retry = page.getByRole('button', { name: en.status.retry });
+    await expect(retry).toBeVisible();
+    await page.unroute(`**${STATUS_PATH}`);
+    await retry.click();
+    await expect(badge(page)).toContainText(en.status.NONE);
     await expect(page.getByRole('heading', { name: en.trends.title, exact: true })).toBeVisible();
     // Where it is measured holds in every state, and red stays for measured outages only.
     await expect(page.getByText(en.scope.measured(site.landmark), { exact: true })).toBeVisible();
-    await expect(page.getByRole('alert')).not.toHaveCSS('color', rgb(PALETTE.light.off));
   });
 
   test('keeps the statistics card’s shape and disclosures when the statistics fail to load', async ({ page }) => {
+    await trackLayoutShift(page);
     await page.route(`**${STATS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
     await page.goto('/en/');
-    const failed = page.getByText(en.trends.loadFailed, { exact: true });
+    const failed = page.locator('.gg-trends-body').getByText(en.trends.loadFailed, { exact: true });
     await expect(failed).toBeVisible();
     await expect(failed).not.toHaveCSS('color', rgb(PALETTE.light.off));
     await expect(page.locator('.gg-trends-body')).toBeVisible();
-    await expect(page.getByText(en.trends.howTitle, { exact: true })).toBeVisible();
+    for (const label of [en.trends.patternsTitle, en.trends.tableLabel, en.trends.howTitle]) {
+      await expect(page.getByText(label, { exact: true })).toBeVisible();
+    }
+    expect(await readLayoutShift(page)).toBe(0);
   });
 
   test('keeps the last status and warns when a later poll fails', async ({ page }) => {
@@ -481,6 +506,45 @@ test.describe('public page', () => {
     await expect(staleWarning(page)).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
     await expect(badge(page)).toContainText(en.status.NONE);
+    await page.unroute(`**${STATUS_PATH}`);
+    await page.getByRole('button', { name: en.status.retry }).click();
+    await expect(staleWarning(page)).toHaveCount(0);
+  });
+
+  test('keeps a manual retry pending while a poll is already in flight', async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/');
+    await expect(badge(page)).toContainText(en.status.NONE);
+    await page.route(`**${STATUS_PATH}`, (route) => route.fulfill({ status: 500, json: { error: ERROR.internal } }));
+    await pollNow(page);
+    await expect(staleWarning(page)).toBeVisible();
+
+    await page.unroute(`**${STATUS_PATH}`);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(`**${STATUS_PATH}`, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    const pollRequested = page.waitForRequest(`**${STATUS_PATH}`);
+    await pollNow(page);
+    await pollRequested;
+    await page.getByRole('button', { name: en.status.retry }).click();
+    await expect(page.getByRole('button', { name: en.status.retrying })).toBeVisible();
+    release();
+    await expect(staleWarning(page)).toHaveCount(0);
+  });
+
+  test('the skip link visibly focuses the main content', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.gg-skip')).toHaveText(en.masthead.skip);
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    const main = page.getByRole('main');
+    await expect(main).toBeFocused();
+    await expect(main).toHaveCSS('outline-style', 'solid');
   });
 
   for (const locale of LOCALES) {
@@ -803,6 +867,19 @@ test.describe('share', () => {
     await expect(page.getByText(en.share.copied)).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(SHARE_URL);
   });
+
+  test('explains what to do when copying fails', async ({ page }) => {
+    await page.addInitScript(() => {
+      delete (Navigator.prototype as Partial<Navigator>).share;
+      Object.defineProperty(Navigator.prototype, 'clipboard', {
+        configurable: true,
+        value: { writeText: async () => Promise.reject(new Error('denied')) },
+      });
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: en.share.copy }).click();
+    await expect(page.getByText(en.share.copyFailed, { exact: true })).toBeVisible();
+  });
 });
 
 test.describe('privacy contact', () => {
@@ -942,6 +1019,17 @@ test.describe('wide screens', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   for (const locale of LOCALES) {
+    test(`uses the two-column layout at tablet width (${locale})`, async ({ page }) => {
+      await page.setViewportSize({ width: 820, height: 1180 });
+      await withLocale(page, locale);
+      await page.goto(localePath(locale));
+      await expect(page.locator('#trends-heading')).toBeVisible();
+      const status = await page.locator('.gg-status-card').boundingBox();
+      const trends = await page.locator('section', { has: page.locator('#trends-heading') }).boundingBox();
+      expect(status && trends && trends.x > status.x + status.width).toBe(true);
+      expect(await scrollsSideways(page)).toBe(false);
+    });
+
     test(`the statistics sit beside the status and the history (${locale})`, async ({ page }) => {
       await withLocale(page, locale);
       await page.goto(localePath(locale));
@@ -1025,6 +1113,7 @@ test.describe('outages by time of day', () => {
   test('the weekly chart opens on this week, and Home and the arrow keys move between weeks', async ({ page }) => {
     await withOutages(page);
     await page.goto('/en/');
+    await openPatterns(page);
     const readout = (outages: number) =>
       page.locator('p', { hasText: `${en.trends.off} · ${en.trends.outageCount(outages)}` });
     await expect(page.getByRole('heading', { name: en.trends.chartTitle })).toBeVisible();
@@ -1057,6 +1146,7 @@ test.describe('outages by time of day', () => {
     const served = page.waitForResponse(`**${STATS_PATH}`);
     await page.goto('/en/');
     await served;
+    await openPatterns(page);
     const partial = en.trends.partial(calendarDay(firstDay)).trim();
     await expect(
       page.locator('p', { hasText: `${en.trends.off} · ${en.trends.outageCount(3)}` }).filter({ hasText: partial }),
@@ -1079,6 +1169,7 @@ test.describe('outages by time of day', () => {
       };
     });
     await page.goto('/en/');
+    await openPatterns(page);
     const lasted = `5 ${en.units.h} 23 ${en.units.min}`;
     const tiles = page.locator('.gg-trends-body');
     await expect(tiles).toContainText(`${en.trends.longest}${lasted}`);
@@ -1096,6 +1187,7 @@ test.describe('outages by time of day', () => {
       last30: { ...stats.last30, trackedHours: 10 * 24, outages: 1 },
     }));
     await page.goto('/en/');
+    await openPatterns(page);
     await expect(
       page.getByRole('heading', { name: en.trends.byHourTitle(calendarDay(localDate(since)), 1), exact: true }),
     ).toBeVisible();
@@ -1104,6 +1196,7 @@ test.describe('outages by time of day', () => {
   test('says when the last 30 days had no outages, instead of opening on an empty hour', async ({ page }) => {
     await withOutages(page, {});
     await page.goto('/en/');
+    await openPatterns(page);
     await expect(page.getByRole('heading', { name: byHourTitle('en'), exact: true })).toBeVisible();
     await expect(page.getByText(en.trends.byHourEmpty, { exact: true })).toBeVisible();
   });
@@ -1111,6 +1204,7 @@ test.describe('outages by time of day', () => {
   test('opens on the hour with the most time off, and the arrow keys move between hours', async ({ page }) => {
     await withOutages(page);
     await page.goto('/en/');
+    await openPatterns(page);
     await expect(page.getByRole('heading', { name: byHourTitle('en'), exact: true })).toBeVisible();
     const u = en.units;
     await expect(page.getByText(`18:00–19:00: 1 ${u.h} 30 ${u.min} ${en.trends.off}`, { exact: true })).toBeVisible();
@@ -1206,6 +1300,7 @@ test.describe('outages by time of day', () => {
     test('is in Afrikaans', async ({ page }) => {
       await withOutages(page);
       await page.goto('/');
+      await openPatterns(page, 'af');
       await expect(page.getByRole('heading', { name: byHourTitle('af'), exact: true })).toBeVisible();
       await expect(page.getByRole('group', { name: af.trends.byHourLabel })).toBeVisible();
     });
@@ -1219,8 +1314,11 @@ test.describe('outages by time of day', () => {
         await withOutages(page);
         await trackLayoutShift(page);
         await page.goto(localePath(locale));
-        await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
+        const patterns = page.getByText(DICTIONARIES[locale].trends.patternsTitle, { exact: true });
+        await expect(patterns).toBeVisible();
         expect(await readLayoutShift(page)).toBe(0);
+        await openPatterns(page, locale);
+        await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
       });
 
       // A shift only counts once the shell has painted, which a fast local server can skip, so this
@@ -1254,37 +1352,27 @@ test.describe('outages by time of day', () => {
         expect(await height()).toBe(loaded);
       });
 
-      // Below 340px text wraps the most and varies most with the data, so the reserve leaves more room.
-      for (const [width, maxGap] of [
-        [320, 60],
-        [360, 36],
-        [1280, 36],
-      ] as const) {
-        test(`reserves the statistics their loaded height, without a gap, at ${width}px (${locale})`, async ({
-          page,
-        }) => {
+      for (const width of [320, 360, 1280]) {
+        test(`keeps the compact statistics shell the loaded height at ${width}px (${locale})`, async ({ page }) => {
           await page.setViewportSize({ width, height: 900 });
           await withOutages(page);
           const body = page.locator('.gg-trends-body');
           const measure = () =>
             body.evaluate(async (el) => {
               await document.fonts.ready;
-              const box = el.getBoundingClientRect();
-              const last = el.lastElementChild?.getBoundingClientRect();
-              return { height: box.height, gap: box.bottom - (last?.bottom ?? box.bottom) };
+              return el.getBoundingClientRect().height;
             });
           // Twice, so the display font is cached and used from the start, as on most visits.
           await page.goto(localePath(locale));
           await page.evaluate(() => document.fonts.ready);
           await page.reload();
-          await expect(page.getByRole('heading', { name: byHourTitle(locale), exact: true })).toBeVisible();
+          await expect(page.getByText(DICTIONARIES[locale].trends.patternsTitle, { exact: true })).toBeVisible();
           const loaded = await measure();
-          // The reserve is the tallest body in its width range, so a shorter one leaves some room.
-          expect(loaded.gap).toBeLessThanOrEqual(maxGap);
+          expect(loaded).toBeLessThan(360);
           await blockAppEntry(page);
           await page.reload();
           await expect(body.locator('.gg-skel')).not.toHaveCount(0);
-          expect((await measure()).height).toBe(loaded.height);
+          expect(await measure()).toBe(loaded);
         });
       }
     });
@@ -1309,7 +1397,7 @@ test.describe('all outages', () => {
         const m = DICTIONARIES[locale].history;
         await logOutages(request, PAGE_SIZE + 2);
         await page.goto(localePath(locale));
-        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+        await expect(rows(page)).toHaveCount(RECENT_PREVIEW_LIMIT);
 
         const showAll = page.getByRole('button', { name: m.showAll });
         await showAll.click();
@@ -1332,7 +1420,7 @@ test.describe('all outages', () => {
 
         await page.getByRole('button', { name: m.showRecent }).click();
         await expect(page.getByRole('heading', { name: m.title })).toBeVisible();
-        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+        await expect(rows(page)).toHaveCount(RECENT_PREVIEW_LIMIT);
         await expect(showAll).toBeFocused();
       });
 
@@ -1383,14 +1471,14 @@ test.describe('all outages', () => {
         }
 
         await page.goto(localePath(locale));
-        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+        await expect(rows(page)).toHaveCount(RECENT_PREVIEW_LIMIT);
         const dayHeadings = history(page).getByRole('heading', { level: 3 });
-        await expect(dayHeadings).toHaveCount(3);
+        await expect(dayHeadings).toHaveCount(1);
         await expect(dayHeadings.first().locator('..').getByRole('listitem')).toHaveCount(3);
 
         await page.getByRole('button', { name: DICTIONARIES[locale].history.showAll }).click();
         await expect(page.getByRole('heading', { name: DICTIONARIES[locale].history.allTitle })).toBeVisible();
-        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+        await expect(rows(page)).toHaveCount(5);
         await expect(dayHeadings).toHaveCount(3);
         await expect(dayHeadings.first().locator('..').getByRole('listitem')).toHaveCount(3);
       });
@@ -1449,9 +1537,9 @@ test.describe('all outages', () => {
   });
 
   test('offers no full list while the recent one holds every outage', async ({ page, request }) => {
-    await logOutages(request, RECENT_LIMIT - 1);
+    await logOutages(request, RECENT_PREVIEW_LIMIT);
     await page.goto('/');
-    await expect(rows(page)).toHaveCount(RECENT_LIMIT - 1);
+    await expect(rows(page)).toHaveCount(RECENT_PREVIEW_LIMIT);
     await expect(page.getByRole('button', { name: en.history.showAll })).toHaveCount(0);
   });
 
@@ -1465,7 +1553,7 @@ test.describe('all outages', () => {
     const showAll = page.getByRole('button', { name: en.history.showAll });
     await showAll.click();
     await expect(history(page).getByText(en.history.failed)).toBeVisible();
-    await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+    await expect(rows(page)).toHaveCount(RECENT_PREVIEW_LIMIT);
     fail = false;
     await showAll.click();
     await expect(page.getByRole('heading', { name: en.history.allTitle })).toBeVisible();
@@ -1713,13 +1801,13 @@ test.describe('unexpected responses', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: '{"trackingSince":null}' }),
     );
     await page.goto('/en/');
-    await expect(page.getByText(en.trends.loadFailed, { exact: true })).toBeVisible();
+    await expect(page.locator('.gg-trends-body').getByText(en.trends.loadFailed, { exact: true })).toBeVisible();
   });
 
   test('treats statistics without the hourly figures as failing to load', async ({ page }) => {
     await patchJson<Partial<StatsResponse>>(page, STATS_PATH, ({ last30ByHour: _, ...body }) => body);
     await page.goto('/en/');
-    await expect(page.getByText(en.trends.loadFailed, { exact: true })).toBeVisible();
+    await expect(page.locator('.gg-trends-body').getByText(en.trends.loadFailed, { exact: true })).toBeVisible();
   });
 
   test('limits the sign-in fields to what the server accepts', async ({ page }) => {

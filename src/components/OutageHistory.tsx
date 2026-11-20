@@ -1,7 +1,8 @@
 import { batch, type Component, createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
-import { localDate, type OutageSummary, outageDurationMs, RECENT_LIMIT } from '../../shared/api';
+import { localDate, type OutageSummary, outageDurationMs } from '../../shared/api';
 import { api } from '../lib/api';
 import { formatDuration, formatEnd, formatRelativeDay, formatTime } from '../lib/format';
+import { RECENT_PREVIEW_LIMIT } from '../lib/history';
 import { t } from '../lib/i18n';
 import { pageOf } from '../lib/pages';
 import * as motion from '../styles/motion.css';
@@ -125,6 +126,7 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
   createEffect(on(recentKey, () => props.expanded && load(false), { defer: true }));
 
   const current = () => pageOf(all(), page());
+  const recentPreview = () => props.recent.slice(0, RECENT_PREVIEW_LIMIT);
   const turn = (to: number) => to >= 0 && to < current().count && setPage(to);
   const collapse = () => {
     latest++;
@@ -150,10 +152,9 @@ export const OutageHistory: Component<OutageHistoryProps> = (props) => {
       when={props.expanded}
       fallback={
         <>
-          <OutageList outages={props.recent} now={props.now} markArrivals />
+          <OutageList outages={recentPreview()} now={props.now} markArrivals />
           {failure()}
-          {/* A full recent list may not be all of them. */}
-          <Show when={props.recent.length >= RECENT_LIMIT}>
+          <Show when={props.recent.length > RECENT_PREVIEW_LIMIT}>
             <button
               ref={showAll}
               type="button"

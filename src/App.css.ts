@@ -7,3 +7,21 @@ export const error = style({ color: vars.color.text, fontWeight: 600, margin: 'a
 export const warning = style({ color: vars.color.text, fontWeight: 600 });
 
 export const trendsWarning = style([warning, { marginTop: '0.75rem', fontSize: '0.875rem' }]);
+
+export const failureBand = style({
+  gap: '0.75rem',
+  background: vars.color.card,
+  color: vars.color.text,
+  borderTopColor: vars.color.text,
+});
+
+export const warningRow = style({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  alignItems: 'center',
+  gap: '0.75rem',
+});
+
+export const retry = style({ whiteSpace: 'nowrap' });
+
+export const retryDetail = style({ justifyContent: 'center' });

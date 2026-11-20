@@ -1,11 +1,11 @@
 import { globalKeyframes, globalStyle } from '@vanilla-extract/css';
-import { RECENT_LIMIT } from '../../shared/api';
+import { RECENT_PREVIEW_LIMIT } from '../lib/history';
 import { vars } from './theme.css';
 
-// Two columns of 32.5rem, about as wide as the one-column card, so the text wrapping that the reserved
-// heights (.gg-trends-body, .gg-history-body) were measured for holds.
-const WIDE_REM = 68;
-const WIDE = `screen and (min-width: ${WIDE_REM}rem)`;
+// A tablet can hold two useful 24rem columns; the shell still expands to 68rem on wide displays.
+const TWO_COLUMN_REM = 50;
+const SHELL_MAX_REM = 68;
+const WIDE = `screen and (min-width: ${TWO_COLUMN_REM}rem)`;
 
 // Layout classes use stable global names (gg-*) because the static loading
 // skeleton in index.html renders them before any JavaScript runs. Keeping the
@@ -80,7 +80,7 @@ globalStyle('.gg-main', { display: 'flex', flexDirection: 'column', gap: '1rem' 
 const PUBLIC_SHELL = 'html:not([data-page="admin"]) .gg-shell:has(> .gg-main > .gg-status-card)';
 const PUBLIC_MAIN = 'html:not([data-page="admin"]) .gg-main:has(> .gg-status-card)';
 
-globalStyle(PUBLIC_SHELL, { '@media': { [WIDE]: { maxWidth: `${WIDE_REM}rem` } } });
+globalStyle(PUBLIC_SHELL, { '@media': { [WIDE]: { maxWidth: `${SHELL_MAX_REM}rem` } } });
 globalStyle(PUBLIC_MAIN, {
   '@media': {
     [WIDE]: {
@@ -95,9 +95,6 @@ globalStyle(`${PUBLIC_MAIN} > :nth-child(1)`, { '@media': { [WIDE]: { gridColumn
 globalStyle(`${PUBLIC_MAIN} > :nth-child(2)`, { '@media': { [WIDE]: { gridColumn: 1, gridRow: 2 } } });
 globalStyle(`${PUBLIC_MAIN} > :nth-child(3)`, { '@media': { [WIDE]: { gridColumn: 2, gridRow: '1 / span 2' } } });
 globalStyle(`${PUBLIC_MAIN} > :nth-child(n + 4)`, { '@media': { [WIDE]: { gridColumn: '1 / -1' } } });
-
-// Focused only from script (tabindex=-1, after the banner closes), so it needs no ring.
-globalStyle('.gg-main:focus', { outline: 'none' });
 
 // Off screen until a keyboard user tabs to it; absolute, so the shell and the app keep the same boxes.
 globalStyle('.gg-skip', {
@@ -181,20 +178,12 @@ globalStyle('.gg-status-detail', {
 globalStyle('.gg-status-warning', { fontSize: '0.8125rem' });
 globalStyle('.gg-status-checked', { fontSize: '0.8125rem' });
 
-// The trends body reserves its loaded height, which depends on how many lines its text wraps to, so
-// it steps with the width: the tallest loaded body in each range, in either language. Only text that
-// wraps further on a zoomed screen, or the user-opened weekly table below it, may grow the card.
-globalStyle('.gg-trends-body', {
-  minHeight: '51.625rem',
-  '@media': {
-    'screen and (min-width: 21.25rem)': { minHeight: '50.96875rem' },
-    'screen and (min-width: 33.75rem)': { minHeight: '48.46875rem' },
-  },
-});
+// The summary figures stay visible; the taller charts are an optional disclosure below them.
+globalStyle('.gg-trends-body', { minHeight: '20rem' });
 
-// Reserve the tallest recent list: every outage on a different day, with one heading per group.
+// Reserve the compact preview: each outage is on a different day, with one heading per group.
 globalStyle('.gg-history-body', {
-  minHeight: `calc(${RECENT_LIMIT} * 5.75rem + 3.5rem)`,
+  minHeight: `calc(${RECENT_PREVIEW_LIMIT} * 5.75rem + 3.5rem)`,
 });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
@@ -256,6 +245,29 @@ globalStyle('.gg-icon-button', {
 globalStyle('.gg-icon-button:hover', { background: vars.color.bg, borderColor: vars.color.text });
 globalStyle('.gg-icon-button:active', { transform: 'translateY(1px)' });
 
+globalStyle('.gg-status-actions', { display: 'flex' });
+
+globalStyle('.gg-status-alert', {
+  width: '100%',
+  minHeight: '2.75rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.5rem',
+  padding: '0 1rem',
+  borderRadius: vars.radius.control,
+  border: `1px solid ${vars.color.inputBorder}`,
+  background: vars.color.card,
+  color: vars.color.text,
+  fontWeight: 650,
+  cursor: 'pointer',
+  transition: 'background-color 150ms ease, border-color 150ms ease, transform 120ms ease',
+});
+
+globalStyle('.gg-status-alert:hover', { background: vars.color.bg, borderColor: vars.color.text });
+globalStyle('.gg-status-alert:active', { transform: 'translateY(1px)' });
+globalStyle('.gg-status-alert:disabled', { cursor: 'not-allowed', opacity: 0.6 });
+
 globalStyle('.gg-masthead-actions', { flex: 'none', display: 'flex', gap: '0.5rem' });
 
 globalStyle('.gg-lang-button', { width: 'auto', padding: '0 0.875rem', fontSize: '0.875rem', fontWeight: 600 });
@@ -289,6 +301,9 @@ globalStyle('.gg-safety', {
   background: vars.color.bg,
   borderLeft: `4px solid ${vars.color.focus}`,
 });
+
+// Static locale copies are wrapped in spans; flatten them so the shell wraps exactly like the app.
+globalStyle('.gg-safety > span, .gg-safety > a > span', { display: 'contents' });
 
 // The one action a resident may need in an outage: a 44px tap target, with negative margins so the
 // line and the card keep their height.
@@ -326,6 +341,11 @@ globalStyle('.gg-notice', {
 });
 
 globalStyle('.gg-status-note', { color: vars.color.muted, fontSize: '0.9375rem' });
+
+globalStyle('a, button, summary, [role="group"][tabindex="0"]', {
+  touchAction: 'manipulation',
+  WebkitTapHighlightColor: `color-mix(in srgb, ${vars.color.focus} 25%, transparent)`,
+});
 
 globalKeyframes('gg-shimmer', { to: { transform: 'translateX(100%)' } });
 

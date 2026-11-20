@@ -1,5 +1,7 @@
 import { type Component, For } from 'solid-js';
+import { RECENT_PREVIEW_LIMIT } from '../lib/history';
 import { t } from '../lib/i18n';
+import { AlertsBell } from './AlertsBell';
 import { SafetyLine, Scope } from './StatusNotes';
 
 // Loading placeholders. index.html renders the same markup statically before any
@@ -22,6 +24,9 @@ export const StatusSkeleton: Component = () => (
       <span class="gg-skel gg-skel-text gg-w-30" />
     </div>
     <SafetyLine />
+    <div class="gg-status-actions">
+      <AlertsBell labelled />
+    </div>
   </>
 );
 
@@ -37,10 +42,15 @@ export const TrendsCardSkeleton: Component = () => (
         <div class="gg-skel-grid">
           <For each={[1, 2, 3, 4]}>{() => <span class="gg-skel gg-skel-tile" />}</For>
         </div>
+      </div>
+    </div>
+    <details class="gg-trends-details">
+      <summary>{t().trends.patternsTitle}</summary>
+      <div class="gg-skel-stack" aria-hidden="true">
         <span class="gg-skel gg-skel-chart" />
         <span class="gg-skel gg-skel-chart" />
       </div>
-    </div>
+    </details>
     <details class="gg-trends-details">
       <summary>{t().trends.tableLabel}</summary>
     </details>
@@ -53,7 +63,7 @@ export const TrendsCardSkeleton: Component = () => (
 /** The outage list while loading; the card frame and its .gg-history-body are in App.tsx and index.html. */
 export const HistorySkeleton: Component = () => (
   <div class="gg-skel-list" aria-hidden="true">
-    <For each={[1, 2, 3, 4, 5]}>
+    <For each={Array.from({ length: RECENT_PREVIEW_LIMIT })}>
       {() => (
         <div class="gg-skel-group">
           <span class="gg-skel gg-skel-day" />

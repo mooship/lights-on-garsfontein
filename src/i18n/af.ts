@@ -39,7 +39,7 @@ export const af = {
     // Added to the WhatsApp and Telegram links' names: they open in a new tab.
     newTab: '(maak in ’n nuwe oortjie oop)',
     copied: 'Skakel gekopieer',
-    copyFailed: 'Kon nie die skakel kopieer nie.',
+    copyFailed: 'Kon nie die skakel kopieer nie. Probeer weer of gebruik WhatsApp of Telegram.',
   },
   // What the measuring point covers; `measured` gets site.landmark, which may be empty.
   scope: {
@@ -73,6 +73,8 @@ export const af = {
     checked: (seconds: number) => `Nagegaan ${seconds} s gelede`,
     stale: (time: string) => `Kan nie die bediener bereik nie. Dit is die status soos dit om ${time} was.`,
     unreachable: 'Kan nie die bediener bereik nie. Ons probeer binnekort weer.',
+    retry: 'Gaan weer na',
+    retrying: 'Gaan tans weer na…',
   },
   history: {
     title: 'Onlangse onderbrekings',
@@ -92,6 +94,7 @@ export const af = {
   },
   trends: {
     title: 'Statistiek',
+    patternsTitle: 'Wys onderbrekingspatrone',
     tableLabel: 'Wys die syfers',
     refreshFailed: (time: string) => `Kon nie die statistiek bywerk nie. Dit is die syfers soos dit om ${time} was.`,
     // Retried every STATS_POLL_MS (src/lib/poll.ts).
@@ -150,6 +153,8 @@ export const af = {
   alerts: {
     bell: {
       label: 'Kragkennisgewings',
+      actionOff: 'Kry kennisgewings',
+      actionOn: 'Kennisgewings aan',
       on: 'Skakel kragkennisgewings af',
       off: 'Skakel kragkennisgewings aan',
       blocked: 'Kragkennisgewings is in jou blaaier geblokkeer',

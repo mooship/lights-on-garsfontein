@@ -1,7 +1,7 @@
 import Bell from 'lucide-solid/icons/bell';
 import BellOff from 'lucide-solid/icons/bell-off';
 import BellRing from 'lucide-solid/icons/bell-ring';
-import { type Component, Match, Switch } from 'solid-js';
+import { type Component, Match, Show, Switch } from 'solid-js';
 import { busy, pressBell, state } from '../lib/alerts-store';
 import { t } from '../lib/i18n';
 import type { AlertsState } from '../lib/push';
@@ -20,23 +20,30 @@ const TITLE: Record<AlertsState, 'on' | 'off' | 'blocked' | 'install'> = {
  * Its name stays the same; `title` says what a press does. It is a toggle, with `aria-pressed`, only
  * while a press can turn alerts on or off; otherwise a press opens the card that explains why not.
  */
-export const AlertsBell: Component = () => (
-  <button
-    type="button"
-    class={`gg-icon-button ${css.bell}`}
-    aria-label={t().alerts.bell.label}
-    title={t().alerts.bell[TITLE[state() ?? 'off']]}
-    aria-pressed={state() === 'on' || state() === 'off' ? state() === 'on' : undefined}
-    aria-disabled={busy()}
-    onClick={pressBell}
-  >
-    <Switch fallback={<Bell size={20} aria-hidden="true" />}>
-      <Match when={state() === 'on'}>
-        <BellRing size={20} aria-hidden="true" />
-      </Match>
-      <Match when={state() === 'blocked'}>
-        <BellOff size={20} aria-hidden="true" />
-      </Match>
-    </Switch>
-  </button>
-);
+export const AlertsBell: Component<{ labelled?: boolean }> = (props) => {
+  const action = () => (state() === 'on' ? t().alerts.bell.actionOn : t().alerts.bell.actionOff);
+
+  return (
+    <button
+      type="button"
+      class={`${props.labelled ? 'gg-status-alert' : 'gg-icon-button'} ${css.bell}`}
+      aria-label={props.labelled ? action() : t().alerts.bell.label}
+      title={t().alerts.bell[TITLE[state() ?? 'off']]}
+      aria-pressed={state() === 'on' || state() === 'off' ? state() === 'on' : undefined}
+      aria-disabled={busy()}
+      onClick={pressBell}
+    >
+      <Switch fallback={<Bell size={20} aria-hidden="true" />}>
+        <Match when={state() === 'on'}>
+          <BellRing size={20} aria-hidden="true" />
+        </Match>
+        <Match when={state() === 'blocked'}>
+          <BellOff size={20} aria-hidden="true" />
+        </Match>
+      </Switch>
+      <Show when={props.labelled}>
+        <span>{action()}</span>
+      </Show>
+    </button>
+  );
+};

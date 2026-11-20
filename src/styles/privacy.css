@@ -73,6 +73,11 @@ a {
 a:hover {
   text-decoration-color: currentColor;
 }
+a,
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--focus) 25%, transparent);
+}
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;

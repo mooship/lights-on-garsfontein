@@ -34,7 +34,7 @@ export const en = {
     copy: 'Copy link',
     newTab: '(opens in a new tab)',
     copied: 'Link copied',
-    copyFailed: 'Could not copy the link.',
+    copyFailed: 'Could not copy the link. Try again or use WhatsApp or Telegram.',
   },
   scope: {
     measured: (landmark: string) =>
@@ -62,6 +62,8 @@ export const en = {
     checked: (seconds: number) => `Checked ${seconds} s ago`,
     stale: (time: string) => `Unable to reach the server. Showing the status as at ${time}.`,
     unreachable: 'Unable to reach the server. Retrying shortly.',
+    retry: 'Check again',
+    retrying: 'Checking…',
   },
   history: {
     title: 'Recent outages',
@@ -81,6 +83,7 @@ export const en = {
   },
   trends: {
     title: 'Statistics',
+    patternsTitle: 'View outage patterns',
     tableLabel: 'Show the figures',
     refreshFailed: (time: string) => `Unable to refresh the statistics. Showing figures as at ${time}.`,
     // Retried every STATS_POLL_MS (src/lib/poll.ts).
@@ -131,6 +134,8 @@ export const en = {
   alerts: {
     bell: {
       label: 'Power alerts',
+      actionOff: 'Get alerts',
+      actionOn: 'Alerts on',
       on: 'Turn off power alerts',
       off: 'Turn on power alerts',
       blocked: 'Power alerts are blocked in your browser',

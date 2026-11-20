@@ -20,7 +20,8 @@ interface Poll<T> {
   error: Accessor<unknown>;
   /** When `data` last arrived (Date.now() ms); 0 until it first does. */
   updatedAt: Accessor<number>;
-  refetch: () => void;
+  /** Resolves after the latest request finishes; an overlapping request is ignored. */
+  refetch: () => Promise<void>;
 }
 
 /**
@@ -32,19 +33,29 @@ export function createPoll<T>(initial: Promise<T>, fetcher: () => Promise<T>): P
   const [error, setError] = createSignal<unknown>();
   const [updatedAt, setUpdatedAt] = createSignal(0);
   let latest = 0;
-  const load = (request: Promise<T>) => {
+  let pending: Promise<void> | undefined;
+  const load = (request: Promise<T>): Promise<void> => {
     const id = ++latest;
-    request.then(
-      (value) =>
-        id === latest &&
+    const current = request.then(
+      (value) => {
+        if (id !== latest) return;
         batch(() => {
           setData(() => value);
           setError(undefined);
           setUpdatedAt(Date.now());
-        }),
-      (e) => id === latest && setError(() => e ?? new Error('failed')),
+        });
+      },
+      (e) => {
+        if (id !== latest) return;
+        setError(() => e ?? new Error('failed'));
+      },
     );
+    pending = current;
+    current.then(() => {
+      if (pending === current) pending = undefined;
+    });
+    return current;
   };
   load(initial);
-  return { data, error, updatedAt, refetch: () => load(fetcher()) };
+  return { data, error, updatedAt, refetch: () => pending ?? load(fetcher()) };
 }

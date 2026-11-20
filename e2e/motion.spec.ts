@@ -90,6 +90,7 @@ test.describe('motion', () => {
     });
     await recordAnimations(page);
     await page.goto('/en/');
+    await page.getByText(en.trends.patternsTitle, { exact: true }).click();
     await expect.poll(() => animated(page, 'rect[data-bar]')).toBeGreaterThan(0);
     const grown = await animated(page, 'rect[data-bar]');
 

@@ -106,6 +106,17 @@ for (const locale of LOCALES) {
       await expect(bell(page)).toHaveAttribute('aria-pressed', 'false');
     });
 
+    test('offers a visible, touch-friendly alerts action', async ({ page }) => {
+      await fakePush(page);
+      await load(page);
+      const action = page.getByRole('button', { name: m.bell.actionOff, exact: true });
+      await expect(action).toBeVisible();
+      await expect(action).toHaveCSS('touch-action', 'manipulation');
+      await action.click();
+      await expect(card(page)).toBeVisible();
+      await expect(card(page)).toHaveCSS('overscroll-behavior', 'contain');
+    });
+
     test('offers alerts on a return visit and subscribes on tap', async ({ page }) => {
       await fakePush(page);
       const calls = await recordSubscriptionCalls(page);

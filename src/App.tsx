@@ -41,8 +41,27 @@ import { createPoll, POLL_MS, STATS_POLL_MS, whenVisible } from './lib/poll';
 import { useStatusTab } from './lib/tab';
 import { syncThemeColor, watchSystemTheme } from './lib/theme';
 import * as motion from './styles/motion.css';
+import { button } from './styles/ui.css';
 
 const Admin = lazy(() => import('./admin/Admin'));
+
+const StatusRetry: Component<{ onRetry: () => Promise<void> }> = (props) => {
+  const [pending, setPending] = createSignal(false);
+  const retry = async () => {
+    if (pending()) return;
+    setPending(true);
+    try {
+      await props.onRetry();
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <button type="button" class={`${button.primary} ${css.retry}`} aria-disabled={pending()} onClick={retry}>
+      {pending() ? t().status.retrying : t().status.retry}
+    </button>
+  );
+};
 
 export interface InitialData {
   status: Promise<StatusResponse>;
@@ -176,9 +195,12 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                     fallback={
                       <Show when={warning()}>
                         {(text) => (
-                          <p class={`gg-status-warning ${css.warning}`} role="status">
-                            {text()}
-                          </p>
+                          <div class={css.warningRow}>
+                            <p class={`gg-status-warning ${css.warning}`} role="status">
+                              {text()}
+                            </p>
+                            <StatusRetry onRetry={status.refetch} />
+                          </div>
                         )}
                       </Show>
                     }
@@ -189,15 +211,26 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                   </Show>
                 </div>
                 <SafetyLine />
+                <div class="gg-status-actions">
+                  <AlertsBell labelled />
+                </div>
               </>
             )}
           </Match>
           <Match when={status.error() !== undefined}>
-            <p class={`${css.error} ${motion.enter}`} role="alert">
-              {t().status.unreachable}
-            </p>
+            <div class={`gg-band ${css.failureBand} ${motion.enter}`}>
+              <p class={css.error} role="alert">
+                {t().status.unreachable}
+              </p>
+            </div>
             <Scope />
+            <div class={`gg-status-detail ${css.retryDetail}`}>
+              <StatusRetry onRetry={status.refetch} />
+            </div>
             <SafetyLine />
+            <div class="gg-status-actions">
+              <AlertsBell labelled />
+            </div>
           </Match>
           <Match when={true}>
             <StatusSkeleton />
@@ -245,6 +278,14 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
               </h2>
               <p class={css.warning}>{t().trends.loadFailed}</p>
             </div>
+            <details class="gg-trends-details">
+              <summary>{t().trends.patternsTitle}</summary>
+              <p class={css.warning}>{t().trends.loadFailed}</p>
+            </details>
+            <details class="gg-trends-details">
+              <summary>{t().trends.tableLabel}</summary>
+              <p class={css.warning}>{t().trends.loadFailed}</p>
+            </details>
             <HowWeMeasure />
           </Match>
           <Match when={true}>

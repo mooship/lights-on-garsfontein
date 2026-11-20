@@ -10,6 +10,7 @@ export const card = style([
     maxWidth: '26rem',
     maxHeight: 'calc(100dvh - 1.5rem)',
     overflowY: 'auto',
+    overscrollBehavior: 'contain',
     display: 'flex',
     flexDirection: 'column',
     gap: '0.75rem',
@@ -22,7 +23,6 @@ export const heading = style({
   fontWeight: 700,
   fontSize: '1.25rem',
   lineHeight: 1.3,
-  selectors: { '&:focus': { outline: 'none' } },
 });
 
 export const text = style({ fontSize: '0.9375rem', lineHeight: 1.45 });
