@@ -291,6 +291,8 @@ globalStyle('.gg-footer nav a', {
   minHeight: '2.75rem',
 });
 
+globalStyle('html[data-page="admin"] .gg-static-public', { display: 'none' });
+
 globalStyle('.gg-scope', { fontSize: '0.9375rem', lineHeight: 1.45, color: vars.color.muted });
 
 // A warning label: a strip on the board's grey with the hazard amber as its left rule.

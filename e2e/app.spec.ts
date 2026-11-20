@@ -124,6 +124,13 @@ async function expectShellIn(page: Page, locale: Locale) {
   await expect(others).not.toHaveCount(0);
   await expect(page.locator(`[data-l]:not([data-l="${locale}"]):visible`)).toHaveCount(0);
   await expect(page.getByRole('heading', { name: DICTIONARIES[locale].trends.title, exact: true })).toBeVisible();
+  const footer = page.locator('.gg-footer');
+  await expect(footer.getByRole('link', { name: DICTIONARIES[locale].footer.privacy })).toBeVisible();
+  await expect(footer.getByRole('link', { name: DICTIONARIES[locale].footer.csv })).toBeVisible();
+  await expect(footer.getByRole('link', { name: DICTIONARIES[locale].footer.feed })).toBeVisible();
+  const signIn = footer.getByRole('link', { name: DICTIONARIES[locale].footer.signIn });
+  if ((await page.locator('html').getAttribute('data-page')) === 'admin') await expect(signIn).toBeHidden();
+  else await expect(signIn).toBeVisible();
 }
 
 test.describe('theme boot', () => {
