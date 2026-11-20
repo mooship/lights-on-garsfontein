@@ -214,7 +214,7 @@ You need Node 24 or newer, npm 11 or newer, a Cloudflare account and, optionally
    | Field | Meaning |
    | --- | --- |
    | `slug` | Used in file names, such as the CSV download |
-   | `url` | Public origin, no trailing slash; must equal `SITE_URL` in `wrangler.toml` |
+   | `url` | Public origin, no trailing slash; must equal `SITE_URL` in `cloudflare.config.ts` |
    | `repo` | Source link, shown in the privacy notice and `llms.txt` |
    | `brand.short`, `brand.full` | Short and full site names |
    | `operator.name` | Responsible party in the privacy notice; provider in structured data |
@@ -232,17 +232,17 @@ You need Node 24 or newer, npm 11 or newer, a Cloudflare account and, optionally
 
 3. **Edit the place copy** in `src/i18n/*.ts` (for example `masthead`, `footer.measured`, `footer.operator` and `scope`) and the `<head>` copy in `src/i18n/head.ts`.
 4. **Review the prose** in `index.html`, `privacy.html`, `404.html` and `templates/` (`llms.txt`, `site.webmanifest`, `.well-known/security.txt`) that names the area or operator. Config values go in as `%site.<path>%` and the start date as `%since.<locale>%`; the build fails on an unknown placeholder.
-5. **Configure Cloudflare**: `cp wrangler.example.toml wrangler.toml` and follow the numbered steps at its top (Worker and database names, `npx wrangler d1 create`, Turnstile widget and hostnames, `SITE_URL`). Each rate limiter's `namespace_id` must be unique in your account. Create the queue that power alerts go through once, with `npx wrangler queues create lights-on-push`. Keep `workers_dev = true`, or uncomment `routes` for a custom domain and set `workers_dev = false` once it is live.
-6. **Set the secrets** (`npx wrangler login`, then `npx wrangler secret put <NAME>`):
+5. **Configure Cloudflare**: `cp cloudflare.example.config.ts cloudflare.config.ts` and replace the placeholders (Worker and database names, `npx --no-install cf d1 create`, Turnstile widget and hostnames, `SITE_URL`). Each rate limiter namespace must be unique in your account. Create the queue that power alerts go through once, with `npx --no-install cf queues create lights-on-push`. Set `workersDev` to `false` once a custom domain is live.
+6. **Set the secrets** (`cf auth login`, then `npx --no-install cf workers secrets update <NAME>`):
 
    | Secret | Purpose |
    | --- | --- |
    | `ADMIN_USERNAME` | Admin sign-in name (case-insensitive) |
-   | `ADMIN_PASSWORD_HASH` | PBKDF2 hash of a password of at least 12 characters: `npm run --silent hash-password \| npx wrangler secret put ADMIN_PASSWORD_HASH`. Changing it signs out every session |
+   | `ADMIN_PASSWORD_HASH` | PBKDF2 hash of a password of at least 12 characters: `npm run --silent hash-password \| npx --no-install cf workers secrets update ADMIN_PASSWORD_HASH`. Changing it signs out every session |
    | `TURNSTILE_SECRET_KEY` | The Turnstile widget's secret key |
    | `ADMIN_API_TOKEN` | Optional: bearer token for scripts; generate it with `openssl rand -hex 32` |
    | `HEARTBEAT_TOKEN` | Optional: bearer token for the sensor; generate it with `openssl rand -hex 32` |
-   | `VAPID_PRIVATE_KEY` | Optional: the key that signs power alerts, an ECDSA P-256 private key as a one-line JWK: `npm run --silent vapid-keys | npx wrangler secret put VAPID_PRIVATE_KEY`. The public key is derived from it and served at `GET /api/push/key`; until it is set, that answers `404` and browsers cannot subscribe |
+   | `VAPID_PRIVATE_KEY` | Optional: the key that signs power alerts, an ECDSA P-256 private key as a one-line JWK: `npm run --silent vapid-keys | npx --no-install cf workers secrets update VAPID_PRIVATE_KEY`. The public key is derived from it and served at `GET /api/push/key`; until it is set, that answers `404` and browsers cannot subscribe |
    | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the owner's private Telegram alerts (see [Owner alerts on Telegram](#owner-alerts-on-telegram)). Until both are set, none are sent |
    | `TELEGRAM_WEBHOOK_SECRET` | Optional: the secret Telegram sends with each command to the bot. Until it is set, `POST /api/telegram` answers `401` |
    | `CONTACT_EMAIL` | Optional: address for privacy requests, revealed on the privacy page only after a Turnstile check. Until it is set, requests go to public GitHub issues |
@@ -261,17 +261,17 @@ An outage is alerted once it has lasted `ALERT_DELAY_MS` (`worker/lib/alerts.ts`
 
 The minute cron puts pages of subscriptions on the `PUSH_QUEUE` queue (`lights-on-push`), and the queue handler sends each page to the push service, retrying transient failures (429, 5xx, network errors, or an error in the Worker itself) up to `PUSH_MAX_ATTEMPTS`. A message that is not delivered within `PUSH_TTL_SECONDS` (`worker/lib/webpush.ts`, one hour) is dropped by the push service, so nobody gets a stale alert hours later. A subscription the push service answers `404` or `410` for is deleted.
 
-`PUSH_QUEUE` and `PUSH_LIMITER` are in `wrangler.toml` (also under `[env.e2e]`) and `wrangler.example.toml`. `PUSH_LIMITER` is the 5/min limit on the subscription writes. [`privacy.html`](privacy.html) says what a subscription holds and when it is deleted; keep it accurate if that changes.
+`PUSH_QUEUE` and `PUSH_LIMITER` are in `cloudflare.config.ts` and its example config, with separate e2e mode values. `PUSH_LIMITER` is the 5/min limit on the subscription writes. [`privacy.html`](privacy.html) says what a subscription holds and when it is deleted; keep it accurate if that changes.
 
 ### Owner alerts on Telegram
 
 The owner can get the same alerts privately, in a chat with their own Telegram bot. They are not for residents. The messages are English and, unlike the public alerts, say how an outage was recorded: a silent sensor reads "No reading from home since 14:05. The power may be off.", because it can also mean a lost connection. The copy is `admin.telegram` in `src/admin/copy.ts`.
 
-To set it up, create a bot with [@BotFather](https://t.me/BotFather) and keep its token. Send the bot `/start`, then open `https://api.telegram.org/bot<token>/getUpdates` and read `message.chat.id`. Set both secrets: `npx wrangler secret put TELEGRAM_BOT_TOKEN` and `npx wrangler secret put TELEGRAM_CHAT_ID`.
+To set it up, create a bot with [@BotFather](https://t.me/BotFather) and keep its token. Send the bot `/start`, then open `https://api.telegram.org/bot<token>/getUpdates` and read `message.chat.id`. Set both secrets: `npx --no-install cf workers secrets update TELEGRAM_BOT_TOKEN` and `npx --no-install cf workers secrets update TELEGRAM_CHAT_ID`.
 
 These alerts come sooner than the power alerts above: once an outage has lasted `TELEGRAM_ALERT_DELAY_MS` (`worker/lib/alerts.ts`), counted from when the power went off, where push waits `ALERT_DELAY_MS`. Telegram keeps its own claims (the `telegram_*_alert_at` columns), so a short outage can send you "off" and "back on" while residents hear nothing, and a sensor outage that turns out to be a lost connection sends you "off" and then the false alarm. Each claim puts one Telegram message on `PUSH_QUEUE`, even with no subscribers. An outage cannot be deleted while either channel awaits its follow-up.
 
-The bot takes three commands. `/status` gives the status, the sensor's state and any open outage with how it was recorded; `/pause 3h` pauses outage detection (`30m`, `3h`, `2d`, up to `MAX_PAUSE_MS`), like [`lights-on pause`](#sensor); `/resume` ends a pause. Telegram posts each message to `POST /api/telegram`, which checks `TELEGRAM_WEBHOOK_SECRET`, answers only `TELEGRAM_CHAT_ID`, and replies in the response (`worker/lib/telegram-commands.ts`). To connect it once, generate a value (`openssl rand -hex 32`), set it with `npx wrangler secret put TELEGRAM_WEBHOOK_SECRET`, then call the Bot API's `setWebhook` with `url` set to `<site>/api/telegram`, `secret_token` set to the same value and `allowed_updates` set to `["message"]`, and `setMyCommands` with `status`, `pause` and `resume` so they show in Telegram's menu.
+The bot takes three commands. `/status` gives the status, the sensor's state and any open outage with how it was recorded; `/pause 3h` pauses outage detection (`30m`, `3h`, `2d`, up to `MAX_PAUSE_MS`), like [`lights-on pause`](#sensor); `/resume` ends a pause. Telegram posts each message to `POST /api/telegram`, which checks `TELEGRAM_WEBHOOK_SECRET`, answers only `TELEGRAM_CHAT_ID`, and replies in the response (`worker/lib/telegram-commands.ts`). To connect it once, generate a value (`openssl rand -hex 32`), set it with `npx --no-install cf workers secrets update TELEGRAM_WEBHOOK_SECRET`, then call the Bot API's `setWebhook` with `url` set to `<site>/api/telegram`, `secret_token` set to the same value and `allowed_updates` set to `["message"]`, and `setMyCommands` with `status`, `pause` and `resume` so they show in Telegram's menu.
 
 `worker/lib/telegram.ts` sends each alert with the Bot API's `sendMessage`, retrying a 429, a 5xx or a network error up to `PUSH_MAX_ATTEMPTS`. Any other error (a wrong token or chat ID) is dropped and logged with Telegram's description; logs never contain the token.
 
@@ -293,7 +293,7 @@ The bot takes three commands. `/status` gives the status, the sensor's state and
 
 ### Adding an endpoint
 
-Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/routes/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` (which the dev proxy in `vite.config.ts` reads) and in `assets.run_worker_first` in `wrangler.toml` and `wrangler.example.toml`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in `src/admin/copy.ts` (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `limiter`, `authorize`, `cors`, `edgeCache` and `purges`. The cross-site and JSON checks on writes apply to every route.
+Add its path to `shared/paths.ts`, put the handler and its route map (keyed by `"METHOD /path"`) in `worker/routes/`, and spread it into `routes` in `worker/routes/index.ts`. A path outside `/api/` also goes in `WORKER_PAGES` and in `assets.runWorkerFirst` in `cloudflare.config.ts` and `cloudflare.example.config.ts`. A new error code goes in `shared/errors.ts`, and its message in `admin.errors` in `src/admin/copy.ts` (the typecheck fails until it has one). Declare guards on the route (`worker/lib/router.ts`): `limiter`, `authorize`, `cors`, `edgeCache` and `purges`. The cross-site and JSON checks on writes apply to every route.
 
 ### Adding a language
 
@@ -317,43 +317,41 @@ Follow the migration rules in [AGENTS.md](AGENTS.md#hard-rules): the database ch
 npm install
 cp .dev.vars.example .dev.vars   # local test keys; sign in as "admin" / "test-password"
 npm run db:migrate:local
-npm run preview                  # build, then serve on http://localhost:8787
+npm run preview                  # preview the built site and Worker locally
 ```
 
-`wrangler dev` needs `VAPID_PRIVATE_KEY` in your own `.dev.vars`, so copy it from `.dev.vars.example` as above; without it `GET /api/push/key` answers `404` and power alerts cannot be turned on locally.
-
-For hot reload, run `npm run build` once (the Worker serves `dist/`), then `npm run dev:worker` and `npm run dev` side by side; Vite serves the UI on port 5173 and proxies the API to the Worker.
+`cf dev` needs `VAPID_PRIVATE_KEY` in your own `.dev.vars`, so copy it from `.dev.vars.example` as above; without it `GET /api/push/key` answers `404` and power alerts cannot be turned on locally. `npm run dev` starts the Vite plugin and the Worker together with hot reload.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` / `dev:worker` | Vite dev server / local Worker |
-| `npm run build` / `preview` | Build to `dist/` / build and serve locally |
-| `npm test` / `test:watch` | Vitest, once or in watch mode: the `worker` project (workerd with D1) and the `node` project (`test/node/`); `CHECK_DIST=1` also checks `dist/` |
+| `npm run dev` / `dev:worker` | Local Vite and Worker development server |
+| `npm run build` / `preview` | Build Cloudflare output to `.cloudflare/output/` / preview it locally |
+| `npm test` / `test:watch` | Vitest, once or in watch mode: the `worker` project (workerd with D1) and the `node` project (`test/node/`); `CHECK_DIST=1` also checks the built assets |
 | `npm run test:coverage` | Both Vitest projects with Istanbul coverage; fails below 95% for statements, branches, functions or lines (`thresholds` in `vitest.config.ts`) |
-| `npm run test:e2e` | Playwright against `wrangler dev --env e2e` with a fresh local database; each run writes `.dev.vars.e2e` from `.dev.vars.example` |
-| `npm run lighthouse` | Lighthouse CI on the built `dist/` (run `npm run build` first): starts `wrangler dev --env e2e` on a fresh local database and audits `/`, `/en/` and `/privacy` on the mobile profile, three runs each, asserting the median ([`.github/lighthouserc.cjs`](.github/lighthouserc.cjs)). Needs Chrome |
+| `npm run test:e2e` | Playwright against an e2e build served by `vite preview`, with a fresh local database; each run writes `.dev.vars.e2e` from `.dev.vars.example` |
+| `npm run lighthouse` | Lighthouse CI on an e2e build served by `vite preview`, with a fresh local database. It audits `/`, `/en/` and `/privacy` on the mobile profile, three runs each, asserting the median ([`.github/lighthouserc.cjs`](.github/lighthouserc.cjs)). Needs Chrome |
 | `npm run test:api` / `test:api:prod` | Bruno, by hand (below) |
 | `npm run lint` / `lint:fix` / `lint:ci` | Biome: check / fix / check as CI does |
 | `npm run typecheck` | Type-check the app, Worker, tests and Node scripts; generates the Worker binding types first |
-| `npm run cf-typegen` | Generate `worker/worker-configuration.d.ts` (git-ignored) on its own, for an editor that needs it before a typecheck |
+| `npm run cf-typegen` | Generate `.cloudflare/types/index.d.ts` (git-ignored) on its own, for an editor that needs it before a typecheck |
 | `npm run db:generate` | Create a migration after changing `worker/db/schema.ts` |
 | `npm run db:migrate:local` / `db:migrate:remote` | Apply pending migrations locally / to production |
 | `npm run hash-password` | Print an `ADMIN_PASSWORD_HASH` value (input hidden) |
 | `npm run og` / `icons` | Re-render the social card and icons |
 | `npm run deploy` / `deploy:ci` | Build, migrate and deploy / migrate and deploy |
 
-On commit, Lefthook formats and lints the matching staged files with Biome (writing the fixes) and type-checks them; it never runs tests. `npm install` installs the hooks. Run the tests yourself; CI runs them too. CI installs npm 11 and runs lint, typecheck, build and both Vitest projects under the coverage gate (with `dist/` checks) on Node 24, and e2e on Node 24, and fails if `wrangler types` or `drizzle-kit generate` would change a committed file. A separate job builds the site and runs Lighthouse, which fails the build unless accessibility, best practices and SEO score 100 and performance at least 95 on every audited page.
+On commit, Lefthook formats and lints the matching staged files with Biome (writing the fixes) and type-checks them; it never runs tests. `npm install` installs the hooks. Run the tests yourself; CI runs them too. CI installs npm 11 and runs lint, typecheck, build and both Vitest projects under the coverage gate (including built assets) on Node 24, and e2e on Node 24. A separate job builds the site and runs Lighthouse, which fails the build unless accessibility, best practices and SEO score 100 and performance at least 95 on every audited page.
 
 ### API tests (Bruno)
 
 `bruno/` is a [Bruno](https://www.usebruno.com) collection: one request per endpoint, each with assertions. It runs by hand, not in CI. Start a local server with the e2e rate limits and its own database, then run the suite in a second terminal:
 
 ```sh
-cp .dev.vars.example .dev.vars.e2e   # --env e2e reads this file; npm run test:e2e also writes it
+cp .dev.vars.example .dev.vars.e2e   # mode e2e reads this file; npm run test:e2e also writes it
 cp bruno/.env.example bruno/.env
 npm run build
-npx wrangler d1 migrations apply DB --local --env e2e --persist-to .wrangler/bruno-state
-npx wrangler dev --env e2e --port 8787 --persist-to .wrangler/bruno-state
+npx --no-install cf d1 migrations apply 11111111-1111-4111-8111-111111111111 --local --mode e2e --dir drizzle --persist-to .cloudflare/state
+npx --no-install cf dev --mode e2e -- --port 8787
 npm run test:api
 ```
 

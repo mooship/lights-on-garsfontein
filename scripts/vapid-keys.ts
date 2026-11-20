@@ -1,5 +1,5 @@
 // Prints a VAPID_PRIVATE_KEY value: an ECDSA P-256 private key as a one-line JWK.
-// Usage: npm run --silent vapid-keys | npx wrangler secret put VAPID_PRIVATE_KEY
+// Usage: npm run --silent vapid-keys | npx --no-install cf workers secrets update VAPID_PRIVATE_KEY
 import process from 'node:process';
 
 const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);

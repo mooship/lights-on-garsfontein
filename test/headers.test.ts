@@ -45,6 +45,17 @@ describe('security headers on Worker responses', () => {
     expect(unknownApi.status).toBe(404);
   });
 
+  it('builds a generated locale shell when Vite development has no static page', async () => {
+    const fetchAsset = vi.fn(async (_request: Request) => new Response('missing', { status: 404 }));
+    const withAssets = { ...env, ASSETS: { fetch: fetchAsset } } as unknown as Env;
+
+    const page = await call('/en/', { env: withAssets });
+
+    expect(await page.text()).toContain('<html lang="en"');
+    expect(fetchAsset).toHaveBeenCalledOnce();
+    expect(page.headers.get('Content-Security-Policy')).toBeNull();
+  });
+
   it('opens CORS only on the public read endpoints', async () => {
     for (const path of [STATUS_PATH, STATS_PATH, CSV_PATH]) {
       expect((await call(path)).headers.get('Access-Control-Allow-Origin')).toBe('*');

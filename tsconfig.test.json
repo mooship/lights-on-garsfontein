@@ -2,7 +2,7 @@
   "extends": "./tsconfig.worker.json",
   "compilerOptions": {
     "types": [
-      "./worker/worker-configuration.d.ts",
+      "./.cloudflare/types/index.d.ts",
       "@cloudflare/vitest-plugin/types",
       "vite/client"
     ]

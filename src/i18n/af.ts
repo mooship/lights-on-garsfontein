@@ -70,6 +70,7 @@ export const af = {
     noOutages: (date: string) => `Geen onderbrekings sedert die rekord op ${date} begin het nie.`,
     lastOutage: (from: string, to: string, day: string, lasted: string) =>
       `Laaste onderbreking: ${day} van ${from} tot ${to} (${lasted}).`,
+    checked: (seconds: number) => `Nagegaan ${seconds} s gelede`,
     stale: (time: string) => `Kan nie die bediener bereik nie. Dit is die status soos dit om ${time} was.`,
     unreachable: 'Kan nie die bediener bereik nie. Ons probeer binnekort weer.',
   },

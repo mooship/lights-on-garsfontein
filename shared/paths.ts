@@ -1,5 +1,5 @@
 import type { Locale } from '../site.config';
-import { LOCALES, localePath } from './locale';
+import { LOCALES, localePath } from './locale.ts';
 
 /** A request under this that no route matches gets the Worker's JSON 404, not the app's page. */
 export const API_PREFIX = '/api/';
@@ -43,7 +43,7 @@ export const FAVICON_ON_PATH = '/favicon-on.svg';
 export const FAVICON_OFF_PATH = '/favicon-off.svg';
 
 /**
- * Worker routes outside API_PREFIX. wrangler.toml and wrangler.example.toml list them again in
+ * Worker routes outside API_PREFIX. cloudflare.config.ts and cloudflare.example.config.ts list them again in
  * `assets.run_worker_first`, which cannot import this; change them together.
  */
 export const WORKER_PAGES: readonly string[] = [SITEMAP_PATH, ROBOTS_PATH, OG_IMAGE_PATH, FEED_PATH, ...BADGE_PATHS];

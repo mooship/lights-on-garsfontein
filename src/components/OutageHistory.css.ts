@@ -1,7 +1,16 @@
 import { style } from '@vanilla-extract/css';
 import { vars } from '../styles/theme.css';
 
-// A ledger: one ruled line per outage, the day and times on the left and the length on the right.
+export const day = style({ selectors: { '& + &': { marginTop: '0.75rem' } } });
+export const dayHeading = style({
+  margin: '0 0 0.25rem',
+  color: vars.color.muted,
+  fontSize: '0.8125rem',
+  fontWeight: 600,
+  lineHeight: 1.35,
+});
+
+// A ledger: one ruled line per outage, times on the left and the length on the right.
 export const row = style({
   minHeight: '3.5rem',
   display: 'flex',

@@ -4,7 +4,7 @@
 // throwaway local D1; run `npm run build` first) and audits every public page. Each URL runs three times
 // and the median is asserted, because a single run is noisy on shared runners. Admin and API routes are not audited.
 const PORT = 8789;
-const STATE = '.wrangler/lighthouse-state';
+const STATE = '.cloudflare/state';
 const BASE = `http://127.0.0.1:${PORT}`;
 // The default locale at /, each other locale at /<code>/ (shared/locale.ts), and the privacy page, which holds
 // both languages. Add a locale here when site.config.ts gains one.
@@ -17,10 +17,10 @@ module.exports = {
       startServerCommand: [
         `node -e "require('node:fs').rmSync('${STATE}',{recursive:true,force:true})"`,
         `node -e "require('node:fs').copyFileSync('.dev.vars.example','.dev.vars.e2e')"`,
-        `npx wrangler d1 migrations apply DB --local --env e2e --persist-to ${STATE}`,
-        `npx wrangler dev --env e2e --port ${PORT} --ip 127.0.0.1 --persist-to ${STATE}`,
+        'npm run build -- --mode e2e',
+        `npx --no-install cf d1 migrations apply 11111111-1111-4111-8111-111111111111 --local --mode e2e --dir drizzle --persist-to ${STATE}`,
+        `npx --no-install vite preview --mode e2e --port ${PORT} --host 127.0.0.1`,
       ].join(' && '),
-      startServerReadyPattern: 'Ready on',
       startServerReadyTimeout: 120_000,
       url: PAGES.map((path) => BASE + path),
       numberOfRuns: 3,

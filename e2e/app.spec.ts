@@ -51,6 +51,7 @@ import { SESSION_COOKIE } from '../worker/lib/cookies';
 import { exampleVar } from './dev-vars';
 import {
   ADMIN_API,
+  blockAppEntry,
   expect,
   logOutage,
   patchJson,
@@ -92,7 +93,7 @@ const ADMIN_PASSWORD = 'test-password';
 // Public copy never says how an outage was recorded, in either language.
 const RECORDING_METHOD = /by hand|sensor|met die hand|handmatig|voeler/i;
 
-// Log in through the UI once and reuse the cookie: LOGIN_LIMITER (wrangler.toml) allows only a few a minute.
+// Log in through the UI once and reuse the cookie: LOGIN_LIMITER (cloudflare.config.ts) allows only a few a minute.
 let sessionCookies: Cookie[] = [];
 
 // A sign-in solves a Turnstile challenge from challenges.cloudflare.com, has the Worker verify it with
@@ -126,7 +127,7 @@ test.describe('theme boot', () => {
   test('follows the system theme before the app loads', async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: 'dark' });
     const page = await context.newPage();
-    await page.route('**/assets/*.js', (route) => route.abort()); // prove it is the inline boot script
+    await blockAppEntry(page); // prove it is the inline boot script
     await page.goto('/');
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
     await context.close();
@@ -240,7 +241,7 @@ test.describe('language', () => {
     });
 
     test('/admin shows the English loading shell before the app loads', async ({ page }) => {
-      await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
+      await blockAppEntry(page); // only the static shell and boot script
       await page.goto(ADMIN_PAGE_PATH);
       await expect(page.locator('html')).toHaveAttribute('lang', 'en');
       await expectShellIn(page, 'en');
@@ -287,7 +288,7 @@ test.describe('language', () => {
   test('shows the loading shell in the stored language before the app loads', async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
+    await blockAppEntry(page); // only the static shell and boot script
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('lang', DEFAULT_LOCALE);
     await expectShellIn(page, DEFAULT_LOCALE);
@@ -313,8 +314,8 @@ test.describe('public page', () => {
     // No "for 7 h": nothing measured it on.
     await expect(page.getByText(new RegExp(`^${escapeRegExp(en.status.for(''))}\\d`))).toHaveCount(0);
     await expect(page.locator('[data-status="NONE"]')).toBeVisible();
-    // Just the one line of detail: no warning while all is well.
-    await expect(page.locator('.gg-status-detail > p')).toHaveCount(1);
+    // The detail and successful-poll age; no warning while all is well.
+    await expect(page.locator('.gg-status-detail > p')).toHaveCount(2);
     await expect(page).toHaveTitle(NEUTRAL_TITLE);
     await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/favicon.svg');
     await expect(page.getByText(RECORDING_METHOD)).toHaveCount(0); // never says how outages are recorded
@@ -481,6 +482,24 @@ test.describe('public page', () => {
     await expect(page.getByRole('alert')).toHaveCount(0);
     await expect(badge(page)).toContainText(en.status.NONE);
   });
+
+  for (const locale of LOCALES) {
+    test.describe(`${locale} status freshness`, () => {
+      test.use({ appLocale: locale });
+
+      test('shows the age of the last successful poll', async ({ page }) => {
+        await page.clock.install();
+        await page.goto(localePath(locale));
+        await expect(badge(page)).toBeVisible();
+        const checked = DICTIONARIES[locale].status.checked;
+        await expect(page.getByText(checked(0), { exact: true })).toBeVisible();
+
+        await page.clock.fastForward(20 * SECOND_MS);
+
+        await expect(page.getByText(checked(20), { exact: true })).toBeVisible();
+      });
+    });
+  }
 
   test('stops claiming the power is on once the last reading is older than the heartbeat threshold', async ({
     page,
@@ -958,7 +977,7 @@ test.describe('wide screens', () => {
   }
 
   test('/admin keeps its single column, in the loading shell too', async ({ page }) => {
-    await page.route('**/assets/*.js', (route) => route.abort()); // only the static shell and boot script
+    await blockAppEntry(page); // only the static shell and boot script
     await page.goto(ADMIN_PAGE_PATH);
     const main = page.locator('.gg-main');
     await expect(main).toHaveCSS('display', 'flex');
@@ -1229,7 +1248,7 @@ test.describe('outages by time of day', () => {
         await expect(page.getByRole('status')).toHaveText(DICTIONARIES[locale].status.ON);
         const loaded = await height();
         // The display font is cached now, as on most visits; without the app only the shell shows.
-        await page.route('**/assets/*.js', (route) => route.abort());
+        await blockAppEntry(page);
         await page.reload();
         await expect(card.locator('.gg-skel-row')).toBeVisible();
         expect(await height()).toBe(loaded);
@@ -1262,7 +1281,7 @@ test.describe('outages by time of day', () => {
           const loaded = await measure();
           // The reserve is the tallest body in its width range, so a shorter one leaves some room.
           expect(loaded.gap).toBeLessThanOrEqual(maxGap);
-          await page.route('**/assets/*.js', (route) => route.abort());
+          await blockAppEntry(page);
           await page.reload();
           await expect(body.locator('.gg-skel')).not.toHaveCount(0);
           expect((await measure()).height).toBe(loaded.height);
@@ -1341,6 +1360,39 @@ test.describe('all outages', () => {
         await page.goto(localePath(locale));
         await expect(page.getByRole('button', { name: DICTIONARIES[locale].history.showAll })).toBeVisible();
         expect(await readLayoutShift(page)).toBe(0);
+      });
+
+      test(`groups outages under a shared day in recent and paged lists (${locale})`, async ({ page, request }) => {
+        const starts = [
+          Date.now() - DAY_MS,
+          Date.now() - DAY_MS - 10 * MINUTE_MS,
+          Date.now() - DAY_MS - 20 * MINUTE_MS,
+          Date.now() - 2 * DAY_MS,
+          Date.now() - 3 * DAY_MS,
+        ];
+        for (const start of starts) {
+          const response = await request.post(ADMIN_OUTAGES_PATH, {
+            headers: ADMIN_API,
+            data: {
+              action: OUTAGE_ACTION.create,
+              startTime: new Date(start).toISOString(),
+              endTime: new Date(start + 30 * MINUTE_MS).toISOString(),
+            },
+          });
+          expect(response.status()).toBe(201);
+        }
+
+        await page.goto(localePath(locale));
+        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+        const dayHeadings = history(page).getByRole('heading', { level: 3 });
+        await expect(dayHeadings).toHaveCount(3);
+        await expect(dayHeadings.first().locator('..').getByRole('listitem')).toHaveCount(3);
+
+        await page.getByRole('button', { name: DICTIONARIES[locale].history.showAll }).click();
+        await expect(page.getByRole('heading', { name: DICTIONARIES[locale].history.allTitle })).toBeVisible();
+        await expect(rows(page)).toHaveCount(RECENT_LIMIT);
+        await expect(dayHeadings).toHaveCount(3);
+        await expect(dayHeadings.first().locator('..').getByRole('listitem')).toHaveCount(3);
       });
     });
   }

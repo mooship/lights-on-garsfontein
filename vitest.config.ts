@@ -16,7 +16,7 @@ export default defineConfig({
         plugins: [
           cloudflareTest(async () => ({
             main: './worker/index.ts',
-            wrangler: { configPath: './wrangler.toml' },
+            config: './cloudflare.config.ts',
             miniflare: {
               bindings: {
                 TEST_MIGRATIONS: await readD1Migrations('./drizzle'),
@@ -27,6 +27,10 @@ export default defineConfig({
                 ADMIN_PASSWORD_HASH:
                   'pbkdf2_sha256$100000$n7SohUIkjgbP01xFrUR50w==$G4dp7lkqVXazO3SBFzPjLKXgdzhDeh99ZXefTHRlxEg=',
                 ADMIN_USERNAME: 'admin',
+                CONTACT_EMAIL: '',
+                TELEGRAM_BOT_TOKEN: '',
+                TELEGRAM_CHAT_ID: '',
+                TELEGRAM_WEBHOOK_SECRET: '',
                 HEARTBEAT_TOKEN: 'test-heartbeat-token',
                 ADMIN_API_TOKEN: 'test-admin-api-token',
                 VAPID_PRIVATE_KEY:

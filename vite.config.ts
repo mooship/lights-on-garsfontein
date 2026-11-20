@@ -1,16 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
+import { cloudflare } from '@cloudflare/vite-plugin';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
 import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
-import { escapeHtml, fill, fillStaticI18n, jsonString, localeVisibilityCss } from './build/html.ts';
+import { fill, fillLocalePage, fillSiteHtml, fillStaticI18n, localeVisibilityCss } from './build/html.ts';
 import { DEFAULT_LOCALE, LOCALES, localePath, pageLocale } from './shared/locale.ts';
-import { ADMIN_PAGE_PATH, API_PREFIX, SECURITY_TXT_PATH, SERVICE_WORKER_PATH, WORKER_PAGES } from './shared/paths.ts';
-import { type Locale, site } from './site.config.ts';
-import { HEAD } from './src/i18n/head.ts';
+import { ADMIN_PAGE_PATH, SECURITY_TXT_PATH, SERVICE_WORKER_PATH } from './shared/paths.ts';
 import { FONT_FILES } from './src/styles/fonts.ts';
-
-const WORKER = 'http://localhost:8787';
 
 /**
  * The Fontsource woff2 files are bundled into /assets/ with a hash. This preloads both on
@@ -43,7 +40,7 @@ function hashedFonts(): Plugin {
 const GENERATED = {
   '/site.webmanifest': { mode: 'json', type: 'application/manifest+json', dev: true },
   '/llms.txt': { mode: 'text', type: 'text/plain; charset=utf-8', dev: true },
-  [SECURITY_TXT_PATH]: { mode: 'text', type: 'text/plain; charset=utf-8', dev: false },
+  [SECURITY_TXT_PATH]: { mode: 'text', type: 'text/plain; charset=utf-8', dev: true },
   [SERVICE_WORKER_PATH]: { mode: 'js', type: 'text/javascript; charset=utf-8', dev: true },
 } as const;
 
@@ -56,16 +53,11 @@ const generated = (url: keyof typeof GENERATED) =>
  * templates/ (emitted in the build, and served in dev where marked).
  */
 function siteConfig(): Plugin {
-  const jsonLd = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/g;
   return {
     name: 'site-config',
     transformIndexHtml: {
       order: 'pre',
-      handler(html, { path }) {
-        const parts = html.split(jsonLd);
-        // split() with three groups: [html, open, json, close, html, ...]
-        return parts.map((part, i) => fill(part, i % 4 === 2 ? 'json' : 'html', path)).join('');
-      },
+      handler: (html, { path }) => fillSiteHtml(html, path),
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -85,47 +77,25 @@ function siteConfig(): Plugin {
   };
 }
 
-const ogLocale = (locale: Locale) => site.intlLocales[locale].replace('-', '_');
-
-/** index.html with its %page.<key>% placeholders filled for `locale`'s page. */
-function localePage(html: string, locale: Locale): string {
-  const head = (key: keyof (typeof HEAD)[Locale]) => fill(HEAD[locale][key], 'text', 'src/i18n/head.ts');
-  const url = (l: Locale) => escapeHtml(`${site.url}${localePath(l)}`);
-  const alternate = (hreflang: string, l: Locale) => `<link rel="alternate" hreflang="${hreflang}" href="${url(l)}" />`;
-  const values: Record<string, string> = {
-    lang: locale,
-    url: url(locale),
-    title: escapeHtml(head('title')),
-    description: escapeHtml(head('description')),
-    ogDescription: escapeHtml(head('ogDescription')),
-    imageAlt: escapeHtml(head('imageAlt')),
-    serviceDescription: jsonString(head('serviceDescription')),
-    alternates: [...LOCALES.map((l) => alternate(l, l)), alternate('x-default', DEFAULT_LOCALE)].join('\n    '),
-    ogLocales: [locale, ...LOCALES.filter((l) => l !== locale)]
-      .map((l, i) => `<meta property="og:locale${i ? ':alternate' : ''}" content="${ogLocale(l)}" />`)
-      .join('\n    '),
-  };
-  return html.replace(/%page\.(\w+)%/g, (match, key: string) => {
-    const value = values[key];
-    if (value === undefined) throw new Error(`locale-pages: unknown placeholder ${match} in index.html`);
-    return value;
-  });
-}
-
 /**
- * One index.html per language page (shared/locale.ts): dist/index.html for the default locale and
- * dist/<code>/index.html for each other, with that page's lang, head copy (src/i18n/head.ts),
+ * One index.html per language page (shared/locale.ts): the build root for the default locale and
+ * <code>/index.html for each other, with that page's lang, head copy (src/i18n/head.ts),
  * canonical and hreflang links. Each is a copy of the one built page, so they share every asset
  * (Vite's URLs are absolute, /assets/…). The dev server fills the page for the URL it serves.
  */
 function localePages(): Plugin {
+  let serving = false;
   return {
     name: 'locale-pages',
+    configResolved(config) {
+      serving = config.command === 'serve';
+    },
     transformIndexHtml: {
       order: 'pre',
-      handler(html, { path, originalUrl, server }) {
-        if (server && path === '/index.html')
-          return localePage(html, pageLocale(originalUrl?.split('?')[0] ?? '/') ?? DEFAULT_LOCALE);
+      handler(html, { path, originalUrl }) {
+        if (!serving) return;
+        const url = new URL(originalUrl ?? path, 'http://localhost');
+        return fillLocalePage(html, pageLocale(url.searchParams.get('__page') ?? url.pathname) ?? DEFAULT_LOCALE);
       },
     },
     generateBundle: {
@@ -136,7 +106,7 @@ function localePages(): Plugin {
         if (index?.type !== 'asset') throw new Error('locale-pages: index.html is not in the bundle');
         const html = String(index.source);
         for (const locale of LOCALES) {
-          const source = localePage(html, locale);
+          const source = fillLocalePage(html, locale);
           if (locale === DEFAULT_LOCALE) {
             index.source = source;
             // Unknown paths get 404.html, so the admin page needs a file of its own; the boot script
@@ -182,32 +152,68 @@ function localeVisibility(): Plugin {
   };
 }
 
+/** Vanilla Extract only needs its CSS transform in the client environment. */
+function clearWorkerExternals(): Plugin {
+  return {
+    name: 'clear-worker-externals',
+    enforce: 'pre',
+    configResolved(config) {
+      config.ssr.external = [];
+      const worker = config.environments.ssr;
+      if (worker) worker.resolve.external = [];
+    },
+  };
+}
+
+function clientOnly(plugin: Plugin): Plugin {
+  const apply = plugin.applyToEnvironment;
+  return {
+    ...plugin,
+    applyToEnvironment(environment) {
+      return environment.name === 'client' ? (apply?.(environment) ?? true) : false;
+    },
+  };
+}
+
+function pageInWorkerDev(plugin: Plugin): Plugin {
+  return {
+    ...plugin,
+    applyToEnvironment(environment) {
+      return environment.config.command === 'serve' || environment.name === 'client';
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    clearWorkerExternals(),
+    cloudflare({ experimental: { headersAndRedirectsDevModeSupport: true } }),
     solid(),
-    vanillaExtractPlugin(),
-    localeVisibility(),
-    siteConfig(),
-    staticI18n(),
-    hashedFonts(),
-    localePages(),
+    ...vanillaExtractPlugin().map(clientOnly),
+    clientOnly(localeVisibility()),
+    pageInWorkerDev(siteConfig()),
+    pageInWorkerDev(staticI18n()),
+    clientOnly(hashedFonts()),
+    pageInWorkerDev(localePages()),
   ],
   build: {
     target: 'es2022',
     outDir: 'dist',
     modulePreload: { polyfill: false },
-    rolldownOptions: {
-      // privacy.html is served at /privacy (Workers assets html_handling) and 404.html for every
-      // unknown path. The other language pages and admin.html are copies of index.html (localePages).
-      input: {
-        index: resolve(import.meta.dirname, 'index.html'),
-        privacy: resolve(import.meta.dirname, 'privacy.html'),
-        notFound: resolve(import.meta.dirname, '404.html'),
+  },
+  environments: {
+    client: {
+      build: {
+        rolldownOptions: {
+          // privacy.html is served at /privacy (Workers assets html_handling) and 404.html for every
+          // unknown path. The other language pages and admin.html are copies of index.html (localePages).
+          input: {
+            index: resolve(import.meta.dirname, 'index.html'),
+            privacy: resolve(import.meta.dirname, 'privacy.html'),
+            notFound: resolve(import.meta.dirname, '404.html'),
+          },
+        },
       },
     },
-  },
-  server: {
-    // `npm run dev` serves the UI; run `npm run dev:worker` alongside for the API.
-    proxy: Object.fromEntries([API_PREFIX, ...WORKER_PAGES].map((path) => [path, WORKER])),
   },
 });

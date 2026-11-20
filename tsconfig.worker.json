@@ -5,7 +5,8 @@
       "ES2024"
     ],
     "types": [
-      "./worker/worker-configuration.d.ts"
+      "./.cloudflare/types/index.d.ts",
+      "vite/client"
     ]
   },
   "include": [

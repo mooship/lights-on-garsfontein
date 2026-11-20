@@ -1,6 +1,6 @@
 /**
  * This deployment's identity, in one place. To run the app for another area, change the values
- * here, the place copy in src/i18n/*.ts and your wrangler.toml (see wrangler.example.toml), then
+ * here, the place copy in src/i18n/*.ts and your cloudflare.config.ts (see cloudflare.example.config.ts), then
  * review privacy.html. Plain data with no imports, so the Worker, the app, the build and the
  * scripts can all read it.
  */

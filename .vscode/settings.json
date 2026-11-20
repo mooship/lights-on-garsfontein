@@ -2,13 +2,13 @@
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
-    "package.json": "package-lock.json, bun.lock*, pnpm-lock.yaml, yarn.lock, tsconfig*.json, biome.json*, drizzle.config.*, vite.config.*, vitest.config.*, playwright.config.*, lefthook*, wrangler.*, site.config.*, .npmrc, eslint.config.*, .prettier*",
+    "package.json": "package-lock.json, bun.lock*, pnpm-lock.yaml, yarn.lock, tsconfig*.json, biome.json*, drizzle.config.*, vite.config.*, vitest.config.*, playwright.config.*, lefthook*, cloudflare.config.*, site.config.*, .npmrc, eslint.config.*, .prettier*",
     "README.md": "AGENTS.md, CLAUDE.md, LICENSE*",
     ".gitignore": ".env*, .dev.vars*, .editorconfig, .gitattributes"
   },
   "files.exclude": {
     "**/.git": true,
-    "**/.wrangler": true,
+    "**/.cloudflare": true,
     "**/.playwright-cli": true,
     "**/.lighthouseci": true,
     "**/blob-report": true,

@@ -34,6 +34,10 @@ async function deleteOutages(request: APIRequestContext): Promise<void> {
 /** Lets a poll's interval pass, so the page asks again; the test installs the clock before loading the page. */
 export const pollNow = (page: Page) => page.clock.fastForward(POLL_MS);
 
+/** Stops both the production app bundle and Vite's development entry from loading. */
+export const blockAppEntry = (page: Page) =>
+  page.route(/\/(?:assets\/[^/]+\.js|src\/index\.tsx)(?:\?.*)?$/, (route) => route.abort());
+
 const pending = new WeakMap<Page, Set<Request>>();
 
 /** The requests `page` has sent that have had neither an answer nor a failure; tracked from the first call. */

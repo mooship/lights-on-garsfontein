@@ -1,8 +1,10 @@
 // The string work behind the build's plugins in vite.config.ts, kept apart from Vite so
 // test/node/plugins.test.ts can run it.
 
-import { DEFAULT_LOCALE, LOCALES, nextLocale } from '../shared/locale.ts';
+import { DEFAULT_LOCALE, LOCALES, localePath, nextLocale } from '../shared/locale.ts';
+import type { Locale } from '../site.config.ts';
 import { site } from '../site.config.ts';
+import { HEAD } from '../src/i18n/head.ts';
 import { DICTIONARIES } from '../src/i18n/index.ts';
 
 /** For HTML text and double-quoted attributes; single quotes are left alone. */
@@ -66,6 +68,42 @@ export function fill(text: string, mode: Mode, file: string): string {
     }
   }
   return out;
+}
+
+/** Fill site placeholders in an HTML document, using JSON escaping inside JSON-LD. */
+export function fillSiteHtml(html: string, file: string): string {
+  const jsonLd = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/g;
+  const parts = html.split(jsonLd);
+  return parts.map((part, i) => fill(part, i % 4 === 2 ? 'json' : 'html', file)).join('');
+}
+
+/** Fill index.html's page-specific head placeholders for one locale. */
+export function fillLocalePage(html: string, locale: Locale): string {
+  const head = (key: keyof (typeof HEAD)[Locale]) => fill(HEAD[locale][key], 'text', 'src/i18n/head.ts');
+  const url = (value: Locale) => escapeHtml(`${site.url}${localePath(value)}`);
+  const alternate = (hreflang: string, value: Locale) =>
+    `<link rel="alternate" hreflang="${hreflang}" href="${url(value)}" />`;
+  const ogLocale = (value: Locale) => site.intlLocales[value].replace('-', '_');
+  const values: Record<string, string> = {
+    lang: locale,
+    url: url(locale),
+    title: escapeHtml(head('title')),
+    description: escapeHtml(head('description')),
+    ogDescription: escapeHtml(head('ogDescription')),
+    imageAlt: escapeHtml(head('imageAlt')),
+    serviceDescription: jsonString(head('serviceDescription')),
+    alternates: [...LOCALES.map((value) => alternate(value, value)), alternate('x-default', DEFAULT_LOCALE)].join(
+      '\n    ',
+    ),
+    ogLocales: [locale, ...LOCALES.filter((value) => value !== locale)]
+      .map((value, i) => `<meta property="og:locale${i ? ':alternate' : ''}" content="${ogLocale(value)}" />`)
+      .join('\n    '),
+  };
+  return html.replace(/%page\.(\w+)%/g, (match, key: string) => {
+    const value = values[key];
+    if (value === undefined) throw new Error(`locale-pages: unknown placeholder ${match} in index.html`);
+    return value;
+  });
 }
 
 /** The value at a dotted path such as ['faultReporting', 'url'], or undefined. */

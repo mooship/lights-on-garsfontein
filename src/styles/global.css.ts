@@ -165,8 +165,7 @@ globalStyle('.gg-status-card', {
   overflow: 'hidden',
 });
 
-// Room for two lines of detail (padding + 2 × 0.9375rem × 1.5 + the border), as the last outage takes
-// on a phone; a warning below it only follows a failure.
+// Room for detail, then either its poll age or a stale warning on a separate line.
 globalStyle('.gg-status-detail', {
   paddingTop: '1rem',
   borderTop: `1px solid ${vars.color.border}`,
@@ -176,10 +175,11 @@ globalStyle('.gg-status-detail', {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.25rem',
-  minHeight: 'calc(3.8125rem + 1px)',
+  minHeight: 'calc(5.46875rem + 1px)',
 });
 
 globalStyle('.gg-status-warning', { fontSize: '0.8125rem' });
+globalStyle('.gg-status-checked', { fontSize: '0.8125rem' });
 
 // The trends body reserves its loaded height, which depends on how many lines its text wraps to, so
 // it steps with the width: the tallest loaded body in each range, in either language. Only text that
@@ -192,13 +192,9 @@ globalStyle('.gg-trends-body', {
   },
 });
 
-// The history card sits above the statistics in one column, so its loaded height must not depend on how many outages
-// there are: RECENT_LIMIT rows of 3.5rem (`row` in OutageHistory.css.ts; its 1px rule sits inside that
-// height), then the show-all button (0.75rem + 2.75rem: `more` in OutageHistory.css.ts and `button.ghost`
-// in src/styles/ui.css.ts) that appears only when the list is full. The 4px is slack for a multi-day row
-// whose times wrap to a third line on a 320px screen (about 3.7rem). The loading skeleton is shorter.
+// Reserve the tallest recent list: every outage on a different day, with one heading per group.
 globalStyle('.gg-history-body', {
-  minHeight: `calc(${RECENT_LIMIT} * 3.5rem + 4px + 3.5rem)`,
+  minHeight: `calc(${RECENT_LIMIT} * 5.75rem + 3.5rem)`,
 });
 
 globalStyle('.gg-trends-details', { marginTop: '0.75rem', fontSize: '0.875rem' });
@@ -356,10 +352,12 @@ globalStyle('.gg-skel-row', { borderTopColor: vars.color.border });
 globalStyle('.gg-skel-stack', { display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1 });
 globalStyle('.gg-skel-row > .gg-skel-stack', { flex: 'none' });
 globalStyle('.gg-skel-grid', { display: 'flex', flexDirection: 'column', gap: '0.5rem' });
-globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.25rem' });
+globalStyle('.gg-skel-list', { display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingTop: '0.25rem' });
+globalStyle('.gg-skel-group', { display: 'flex', flexDirection: 'column', gap: '0.25rem' });
 
 globalStyle('.gg-skel-heading', { height: '1.75rem' });
 globalStyle('.gg-skel-text', { height: '0.875rem' });
+globalStyle('.gg-skel-day', { height: '0.8125rem', width: '30%' });
 globalStyle('.gg-skel-tile', { height: '3rem' });
 globalStyle('.gg-skel-chart', { height: '11.5rem', marginTop: '1.25rem' });
 globalStyle('.gg-skel-item', { height: '2.25rem' });

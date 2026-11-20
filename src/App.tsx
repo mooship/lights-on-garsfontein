@@ -171,13 +171,21 @@ const PublicView: Component<{ initial: InitialData }> = (props) => {
                 <Scope />
                 <div class="gg-status-detail">
                   <p class={motion.enter}>{statusDetail(s(), minute())}</p>
-                  {/* Only when something is wrong; the loading shell has no line for it. */}
-                  <Show when={warning()}>
-                    {(text) => (
-                      <p class={`gg-status-warning ${css.warning}`} role="status">
-                        {text()}
-                      </p>
-                    )}
+                  <Show
+                    when={!status.error()}
+                    fallback={
+                      <Show when={warning()}>
+                        {(text) => (
+                          <p class={`gg-status-warning ${css.warning}`} role="status">
+                            {text()}
+                          </p>
+                        )}
+                      </Show>
+                    }
+                  >
+                    <p class="gg-status-checked">
+                      {t().status.checked(Math.max(0, Math.floor((now() - status.updatedAt()) / SECOND_MS)))}
+                    </p>
                   </Show>
                 </div>
                 <SafetyLine />

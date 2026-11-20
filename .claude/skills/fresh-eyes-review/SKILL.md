@@ -19,7 +19,7 @@ Check these first; they are the usual misses.
 
 - A rule in `AGENTS.md` the change breaks (Hard rules, Safety, Writing, Conventions).
 - A behaviour change with no test, a test that no longer fails without the change, a weakened assertion, a skip, a fixed wait, or a coverage ignore.
-- A change that needs a companion change it lacks: a document, both languages, a generated file, a migration, a header hash, a `wrangler` binding.
+- A change that needs a companion change it lacks: a document, both languages, a generated file, a migration, a header hash, a Cloudflare binding.
 - A claim in copy or docs that the code does not back.
 - A new dependency, or a version under 7 days old (`.npmrc` sets the delay).
 - A secret, a personal or visitor-identifying value, or a private path in the diff.

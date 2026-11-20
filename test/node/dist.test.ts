@@ -5,9 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { localePath } from '../../shared/locale';
 import { site } from '../../site.config';
 
-// Checks on the output of `npm run build`. Only in CI (which builds first) or with CHECK_DIST=1, so a
-// stale local dist/ cannot fail a push.
-const DIST = resolve(import.meta.dirname, '../../dist');
+// Checks the static output of `npm run build`. Only in CI (which builds first) or with CHECK_DIST=1.
+const DIST = resolve(import.meta.dirname, '../../.cloudflare/output/v1/workers/default/assets');
 const read = (file: string) => readFileSync(resolve(DIST, file), 'utf8');
 const exists = (file: string) => existsSync(resolve(DIST, file));
 
@@ -20,7 +19,7 @@ function stripRepeatedly(text: string, pattern: RegExp): string {
   return text;
 }
 
-/** dist/index.html for the default locale, dist/<code>/index.html for the others. */
+/** The build has index.html for the default locale and <code>/index.html for the others. */
 const LOCALE_PAGES = site.locales.map((locale) => ({ locale, file: `${localePath(locale).slice(1)}index.html` }));
 const HTML = [...LOCALE_PAGES.map((p) => p.file), 'privacy.html', '404.html', 'admin.html'];
 

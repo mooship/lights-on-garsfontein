@@ -1,4 +1,7 @@
-import { API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
+import { fillLocalePage, fillSiteHtml, fillStaticI18n } from '../build/html';
+import indexHtml from '../index.html?raw';
+import { LOCALES, localePath, pageLocale } from '../shared/locale';
+import { ADMIN_PAGE_PATH, API_PREFIX, OUTAGE_VIEWS } from '../shared/paths';
 import { HOURLY_CRON } from './crons';
 import { createDb } from './db/client';
 import {
@@ -40,16 +43,26 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   const url = new URL(request.url);
   // HEAD runs the GET route; the runtime drops the body.
   const method = request.method === 'HEAD' ? 'GET' : request.method;
+  const locale = LOCALES.find((value) => localePath(value).slice(0, -1) === url.pathname);
+  if (locale && method === 'GET') return new Response(null, { status: 308, headers: { Location: localePath(locale) } });
   const match = routes[`${method} ${url.pathname}`];
   if (match) return dispatch(match, request, env, ctx);
   if (url.pathname.startsWith(API_PREFIX)) return errors.notFound();
-  return env.ASSETS.fetch(request);
+  const asset = await env.ASSETS.fetch(request);
+  if (asset.status !== 404 || method !== 'GET') return asset;
+  const page = pageLocale(url.pathname);
+  if (!page && url.pathname !== ADMIN_PAGE_PATH) return asset;
+  let shell = fillLocalePage(fillStaticI18n(fillSiteHtml(indexHtml, 'index.html')), page ?? 'en');
+  if (!page) shell = shell.replace('<html ', '<html data-page="admin" ');
+  return new Response(shell, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
 export default {
   async fetch(request, env, ctx) {
     try {
-      return withSecurityHeaders(await route(request, env, ctx));
+      const response = await route(request, env, ctx);
+      const { pathname } = new URL(request.url);
+      return pageLocale(pathname) || pathname === ADMIN_PAGE_PATH ? response : withSecurityHeaders(response);
     } catch (error) {
       console.error('Unhandled error', error);
       return withSecurityHeaders(errors.internal());

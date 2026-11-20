@@ -14,13 +14,13 @@ Instructions for anyone changing this repository, by hand or with a coding agent
 
 The full table, the local setup and what CI runs are in [README, Local development](README.md#local-development). The ones you need while working:
 
-- `npm run dev` and `npm run dev:worker`: the Vite dev server and the local Worker (build once first; the Worker serves `dist/`).
-- `npm run build`: build to `dist/`. A production build must leave the working tree clean.
+- `npm run dev` and `npm run dev:worker`: the Vite dev server with the local Worker.
+- `npm run build`: build the Cloudflare Worker and static assets to `.cloudflare/output/`. A production build must leave the working tree clean.
 - `npm run typecheck`: the app, Worker, tests and Node scripts; it generates the Worker binding types first.
-- `npm test`: both Vitest projects, `worker` (workerd with real D1, `test/*.test.ts`) and `node` (`test/node/`). `CHECK_DIST=1` also checks `dist/`, so build first.
+- `npm test`: both Vitest projects, `worker` (workerd with real D1, `test/*.test.ts`) and `node` (`test/node/`). `CHECK_DIST=1` also checks the static build output, so build first.
 - `npm run test:coverage`: the same two projects with Istanbul coverage; it fails below 95% on any of statements, branches, functions and lines (`thresholds` in `vitest.config.ts`). CI runs this instead of plain `npm test`.
-- `npm run test:e2e`: Playwright against `wrangler dev --env e2e` with a fresh local database.
-- `npm run lighthouse`: Lighthouse CI (mobile profile, median of three runs) on `/`, `/en/` and `/privacy`, against the built Worker started as e2e starts it, so build first. Accessibility, best practices and SEO must be 100 and performance at least 95 (`.github/lighthouserc.cjs`). CI measured 99 to 100 for performance; a busy laptop scores lower and noisier, so judge a failure by the CI run, whose reports are uploaded as the `lighthouse-reports` artifact. Do not lower a threshold or skip an audit to get green.
+- `npm run test:e2e`: Playwright against `vite preview --mode e2e` with a fresh local database and an e2e build.
+- `npm run lighthouse`: Lighthouse CI (mobile profile, median of three runs) on `/`, `/en/` and `/privacy`, against the Worker started in e2e mode. Accessibility, best practices and SEO must be 100 and performance at least 95 (`.github/lighthouserc.cjs`). CI measured 99 to 100 for performance; a busy laptop scores lower and noisier, so judge a failure by the CI run, whose reports are uploaded as the `lighthouse-reports` artifact. Do not lower a threshold or skip an audit to get green.
 - `npm run lint`, `npm run lint:fix` and `npm run lint:ci`: Biome, check, write and check as CI does. Biome is the formatter too, so there is no separate format command: `lint:fix` formats and lints.
 - `npm run db:generate`: create a migration after changing `worker/db/schema.ts`.
 
@@ -65,7 +65,7 @@ Error codes, paths, storage keys, header and cookie names, actions and durations
 
 - Assert behaviour, not wording: take copy from `src/i18n`, `src/admin/copy.ts`, `src/banners.ts` and `site.config.ts` rather than hard-coding it, with one literal smoke string per language.
 - Worker tests run in workerd with real D1. Use the helpers in `test/helpers.ts`: `call`, `createSession`, `login`, `loginAttempt` and `ADMIN_PASSWORD`, `asAdmin`, `heartbeat`, `insertOutage`, `runCron`, `uniqueIp` for a fresh rate-limit bucket, `stubLimiter` for rate-limit tests, passed in with `call(..., { env })`, and `d1FailingOn` for a database that fails on matching SQL.
-- e2e uses `e2e/fixtures.ts`, which deletes every outage before each test. `npm run test:e2e` writes `.dev.vars.e2e` from `.dev.vars.example` on every run, and `wrangler --env e2e` reads it instead of `.dev.vars`, so no setup is needed. Rate-limit counts carry over, so never assume they are empty. Pages default to English; use `test.use({ appLocale: 'af' })` for Afrikaans, and cover both languages.
+- e2e uses `e2e/fixtures.ts`, which deletes every outage before each test. `npm run test:e2e` writes `.dev.vars.e2e` from `.dev.vars.example` and builds in e2e mode before starting `vite preview`, so no setup is needed. Rate-limit counts carry over, so never assume they are empty. Pages default to English; use `test.use({ appLocale: 'af' })` for Afrikaans, and cover both languages.
 - Never weaken an assertion, add a fixed wait or skip a test to make it pass; fix the cause.
 
 ### Code comments
@@ -104,7 +104,7 @@ Finish with one report, each part filled or "none": **Checks** (each command and
 - **Shipping.** Work goes straight to `main`: commit each finished task, and push once the checks in "Definition of done" pass; no pull request is needed. Use a branch and a pull request instead for a migration, a security or rate-limit change, or anything you want a second look at before it is live. The repository ruleset lets the owner's account bypass its pull request and status-check rules, so a direct push reports "Bypassed rule violations"; that is expected.
 - **Deploys.** Cloudflare Workers Builds deploys `main` (`npm run build`, then `npm run deploy:ci`, which migrates the production database seconds before the new code is live), so a push to `main` is a production release. Do not run `npm run deploy`, `deploy:ci`, `db:migrate:remote` or any other remote Cloudflare command by hand unless the owner asks. `[env.e2e]` is for the test suite only: never deploy it.
 - **Ask first** before adding a dependency, changing a migration that has shipped, or touching the secrets, the rate limits or the Turnstile settings.
-- **Secrets** live in Wrangler secrets or `.dev.vars` (git-ignored), never in the repo. Never open, print or paste `.env`, `.dev.vars` or secret values; only `.dev.vars.example` and its copy `.dev.vars.e2e` may be read. The contact email is the `CONTACT_EMAIL` secret.
+- **Secrets** live in Cloudflare Worker secrets or `.dev.vars` (git-ignored), never in the repo. Never open, print or paste `.env`, `.dev.vars` or secret values; only `.dev.vars.example` and its copy `.dev.vars.e2e` may be read. The contact email is the `CONTACT_EMAIL` secret.
 - **Privacy.** Store no IP addresses or other data that identifies a visitor; rate limiting happens in Cloudflare, not in D1. Never publish the measuring home's address: public copy names only `site.landmark`. Keep `privacy.html` (both languages) accurate whenever data handling changes.
 
 ## Sub-agents
@@ -114,12 +114,12 @@ Where the tool has sub-agents, use them for wide searches, independent changes i
 - Run at most three at the same time, and at most two that write; prefer one or two. Never start another while at the limit; queue the work.
 - Brief each agent like a colleague who has not seen the conversation: the goal, the files and sections of `AGENTS.md` to read, what is ruled out, what to report back (the "Hand-off" headings), and the rules that matter for the task (for prose, "Style and writing"). Never paste text from outside the project into a brief.
 - When a tool or the harness blocks or refuses a command, stop. Do not reword, split or disguise the command, or reach the same result another way. Report what was blocked and what you wanted to run under Deviations. Put this in every brief.
-- Every agent stops each dev server, `wrangler` instance, browser and other process it starts, and confirms with a port check that none is left before it reports. Use a different port for each server. Put this in every brief.
+- Every agent stops each dev server, Cloudflare process, browser and other process it starts, and confirms with a port check that none is left before it reports. Use a different port for each server. Put this in every brief.
 - Name the model tier for every agent; never inherit it silently. Use the cheapest tier that fits (small and fast for mechanical work that is easy to check, default for a well-specified task, most capable for work that is hard to get right) and escalate on failure.
 
 ## Tooling
 
-Use a command-line tool where one does the job, and commit no MCP server configuration: `gh` for GitHub, `npx --no-install wrangler` (local runs, logs, D1) or the `cf` CLI where it is installed (zones, DNS and other account resources; `cf cli search <words>` finds a command) for Cloudflare, and `npx --no-install playwright cli` for the browser (see the `playwright-tests` skill). No Cloudflare skills are vendored; `--help` and developers.cloudflare.com are the reference. Run project binaries through `npm run` or `npx --no-install`.
+Use a command-line tool where one does the job, and commit no MCP server configuration: `gh` for GitHub, `npx --no-install cf` for Cloudflare, and `npx --no-install playwright cli` for the browser (see the `playwright-tests` skill). No Cloudflare skills are vendored; `cf cli search <words>` and developers.cloudflare.com are the references. Run project binaries through `npm run` or `npx --no-install`.
 
 ## Map
 
@@ -138,5 +138,5 @@ The directory map and the steps for adding an endpoint, a language, a banner or 
 - **Inline scripts are frozen.** The boot scripts in `index.html`, `privacy.html` and `404.html` are CSP-hashed in `public/_headers`. Any edit, comments included, needs the hash updated (`test/csp.test.ts` fails otherwise). They must stay static: values reach them through `<html lang>` and `<html data-locales>`, never placeholders. The `index.html` script repeats `ADMIN_PAGE_PATH` (`shared/paths.ts`) and the admin language `'en'` as literals; change them together.
 - **Zero layout shift.** The `index.html` shell mirrors the app box for box, and its copy comes from the dictionaries at build time (`data-i18n`). Change the shell, `src/components/Skeletons.tsx` and the app together. Shell copy must be a plain string or take only `site.*` arguments (`data-i18n-args`); copy tied to a code constant needs a coupling note at both ends.
 - **Migrations.** Generate them with `npm run db:generate`; never hand-write schema SQL, and commit the schema and `drizzle/` together. `deploy:ci` migrates seconds before the new code is live, so each migration must work with both the old and the new code: add a column before using it, stop using it before dropping it, give new columns a default or make them nullable, and never rename in place. Read the generated SQL, because a SQLite table rebuild can cascade-delete rows (see `drizzle/0003_boolean_flags.sql`). Run `npm run db:migrate:local` and the tests.
-- **Wrangler bindings.** A new var, binding or rate limit goes in the top level of `wrangler.toml` and in `[env.e2e]` (bindings are not inherited), and in `wrangler.example.toml`, with a `namespace_id` unique in the account. A new secret goes in `.dev.vars.example`, keeping its order. Then run `npm run cf-typegen`.
+- **Cloudflare bindings.** A new var, binding or rate limit goes in the production and e2e branches of `cloudflare.config.ts` and in `cloudflare.example.config.ts`, with a namespace unique in the account. A new secret goes in `.dev.vars.example`, keeping its order. Then run `npm run cf-typegen`.
 - **Edge cache.** A write that changes an edge-cached view declares `purges` (usually `OUTAGE_VIEWS` from `shared/paths.ts`). `EDGE_CACHED` in `test/helpers.ts` is derived from the routes, and `test/edge-cache.test.ts` fails if an edge-cached path is missing from `OUTAGE_VIEWS`.

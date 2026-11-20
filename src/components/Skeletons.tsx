@@ -19,6 +19,7 @@ export const StatusSkeleton: Component = () => (
     <Scope />
     <div class="gg-status-detail" aria-hidden="true">
       <span class="gg-skel gg-skel-text gg-w-80" />
+      <span class="gg-skel gg-skel-text gg-w-30" />
     </div>
     <SafetyLine />
   </>
@@ -52,6 +53,13 @@ export const TrendsCardSkeleton: Component = () => (
 /** The outage list while loading; the card frame and its .gg-history-body are in App.tsx and index.html. */
 export const HistorySkeleton: Component = () => (
   <div class="gg-skel-list" aria-hidden="true">
-    <For each={[1, 2, 3, 4, 5]}>{() => <span class="gg-skel gg-skel-item" />}</For>
+    <For each={[1, 2, 3, 4, 5]}>
+      {() => (
+        <div class="gg-skel-group">
+          <span class="gg-skel gg-skel-day" />
+          <span class="gg-skel gg-skel-item" />
+        </div>
+      )}
+    </For>
   </div>
 );

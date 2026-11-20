@@ -3,7 +3,7 @@ import { STATUS_PATH } from './shared/paths';
 
 const PORT = Number(process.env.E2E_PORT ?? 8788);
 // A throwaway local D1 so every run starts empty.
-const STATE = '.wrangler/e2e-state';
+const STATE = '.cloudflare/state';
 
 export default defineConfig({
   testDir: './e2e',
@@ -23,13 +23,12 @@ export default defineConfig({
   webServer: {
     command: [
       `node -e "require('node:fs').rmSync('${STATE}',{recursive:true,force:true})"`,
-      // --env e2e reads .dev.vars.e2e instead of .dev.vars, so the server runs on the example values
+      // Mode e2e reads .dev.vars.e2e instead of .dev.vars, so the server runs on the example values
       // the tests also read (e2e/dev-vars.ts), never a developer's own secrets.
       `node -e "require('node:fs').copyFileSync('.dev.vars.example','.dev.vars.e2e')"`,
-      'npm run build',
-      `npx wrangler d1 migrations apply DB --local --env e2e --persist-to ${STATE}`,
-      // --env e2e: rate limits for a test suite rather than for readers (wrangler.toml).
-      `npx wrangler dev --env e2e --port ${PORT} --persist-to ${STATE}`,
+      'npm run build -- --mode e2e',
+      `npx --no-install cf d1 migrations apply 11111111-1111-4111-8111-111111111111 --local --mode e2e --dir drizzle --persist-to ${STATE}`,
+      `npx --no-install vite preview --mode e2e --port ${PORT}`,
     ].join(' && '),
     url: `http://localhost:${PORT}${STATUS_PATH}`,
     timeout: 180_000,

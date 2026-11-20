@@ -16,10 +16,10 @@
   },
   "packageManager": "npm@11.19.1",
   "scripts": {
-    "dev": "vite",
-    "dev:worker": "wrangler dev",
+    "dev": "cf dev",
+    "dev:worker": "cf dev",
     "build": "vite build",
-    "preview": "npm run build && wrangler dev",
+    "preview": "vite preview",
     "pretypecheck": "npm run cf-typegen",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json && tsc -p tsconfig.node.json",
     "lint": "biome check --error-on-warnings .",
@@ -33,16 +33,16 @@
     "test:api": "cd bruno && bru run --env local --disable-cookies",
     "test:api:prod": "cd bruno && bru run public --env production",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "cf-typegen": "wrangler types worker/worker-configuration.d.ts --env-file=.dev.vars.example",
+    "db:migrate:local": "cf d1 migrations apply 6374fa3a-827f-42f4-910f-8ff9415a1259 --local --dir drizzle",
+    "db:migrate:remote": "cf d1 migrations apply 6374fa3a-827f-42f4-910f-8ff9415a1259 --dir drizzle",
+    "cf-typegen": "cf workers types",
     "hash-password": "node scripts/hash-password.ts",
     "vapid-keys": "node scripts/vapid-keys.ts",
     "og": "node scripts/build-og.ts",
     "deploy": "npm run build && npm run deploy:ci",
     "prepare": "lefthook install --force",
     "icons": "node scripts/build-icons.ts",
-    "deploy:ci": "npm run db:migrate:remote && wrangler deploy"
+    "deploy:ci": "npm run db:migrate:remote && cf deploy"
   },
   "dependencies": {
     "@fontsource-variable/public-sans": "^5.3.0",
@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.7",
+    "@cloudflare/vite-plugin": "2.0.0-rc.2",
     "@cloudflare/vitest-plugin": "^1.8.1",
     "@lhci/cli": "0.16.1",
     "@playwright/test": "^1.65.0",
@@ -62,13 +63,13 @@
     "@vanilla-extract/css": "^1.21.3",
     "@vanilla-extract/vite-plugin": "^5.2.6",
     "@vitest/coverage-istanbul": "^5.1.0",
+    "cf": "1.0.0-rc.2",
     "drizzle-kit": "^0.31.11",
     "lefthook": "^2.2.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vite-plugin-solid": "^2.11.16",
-    "vitest": "^5.0.4",
-    "wrangler": "^4.156.0"
+    "vitest": "^5.0.4"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {

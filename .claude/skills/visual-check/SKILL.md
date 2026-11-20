@@ -13,7 +13,7 @@ The model that does this check must be able to read images. Claude models can; f
 
 1. Install the browser once if it is missing: `npx --no-install playwright install chromium`.
 2. Pick a port nobody uses (say 5190) and check that nothing listens on it: `Get-NetTCPConnection -LocalPort 5190 -State Listen` in PowerShell (an error means none), `lsof -nP -iTCP:5190 -sTCP:LISTEN` elsewhere. Another agent may have a server running, so never reuse a taken port.
-3. Build once (`npm run build`), then run `npx --no-install wrangler dev --port 5190` in the background (the Worker serves `dist/`). Wait for its ready line, run the listener check again and write down the PID: the port was free, so that process is yours. Load the home page once and let it finish.
+3. Build once (`npm run build`), then run `npx --no-install cf dev -- --port 5190` in the background. Wait for its ready line, run the listener check again and write down the PID: the port was free, so that process is yours. Load the home page once and let it finish.
 
 ## 2. Take the screenshots
 

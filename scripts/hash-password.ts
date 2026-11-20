@@ -1,8 +1,8 @@
 // Prints an ADMIN_PASSWORD_HASH value for the given password.
 // Usage: npm run hash-password            (prompts, input hidden)
 //        echo -n "secret" | npm run hash-password
-// Pipe straight into Wrangler (prompt goes to stderr, so only the hash reaches the pipe):
-//        npm run --silent hash-password | npx wrangler secret put ADMIN_PASSWORD_HASH
+// Pipe straight into cf (prompt goes to stderr, so only the hash reaches the pipe):
+//        npm run --silent hash-password | npx --no-install cf workers secrets update ADMIN_PASSWORD_HASH
 import { createInterface } from 'node:readline';
 import { hashPassword } from '../worker/lib/crypto.ts';
 

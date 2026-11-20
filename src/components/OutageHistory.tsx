@@ -1,7 +1,7 @@
 import { batch, type Component, createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
-import { type OutageSummary, outageDurationMs, RECENT_LIMIT } from '../../shared/api';
+import { localDate, type OutageSummary, outageDurationMs, RECENT_LIMIT } from '../../shared/api';
 import { api } from '../lib/api';
-import { formatDay, formatDuration, formatEnd, formatTime } from '../lib/format';
+import { formatDuration, formatEnd, formatRelativeDay, formatTime } from '../lib/format';
 import { t } from '../lib/i18n';
 import { pageOf } from '../lib/pages';
 import * as motion from '../styles/motion.css';
@@ -17,44 +17,59 @@ const OutageList: Component<{ outages: OutageSummary[]; now: number; markArrival
     listed = new Set(ids);
     return new Set(before && props.markArrivals ? ids.filter((id) => !before.has(id)) : []);
   });
+  const groups = createMemo(() => {
+    const result: { key: string; day: string; outages: OutageSummary[] }[] = [];
+    for (const outage of props.outages) {
+      const key = localDate(Date.parse(outage.startTime));
+      const group = result.at(-1);
+      if (group?.key === key) group.outages.push(outage);
+      else result.push({ key, day: formatRelativeDay(outage.startTime, props.now), outages: [outage] });
+    }
+    return result;
+  });
   return (
     <Show when={props.outages.length > 0} fallback={<p class={`${css.empty} ${motion.enter}`}>{t().history.empty}</p>}>
-      <ul class={`${plainList} ${motion.enter}`}>
-        <For each={props.outages}>
-          {(outage) => (
-            <li class={css.row} classList={{ [motion.enter]: arrived().has(outage.id) }}>
-              <div>
-                <div class={css.primary}>{formatDay(outage.startTime)}</div>
-                <div class={css.secondary}>
-                  {t().history.range(
-                    formatTime(outage.startTime),
-                    outage.endTime ? formatEnd(outage.startTime, outage.endTime) : t().history.now,
+      <div class={motion.enter}>
+        <For each={groups()}>
+          {(group) => (
+            <section class={css.day}>
+              <h3 class={css.dayHeading}>{group.day}</h3>
+              <ul class={plainList}>
+                <For each={group.outages}>
+                  {(outage) => (
+                    <li class={css.row} classList={{ [motion.enter]: arrived().has(outage.id) }}>
+                      <div class={css.primary}>
+                        {t().history.range(
+                          formatTime(outage.startTime),
+                          outage.endTime ? formatEnd(outage.startTime, outage.endTime) : t().history.now,
+                        )}
+                      </div>
+                      <div class={css.end}>
+                        <div
+                          class={css.duration}
+                          classList={{
+                            [css.ongoing]: !outage.endTime && !outage.planned,
+                            [css.ongoingPlanned]: !outage.endTime && outage.planned,
+                          }}
+                        >
+                          {formatDuration(outageDurationMs(outage, outage.endTime ? 0 : props.now))}
+                        </div>
+                        <div class={css.secondary}>
+                          {outage.endTime ? '' : t().history.ongoing}
+                          {!outage.endTime && outage.planned ? ' · ' : ''}
+                          <Show when={outage.planned} fallback={outage.endTime ? ' ' : ''}>
+                            <span class={css.plannedTag}>{t().history.planned}</span>
+                          </Show>
+                        </div>
+                      </div>
+                    </li>
                   )}
-                </div>
-              </div>
-              <div class={css.end}>
-                <div
-                  class={css.duration}
-                  classList={{
-                    [css.ongoing]: !outage.endTime && !outage.planned,
-                    [css.ongoingPlanned]: !outage.endTime && outage.planned,
-                  }}
-                >
-                  {/* Only an open outage reads the clock, so closed rows do not re-render every tick. */}
-                  {formatDuration(outageDurationMs(outage, outage.endTime ? 0 : props.now))}
-                </div>
-                <div class={css.secondary}>
-                  {outage.endTime ? '' : t().history.ongoing}
-                  {!outage.endTime && outage.planned ? ' · ' : ''}
-                  <Show when={outage.planned} fallback={outage.endTime ? ' ' : ''}>
-                    <span class={css.plannedTag}>{t().history.planned}</span>
-                  </Show>
-                </div>
-              </div>
-            </li>
+                </For>
+              </ul>
+            </section>
           )}
         </For>
-      </ul>
+      </div>
     </Show>
   );
 };
